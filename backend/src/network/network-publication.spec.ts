@@ -8,10 +8,10 @@ describe('Talep publication debit and receipt', () => {
   let service: NetworkService, db: any, state: any, adapter: PropertyDemandAdapter;
   const dto: any = { type:'PORTFOY_ARIYORUM',title:'Denizli daire talebi',description:'Merkezefendi ilçesinde satılık daire arıyorum.',propertyTypes:['DAIRE'],roomCounts:['3+1'],city:'Denizli',maxBudget:8000000,priceCurrency:'TRY' };
   beforeEach(() => {
-    state={balance:100,totalSpent:0,active:true,posts:[],movements:[],role:Role.EMLAKCI,committed:false};
+    state={validityDays:30,balance:100,totalSpent:0,active:true,posts:[],movements:[],role:Role.EMLAKCI,committed:false};
     db={
       $executeRaw:jest.fn().mockResolvedValue(1), $queryRaw:jest.fn().mockResolvedValue([]),
-      user:{findUnique:jest.fn(async()=>({id:'actor',role:state.role,officeId:null}))}, kullaniciUyelikPaketi:{findFirst:jest.fn().mockResolvedValue(null)}, office:{findFirst:jest.fn().mockResolvedValue(null)}, systemSetting:{findUnique:jest.fn().mockResolvedValue(null)},
+      user:{findUnique:jest.fn(async()=>({id:'actor',role:state.role,officeId:null}))}, kullaniciUyelikPaketi:{findFirst:jest.fn().mockResolvedValue(null)}, office:{findFirst:jest.fn().mockResolvedValue(null)}, systemSetting:{findUnique:jest.fn(async({where})=>where.key==='TALEP_GECERLILIK_GUN'?{valueJson:state.validityDays}:null)},
       networkPost:{create:jest.fn(async ({data})=>{const post={...data,createdAt:new Date('2026-10-14T12:45:00Z'),User:{id:'actor',role:state.role,capabilities:[]}};state.posts.push(post);return post;})},
       kontorCuzdani:{findUnique:jest.fn(async()=>({kullaniciId:'actor',bakiye:state.balance,aktifMi:state.active})),create:jest.fn(async()=>({kullaniciId:'actor',bakiye:0,aktifMi:true})),update:jest.fn(async({data})=>{state.balance-=data.bakiye.decrement;state.totalSpent+=data.toplamHarcama.increment;return {bakiye:state.balance,kullaniciId:'actor'};})},
       kontorHareketi:{create:jest.fn(async({data})=>{const movement={id:'movement-'+(state.movements.length+1),...data};state.movements.push(movement);return movement;})},
@@ -50,6 +50,14 @@ describe('Talep publication debit and receipt', () => {
   });
   it('validation failure does not start a transaction',async()=>{
     (service as any).validateForumPostInput.mockRejectedValue(new BadRequestException('invalid input'));await expect(service.create(dto,'actor')).rejects.toThrow('invalid input');expect(db.$transaction).not.toHaveBeenCalled();expect(state.balance).toBe(100);
+  });
+  it('takes the default validity from TALEP_GECERLILIK_GUN, not from code',async()=>{
+    state.validityDays=14;const before=Date.now();await service.create(dto,'actor');
+    const days=(state.posts[0].expiresAt.getTime()-before)/86400000;expect(days).toBeGreaterThan(13.99);expect(days).toBeLessThan(14.01);
+  });
+  it('refuses to publish when the validity setting is missing',async()=>{
+    db.systemSetting.findUnique.mockResolvedValue(null);
+    await expect(service.create(dto,'actor')).rejects.toThrow('Talep geçerlilik süresi tanımlı değil');expect(state.posts).toHaveLength(0);expect(state.movements).toHaveLength(0);
   });
   it('matching outage after commit preserves receipt and one debit',async()=>{
     service.registerRequestMatchHandler(async()=>{throw new Error('matching unavailable');});const result=await service.create(dto,'actor');expect(result.publicationReceipt.spent).toBe(25);expect(state.posts).toHaveLength(1);expect(state.movements).toHaveLength(1);expect(state.balance).toBe(75);

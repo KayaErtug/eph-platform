@@ -24,7 +24,7 @@ import {
   parseListingNumberOrId,
 } from '../common/listing-number';
 import { PrismaService } from "../prisma/prisma.service";
-import { readCost } from "../pricing/commercial-costs";
+import { parseCostValue, readCost } from "../pricing/commercial-costs";
 import { AdminService } from "../admin/admin.service";
 import { PropertyCriteriaService } from "../property-criteria/property-criteria.service";
 import { PropertyDemandAdapter } from "../property-demand/property-demand.adapter";
@@ -434,7 +434,7 @@ export class NetworkService {
       select: { role: true },
     });
 
-    const blockScope: Prisma.NetworkPostWhereInput = { User: visibleAuthor(viewerId) };
+    const blockScope: Prisma.NetworkPostWhereInput = { User: visibleAuthor(viewerId, viewer?.role) };
     if (viewer?.role === Role.SUPER_ADMIN) return blockScope;
 
     if (viewer?.role === Role.EMLAKCI) {
@@ -2273,6 +2273,9 @@ export class NetworkService {
     const primaryArea = criteria.areas[0] ?? null;
     const contactSettings = this.normalizeContactSettings(dto);
 
+    // Varsayılan talep geçerlilik süresi §0-B gereği SystemSetting'ten okunur (TALEP_GECERLILIK_GUN).
+    const defaultValidityDays = dto.expiresAt ? 0 : await this.getRequestValidityDays();
+
     const MAX_COLLISION_RETRIES = 5;
     let result: any;
     for (let attempt = 0; attempt < MAX_COLLISION_RETRIES; attempt++) {
@@ -2320,7 +2323,7 @@ export class NetworkService {
               ),
               expiresAt: dto.expiresAt
                 ? new Date(dto.expiresAt)
-                : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+                : new Date(Date.now() + defaultValidityDays * 24 * 60 * 60 * 1000),
               isActive: true,
               updatedAt: new Date(),
             },
@@ -2398,6 +2401,15 @@ export class NetworkService {
     }
     await this.refreshRequestMatches(result);
     return result;
+  }
+
+  async getRequestValidityDays(): Promise<number> {
+    const row = await this.prisma.systemSetting.findUnique({ where: { key: "TALEP_GECERLILIK_GUN" }, select: { valueJson: true } });
+    const days = row ? parseCostValue(row.valueJson) : null;
+    if (days === null || days < 1) {
+      throw new BadRequestException("Talep geçerlilik süresi tanımlı değil, yöneticinize başvurun.");
+    }
+    return days;
   }
 
   private getForumActionUserId(user?: CurrentUserPayload): string {

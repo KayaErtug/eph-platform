@@ -171,13 +171,16 @@ export class LinaService {
       const rawAnswer = providerAnswer.content;
 
       // Serbest LLM cevabı hiçbir yazma sonucu taşımaz; "kaydettim/not ettim" iddiası düzeltilir.
-      const outputFilter = this.linaKvkkService.filterText(
-        portfolioFlowActive ? rawAnswer : guardWriteClaims(rawAnswer),
-      );
+      const answerText = portfolioFlowActive ? rawAnswer : guardWriteClaims(rawAnswer);
+      const outputFilter = this.linaKvkkService.filterText(answerText, {
+        role: user?.role,
+      });
+      // Geçmişe (ve sonradan OpenAI'a giden bağlama) yalnız maskeli metin yazılır.
+      const storedText = this.linaKvkkService.filterText(answerText).safeText;
       const kvkkFiltered = outputFilter.filtered || inputFilter.filtered;
 
       await this.rememberPortfolioAssistantMessage(
-        outputFilter.safeText,
+        storedText,
         portfolioFlowActive,
         user,
       );
@@ -187,7 +190,7 @@ export class LinaService {
         user,
         sourceModule,
         userMessage: safeUserMessage,
-        assistantMessage: outputFilter.safeText,
+        assistantMessage: storedText,
         inputTokenCount: providerAnswer.inputTokens,
         outputTokenCount: providerAnswer.outputTokens,
       });
@@ -218,12 +221,16 @@ export class LinaService {
       if (deterministicPortfolioReply) {
         const outputFilter = this.linaKvkkService.filterText(
           deterministicPortfolioReply,
+          { role: user?.role },
         );
+        const storedText = this.linaKvkkService.filterText(
+          deterministicPortfolioReply,
+        ).safeText;
         const kvkkFiltered =
           outputFilter.filtered || inputFilter.filtered;
 
         await this.rememberPortfolioAssistantMessage(
-          outputFilter.safeText,
+          storedText,
           portfolioFlowActive,
           user,
         );
@@ -233,7 +240,7 @@ export class LinaService {
           user,
           sourceModule,
           userMessage: safeUserMessage,
-          assistantMessage: outputFilter.safeText,
+          assistantMessage: storedText,
           inputTokenCount: 0,
           outputTokenCount: 0,
         });
@@ -417,6 +424,11 @@ export class LinaService {
 
     try {
       const audio = await this.askOpenAiSpeech(filtered.safeText);
+      // Ses sağlayıcısına maskeli metin gider; yalnız kullanıcıya dönen metinde SUPER_ADMIN için maskeleme yok.
+      const displayText = this.linaKvkkService.filterText(text, {
+        strictVoiceMode: true,
+        role: user?.role,
+      }).safeText;
 
       this.linaAuditService.log({
         userId: user?.id,
@@ -431,7 +443,7 @@ export class LinaService {
 
       return {
         success: true,
-        message: filtered.safeText,
+        message: displayText,
         provider: "openai",
         audioBase64: audio.toString("base64"),
         mimeType: "audio/mpeg",

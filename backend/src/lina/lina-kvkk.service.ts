@@ -8,7 +8,12 @@ export type LinaKvkkFilterResult = {
 
 @Injectable()
 export class LinaKvkkService {
-  filterText(text: string, options?: { strictVoiceMode?: boolean }): LinaKvkkFilterResult {
+  // role=SUPER_ADMIN (§0): yalnız kullanıcıya gösterilen cevapta maskeleme yapılmaz.
+  // OpenAI'a giden metinlerde rol verilmez; maskeleme politikası değişmez.
+  filterText(text: string, options?: { strictVoiceMode?: boolean; role?: string | null }): LinaKvkkFilterResult {
+    if (options?.role === 'SUPER_ADMIN') {
+      return { safeText: String(text || ''), filtered: false, detectedTypes: [] };
+    }
     let safeText = String(text || '');
     const detectedTypes = new Set<string>();
 

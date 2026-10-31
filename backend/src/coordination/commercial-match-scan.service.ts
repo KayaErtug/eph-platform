@@ -3,6 +3,7 @@ import { assertNoBlockedInteraction } from '../content-safety/block-policy';
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { KontorIslemTuru, MatchScanAttemptStatus, MatchScanSourceType, Prisma, Role } from '@prisma/client';
 import { createHash } from 'node:crypto';
+import { parseCostValue } from '../pricing/commercial-costs';
 import { AdminService } from '../admin/admin.service';
 import { KontorService } from '../kontor/kontor.service';
 import { EphMatchDemand, EphMatchEngineService } from '../matching/eph-match-engine.service';
@@ -42,28 +43,30 @@ export class CommercialMatchScanService {
       eligible: wallet.active && wallet.balance >= costPk, walletOfficeId: wallet.walletOfficeId };
   }
 
-    private async ensureScanAuthorized(userId: string) {
-    const user = await this.prisma.user.findUnique({
+  // Ofis scanPermissions yasağı; yalnız ofise bağlı EMLAKCI etkilenir, SUPER_ADMIN (§0) ve ofis sahibi muaftır.
+  private async scanDenial(userId: string, db: PrismaService | Prisma.TransactionClient = this.prisma): Promise<string | null> {
+    const user = await db.user.findUnique({
       where: { id: userId },
       select: { role: true, officeId: true },
     });
-    if (user?.role === Role.EMLAKCI && user.officeId) {
-      const office = await this.prisma.office.findUnique({
-        where: { id: user.officeId },
-        select: { ownerUserId: true },
-      });
-      if (office?.ownerUserId !== userId) {
-        const policy = await this.prisma.systemSetting.findUnique({
-          where: { key: `EPH_OFFICE_SPENDING_${user.officeId}` },
-        });
-        const permissions = (policy?.valueJson as any)?.scanPermissions;
-        if (permissions && permissions[userId] === false) {
-          throw new ForbiddenException(
-            'Eşleştirme taraması yapma yetkiniz bulunmamaktadır. Lütfen ofis yöneticinizle iletişime geçin.',
-          );
-        }
-      }
-    }
+    if (user?.role !== Role.EMLAKCI || !user.officeId) return null;
+    const office = await db.office.findUnique({
+      where: { id: user.officeId },
+      select: { ownerUserId: true },
+    });
+    if (office?.ownerUserId === userId) return null;
+    const policy = await db.systemSetting.findUnique({
+      where: { key: `EPH_OFFICE_SPENDING_${user.officeId}` },
+    });
+    const permissions = (policy?.valueJson as any)?.scanPermissions;
+    return permissions && permissions[userId] === false
+      ? 'Eşleştirme taraması yapma yetkiniz bulunmamaktadır. Lütfen ofis yöneticinizle iletişime geçin.'
+      : null;
+  }
+
+  private async ensureScanAuthorized(userId: string, db: PrismaService | Prisma.TransactionClient = this.prisma) {
+    const denial = await this.scanDenial(userId, db);
+    if (denial) throw new ForbiddenException(denial);
   }
 
   async quote(typeValue: string, sourceIdValue: string, rawUser: ScanUser, selection: WalletSelection = {}) {
@@ -73,9 +76,11 @@ export class CommercialMatchScanService {
     const context = await this.context(type, sourceId, user);
     const wallet = await this.resolveWallet(user.id, selection);
     const costPk = await this.cost(type);
+    const denial = await this.scanDenial(user.id);
     return { actorId: user.id, costPk, balance: wallet.balance,
-      eligible: wallet.active && wallet.balance >= costPk, source: wallet.source,
-      walletOfficeId: wallet.walletOfficeId, remainingBudget: null, sourceVersion: context.sourceVersion };
+      eligible: !denial && wallet.active && wallet.balance >= costPk, source: wallet.source,
+      walletOfficeId: wallet.walletOfficeId, remainingBudget: null, sourceVersion: context.sourceVersion,
+      ...(denial ? { reason: 'SCAN_NOT_PERMITTED', message: denial } : {}) };
   }
 
   async scan(typeValue: string, sourceIdValue: string, rawUser: ScanUser, body: Record<string, unknown>) {
@@ -89,6 +94,7 @@ export class CommercialMatchScanService {
     const selection = this.selection(body);
     const existing = await this.prisma.matchScanAttempt.findUnique({ where: { requestId } });
     if (existing) return this.replay(existing, type, sourceId, user, selection);
+    await this.ensureScanAuthorized(user.id);
     context = await this.context(type, sourceId, user);
     const wallet = await this.resolveWallet(user.id, selection);
     const costPk = await this.cost(type);
@@ -122,6 +128,7 @@ export class CommercialMatchScanService {
         const locked = await tx.matchScanAttempt.findUnique({ where: { requestId } });
         if (locked?.status !== MatchScanAttemptStatus.PROCESSING) this.reject('MATCH_SCAN_REVIEW_REQUIRED', 'İşlem durumu değişti. Aynı işlem kimliğiyle kontrol edin.');
         await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${user.id} FOR SHARE`;
+        await this.ensureScanAuthorized(user.id, tx);
         if (wallet.walletOfficeId) await tx.$queryRaw`SELECT "id" FROM "Office" WHERE "id" = ${wallet.walletOfficeId} FOR SHARE`;
         const actorNow = await tx.user.findUnique({ where: { id: user.id }, select: { role: true } });
         if (!actorNow || actorNow.role !== user.role) throw new ForbiddenException('Oturum yetkisi değişti.');
@@ -139,7 +146,9 @@ export class CommercialMatchScanService {
         if (lockedSource.sourceVersion !== context.sourceVersion || lockedWallet.chargeUserId !== wallet.chargeUserId || !lockedWallet.active) {
           this.reject('MATCH_SCAN_RECONFIRM', 'Kaynak veya PK hesabı değişti. Yeni onay gerekir.');
         }
-        const spend = await this.kontorService.harcamayiYap({
+        // Yönetim tarifeyi 0 tanımladıysa ücretsiz taramadır; PK hareketi oluşmaz.
+        const spend = costPk === 0 ? { movement: null as { id: string } | null, alreadyProcessed: false, spent: 0,
+          previousBalance: lockedWallet.balance, remainingBalance: lockedWallet.balance } : await this.kontorService.harcamayiYap({
           userId: wallet.chargeUserId, actorId: user.id, walletSource: wallet.source, walletOfficeId: wallet.walletOfficeId || undefined, amount: costPk, islemTuru: KontorIslemTuru.ESLESME_TARAMASI,
           aciklama: `Eşleşme taraması (${type}): ${sourceId}`, ilgiliKayitTuru: `MATCH_SCAN:${SOURCE_TYPES[type]}:${sourceId}`,
           ilgiliKayitId: requestId, idempotencyKey: requestId, transaction: tx,
@@ -147,7 +156,7 @@ export class CommercialMatchScanService {
         const scannedAt = new Date().toISOString();
         const matches = findings.matches.slice(0, MAX_RESULTS);
         const result = {
-          ok: true, policyVersion: 'EPH_PAID_MATCH_V1', operationId: spend.movement.id, requestId, sourceId, sourceType: type,
+          ok: true, policyVersion: 'EPH_PAID_MATCH_V1', operationId: spend.movement?.id ?? null, requestId, sourceId, sourceType: type,
           ...(type === 'REQUEST' ? { postId: sourceId } : {}), scannedAt, sourceVersion: context.sourceVersion,
           replayed: false, duplicateRequest: false, spent: spend.alreadyProcessed ? 0 : spend.spent, remainingBalance: spend.remainingBalance,
           billing: { cost: costPk, charged: !spend.alreadyProcessed, alreadyProcessed: Boolean(spend.alreadyProcessed),
@@ -162,7 +171,7 @@ export class CommercialMatchScanService {
             hiddenPortfolio: { recalculatedAt: scannedAt, wasStale: false, warning: 'Özel portföyler yalnızca kendi hesabınıza aitse gösterilir.' } } : {}),
         };
         await tx.matchScanAttempt.update({ where: { id: attempt.id }, data: {
-          status: MatchScanAttemptStatus.COMPLETED, movementId: spend.movement.id,
+          status: MatchScanAttemptStatus.COMPLETED, movementId: spend.movement?.id ?? null,
           resultJson: JSON.parse(JSON.stringify(result)) as Prisma.InputJsonValue, completedAt: new Date(), failedAt: null, errorMessage: null,
         } });
         return result;
@@ -300,7 +309,7 @@ export class CommercialMatchScanService {
     }
     const units = await this.prisma.unit.findMany({ where: { ...ACTIVE_MATCH_UNIT,
       AND: [visiblePaidUnits(user), { OR: context.demands.map(demand => this.candidateWhere(demand)) }],
-      OR: [{ isPoolVisible: true }, { isPoolVisible: false, isSalesInventory: true, project: { ownerId: user.id } }],
+      ...(user.role === Role.SUPER_ADMIN ? {} : { OR: [{ isPoolVisible: true }, { isPoolVisible: false, isSalesInventory: true, project: { ownerId: user.id } }] }),
       type: { in: [...new Set(context.demands.flatMap(demand => demand.propertyTypes || []))] as any } },
       include: { project: true, images: { where: { isCover: true }, take: 1 } }, orderBy: { id: 'asc' }, take: MAX_CANDIDATES + 1 });
     this.checkLimit(units.length);
@@ -360,7 +369,7 @@ export class CommercialMatchScanService {
         this.reject('MATCH_SCAN_SOURCE_INVALID', 'Taramadan önce portföyün il ve geçerli fiyat bilgisini tamamlayın.');
       }
       if (type === 'PRIVATE_PORTFOLIO' && (record.isPoolVisible || (user.role !== Role.SUPER_ADMIN && record.project.ownerId !== user.id))) throw new ForbiddenException('Bu özel portföyü tarama yetkiniz yok.');
-      await assertNoBlockedInteraction(db, user.id, [record.project.ownerId]);
+      if (user.role !== Role.SUPER_ADMIN) await assertNoBlockedInteraction(db, user.id, [record.project.ownerId]);
       if (type === 'POOL_PROPERTY' && !record.isPoolVisible) throw new NotFoundException('Havuz ilanı bulunamadı.');
       if (type === 'POOL_PROPERTY' && user.role !== Role.SUPER_ADMIN && record.project.ownerId !== user.id) {
         const visible = await db.unit.findFirst({ where: { id: sourceId, AND: [visiblePaidUnits(user)] }, select: { id: true } });
@@ -397,11 +406,14 @@ export class CommercialMatchScanService {
   private checkLimit(count: number) {
     if (count > MAX_CANDIDATES) this.reject('MATCH_SCAN_SOURCE_INVALID', 'Tarama kapsamı çok geniş. Kriterleri daraltın; bu işlem için PK kesilmedi.');
   }
+  // Ücret yalnız SystemSetting'ten okunur (§0-B): tür anahtarı → COST_ESLESME_TARAMA → MATCH_SCAN_COST_PK. Hiçbiri yoksa güvenli hata; 0 = ücretsiz tarama.
   private async cost(type: CommercialScanType) {
-    const general = await this.adminService.getNumericSystemSetting('COST_ESLESME_TARAMA', await this.adminService.getNumericSystemSetting('MATCH_SCAN_COST_PK', 25));
-    const value = await this.adminService.getNumericSystemSetting(COST_KEYS[type], general);
-    if (!Number.isSafeInteger(value) || value <= 0) this.reject('MATCH_SCAN_TARIFF_INVALID', 'Pozitif PK tarama ücreti tanımlanmamış. Yönetimden tarifeyi kontrol edin.');
-    return value;
+    for (const key of [COST_KEYS[type], 'COST_ESLESME_TARAMA', 'MATCH_SCAN_COST_PK']) {
+      const row = await this.prisma.systemSetting.findUnique({ where: { key }, select: { valueJson: true } });
+      const value = row ? parseCostValue(row.valueJson) : null;
+      if (value !== null) return value;
+    }
+    this.reject('MATCH_SCAN_TARIFF_MISSING', 'Tarama ücreti tanımlı değil, yöneticinize başvurun.');
   }
   private async resolveWallet(userId: string, selection: WalletSelection, db: PrismaService | Prisma.TransactionClient = this.prisma) {
     const selected = await resolveOfficeWallet(db, userId, selection, db !== this.prisma);

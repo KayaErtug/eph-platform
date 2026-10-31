@@ -221,6 +221,7 @@ describe('Talep Merkezi 7-char short listing number acceptance suite', () => {
     (network as any).prisma = {
       $transaction: jest.fn(async (cb) => cb(tx)),
       user: db.user,
+      systemSetting: { findUnique: jest.fn().mockResolvedValue({ valueJson: 30 }) },
     };
     (network as any).validateForumPostInput = jest.fn().mockResolvedValue({
       category: 'PORTFOY_ARIYORUM',

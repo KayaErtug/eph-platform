@@ -3431,7 +3431,7 @@ export class AdminService {
 
     const settings = await this.prisma.systemSetting.findMany({
       where: {
-        OR: [{ key: { in: ["TRIAL_INITIAL_DAYS", "TRIAL_EXTENSION_DAYS", "TRIAL_MAX_EXTENSIONS", "POOL_PRIVATE_INFO_COST", "MATCH_SCAN_COST_PK", "MATCH_SCAN_COST_REQUEST_PK", "MATCH_SCAN_COST_PRIVATE_PORTFOLIO_PK", "MATCH_SCAN_COST_POOL_PROPERTY_PK", "MATCH_SCAN_COST_CRM_PK", "DOCUMENT_AI_ANALYSIS_ENABLED", ...NEW_USER_NOTIFY_KEYS] } }, { key: { startsWith: COST_PREFIX } }, { key: { startsWith: LIMIT_PREFIX } }, { key: { startsWith: "MARKET_" } }],
+        OR: [{ key: { in: ["TRIAL_INITIAL_DAYS", "TRIAL_EXTENSION_DAYS", "TRIAL_MAX_EXTENSIONS", "POOL_PRIVATE_INFO_COST", "TALEP_GECERLILIK_GUN", "MATCH_SCAN_COST_PK", "MATCH_SCAN_COST_REQUEST_PK", "MATCH_SCAN_COST_PRIVATE_PORTFOLIO_PK", "MATCH_SCAN_COST_POOL_PROPERTY_PK", "MATCH_SCAN_COST_CRM_PK", "DOCUMENT_AI_ANALYSIS_ENABLED", ...NEW_USER_NOTIFY_KEYS] } }, { key: { startsWith: COST_PREFIX } }, { key: { startsWith: LIMIT_PREFIX } }, { key: { startsWith: "MARKET_" } }],
       },
       orderBy: { key: "asc" },
     });
@@ -3522,7 +3522,7 @@ export class AdminService {
     if (Object.prototype.hasOwnProperty.call(LIMIT_LIST_DEFAULTS, key)) return this.updateLimitList(key, body, actor);
 
     const isCommercialCost = isManagedCommercialKey(key);
-    if (!isCommercialCost && !["TRIAL_INITIAL_DAYS", "TRIAL_EXTENSION_DAYS", "TRIAL_MAX_EXTENSIONS", "POOL_PRIVATE_INFO_COST", "MATCH_SCAN_COST_PK", "MATCH_SCAN_COST_REQUEST_PK", "MATCH_SCAN_COST_PRIVATE_PORTFOLIO_PK", "MATCH_SCAN_COST_POOL_PROPERTY_PK", "MATCH_SCAN_COST_CRM_PK", "DOCUMENT_AI_ANALYSIS_ENABLED", ...NEW_USER_NOTIFY_KEYS].includes(key)) {
+    if (!isCommercialCost && !["TRIAL_INITIAL_DAYS", "TRIAL_EXTENSION_DAYS", "TRIAL_MAX_EXTENSIONS", "POOL_PRIVATE_INFO_COST", "TALEP_GECERLILIK_GUN", "MATCH_SCAN_COST_PK", "MATCH_SCAN_COST_REQUEST_PK", "MATCH_SCAN_COST_PRIVATE_PORTFOLIO_PK", "MATCH_SCAN_COST_POOL_PROPERTY_PK", "MATCH_SCAN_COST_CRM_PK", "DOCUMENT_AI_ANALYSIS_ENABLED", ...NEW_USER_NOTIFY_KEYS].includes(key)) {
       throw new BadRequestException("Desteklenmeyen sistem ayarı.");
     }
 

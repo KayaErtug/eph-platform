@@ -48,6 +48,9 @@ function setup() {
       findUnique: jest.fn().mockResolvedValue(null),
       upsert: jest.fn(),
     },
+    office: { findMany: jest.fn().mockResolvedValue([]) },
+    officeSisterLink: { findMany: jest.fn().mockResolvedValue([]) },
+    sisterPrivateInfoRequest: { groupBy: jest.fn().mockResolvedValue([]) },
     $queryRaw: jest.fn(),
     $executeRaw: jest.fn(),
   };
@@ -212,18 +215,56 @@ describe('EPH-38 inbox and push delivery', () => {
         {
           type: 'OFFICE_JOIN_REQUEST',
           count: 3,
-          title: 'Onay bekleyen ofis başvuruları',
+          title: '3 danışman başvurusu onay bekliyor',
           actionUrl: '/office',
         },
         {
           type: 'NEW_MESSAGE',
           count: 2,
-          title: 'Yeni mesajlar',
+          title: '2 okunmamış mesaj',
           actionUrl: '/messages/c',
         },
       ],
     });
     for (const query of t.db.$queryRaw.mock.calls) expect(query[1]).toBe('u');
+  });
+  it('titles every pending action meaningfully and routes sister events with officeId', async () => {
+    const t = setup();
+    t.db.$queryRaw
+      .mockResolvedValueOnce([
+        { type: 'ROLE_CHANGED', actionUrl: '/profile', count: 1n },
+        { type: 'BILINMEYEN_TUR', actionUrl: '/x', count: 4n },
+      ])
+      .mockResolvedValueOnce([{ count: 2n }]);
+    t.db.office.findMany.mockResolvedValue([{ id: 'o1' }, { id: 'o2' }]);
+    t.db.officeSisterLink.findMany.mockResolvedValue([
+      { officeAId: 'o1', officeBId: 'x', invitedByOfficeId: 'x' },
+      { officeAId: 'o2', officeBId: 'o1', invitedByOfficeId: 'o2' },
+    ]);
+    t.db.sisterPrivateInfoRequest.groupBy.mockResolvedValue([
+      { ownerOfficeId: 'o2', _count: { _all: 3 } },
+    ]);
+    const { pendingActions } = await t.service.summary('u');
+    expect(pendingActions).toEqual(
+      expect.arrayContaining([
+        {
+          type: 'SISTER_INVITE',
+          count: 2,
+          title: '2 kardeş ofis daveti bekliyor',
+          actionUrl: '/office-sisters?officeId=o1',
+        },
+        {
+          type: 'SISTER_PRIVATE_REQUEST',
+          count: 3,
+          title: '3 özel bilgi isteği bekliyor',
+          actionUrl: '/office-sister-requests?officeId=o2',
+        },
+        expect.objectContaining({ type: 'OFFICE_JOIN_REQUEST', title: '2 danışman başvurusu onay bekliyor' }),
+        expect.objectContaining({ type: 'ROLE_CHANGED', title: '1 rol / yetki değişikliği' }),
+        expect.objectContaining({ type: 'BILINMEYEN_TUR', title: '4 okunmamış bildirim' }),
+      ]),
+    );
+    expect(pendingActions.some((a) => a.title === 'Bildirimler')).toBe(false);
   });
   it('merges settings under a lock and rejects unknown and inherited keys', async () => {
     const t = setup();

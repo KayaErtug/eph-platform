@@ -1,4 +1,4 @@
-import { COST_DEFAULTS, parseCostValue, readCost } from './commercial-costs';
+import { COST_DEFAULTS, isManagedCommercialKey, parseCostValue, readCost } from './commercial-costs';
 
 const fakeDb = (rows: Array<{ key: string; valueJson: unknown }>) => ({
   systemSetting: {
@@ -37,5 +37,10 @@ describe('commercial-costs', () => {
 
   it('allows a zero cost', async () => {
     expect(await readCost(fakeDb([{ key: 'COST_TALEP_ACIL_EK', valueJson: 0 }]), 'COST_TALEP_ACIL_EK')).toBe(0);
+  });
+
+  it('has no hard-coded backup for the scan tariff (§0-B) but stays admin-managed', () => {
+    expect(COST_DEFAULTS).not.toHaveProperty('COST_ESLESME_TARAMA');
+    expect(isManagedCommercialKey('COST_ESLESME_TARAMA')).toBe(true);
   });
 });

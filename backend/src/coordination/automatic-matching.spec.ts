@@ -15,6 +15,7 @@ describe('automatic matching after persistence', () => {
       $transaction: jest.fn(async (callback: any) => { const result = await callback(tx); committed = true; return result; }),
       networkPost: { findFirst: jest.fn().mockResolvedValue(post), update: jest.fn().mockImplementation(async () => { committed = true; return post; }) },
       networkPostUpdateLog: { create: jest.fn() },
+      systemSetting: { findUnique: jest.fn().mockResolvedValue({ valueJson: 30 }) },
     };
     const service = new NetworkService(prisma as any, {} as any, {} as any, {} as any, {} as any, {} as any);
     const internal = service as any;

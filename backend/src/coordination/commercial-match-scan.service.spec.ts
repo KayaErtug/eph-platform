@@ -43,7 +43,7 @@ function setup() {
     posts: [{ id: 'post', userId: 'agent', type: 'PORTFOY_ARIYORUM', title: 'Adalet talebi', ...interest, customer: undefined,
       expiresAt: new Date('2099-01-01'), tags: ['Talep Türü: PORTFOY_SATILIK'] }],
     attempts: [], movements: [], wallets: { agent: { bakiye: 100, aktifMi: true }, owner: { bakiye: 200, aktifMi: true }, super: { bakiye: 100, aktifMi: true } },
-    officeMode: 'ALLOCATED', cost: 7, failSave: false, lostCommit: false, failRecovery: false, sequence: 0 };
+    officeMode: 'ALLOCATED', scanPermissions: undefined, cost: 7, failSave: false, lostCommit: false, failRecovery: false, sequence: 0 };
   state.posts[0].id = 'post';
   const db: any = { userBlock: { findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]) }, $queryRaw: jest.fn(async () => []), $executeRaw: jest.fn(async () => 1) };
   function model(name: string) {
@@ -51,7 +51,8 @@ function setup() {
       findFirst: jest.fn(async ({ where }: any) => state[name].find((row: any) => fits(row, where)) || null),
       findMany: jest.fn(async ({ where, take }: any = {}) => state[name].filter((row: any) => fits(row, where)).slice(0, take || Infinity)) };
   }
-  db.systemSetting = { findUnique: jest.fn(async ({ where }: any) => where.key.startsWith('EPH_OFFICE_SPENDING_') ? { valueJson: { mode: state.officeMode } } : null) };
+  db.systemSetting = { findUnique: jest.fn(async ({ where }: any) => where.key.startsWith('EPH_OFFICE_SPENDING_') ? { valueJson: { mode: state.officeMode, scanPermissions: state.scanPermissions } }
+    : where.key === 'COST_ESLESME_TARAMA' && state.cost !== null ? { valueJson: state.cost } : null) };
   db.user = model('users'); db.office = model('offices'); db.customer = model('customers');
   db.customerInterest = model('interests'); db.unit = model('units'); db.networkPost = model('posts');
   db.matchScanAttempt = { ...model('attempts'), create: jest.fn(async ({ data }: any) => {
@@ -114,7 +115,23 @@ describe('Paid matching: shared engine, atomic receipt and KontorService', () =>
   it('receipt persistence failure rolls back actual KontorService debit', async () => { const t = setup(); t.state.failSave = true; expect(await code(t.service.scan('CRM', 'interest', t.actor, t.input))).toBe('MATCH_SCAN_FAILED_RETRY_NEW'); expect(t.spend).toHaveBeenCalledTimes(1); expect(t.state.wallets.agent.bakiye).toBe(100); expect(t.state.movements).toHaveLength(0); expect(t.state.attempts[0].status).toBe('FAILED'); });
   it('lost commit response recovers completed receipt without a second debit', async () => { const t = setup(); t.state.lostCommit = true; expect(await t.service.scan('CRM', 'interest', t.actor, t.input)).toMatchObject({ replayed: true, spent: 0 }); expect(t.state.wallets.agent.bakiye).toBe(93); expect(t.state.movements).toHaveLength(1); });
   it('unresolved failure keeps a review-required state', async () => { const t = setup(); t.state.failSave = true; t.state.failRecovery = true; expect(await code(t.service.scan('CRM', 'interest', t.actor, t.input))).toBe('MATCH_SCAN_REVIEW_REQUIRED'); expect(t.state.wallets.agent.bakiye).toBe(100); });
-  it.each([0, -1, 1.5])('never offers a free or invalid tariff %s', async cost => { const t = setup(); t.state.cost = cost; expect(await code(t.service.quote('CRM', 'interest', t.actor, {}))).toBe('MATCH_SCAN_TARIFF_INVALID'); expect(t.spend).not.toHaveBeenCalled(); });
+  it.each([-1, 1.5, null])('refuses with a safe error when the tariff is missing or invalid (%s)', async cost => { const t = setup(); t.state.cost = cost; await expect(t.service.quote('CRM', 'interest', t.actor, {})).rejects.toMatchObject({ response: { code: 'MATCH_SCAN_TARIFF_MISSING', message: 'Tarama ücreti tanımlı değil, yöneticinize başvurun.' } }); expect(t.spend).not.toHaveBeenCalled(); });
+  it('falls back to the general MATCH_SCAN_COST_PK setting and never to a hard-coded 25', async () => { const t = setup(); t.state.cost = null; t.db.systemSetting.findUnique.mockImplementation(async ({ where }: any) => where.key === 'MATCH_SCAN_COST_PK' ? { valueJson: { value: 9 } } : null); expect(await t.service.quote('CRM', 'interest', t.actor, {})).toMatchObject({ costPk: 9 }); });
+  it('treats an admin-set 0 tariff as a free scan: report is produced, no PK movement', async () => { const t = setup(); t.state.cost = 0; expect(await t.service.quote('CRM', 'interest', t.actor, {})).toMatchObject({ costPk: 0, eligible: true });
+    const receipt: any = await t.service.scan('CRM', 'interest', t.actor, { ...t.input, expectedCostPk: 0 });
+    expect(receipt).toMatchObject({ ok: true, spent: 0, billing: { cost: 0, remainingBalance: 100 } }); expect(t.spend).not.toHaveBeenCalled(); expect(t.state.movements).toHaveLength(0); expect(t.state.wallets.agent.bakiye).toBe(100); expect(t.state.attempts[0].status).toBe('COMPLETED'); });
+  it('office scan ban: quote reports a clear not-eligible state and scan is refused without charge', async () => { const t = setup(); t.state.scanPermissions = { agent: false };
+    expect(await t.service.quote('CRM', 'interest', t.actor, {})).toMatchObject({ eligible: false, reason: 'SCAN_NOT_PERMITTED', message: expect.stringContaining('yetkiniz bulunmamaktadır') });
+    await expect(t.service.scan('CRM', 'interest', t.actor, t.input)).rejects.toThrow(ForbiddenException); expect(t.state.movements).toHaveLength(0); expect(t.state.attempts).toHaveLength(0); });
+  it('office scan ban set during computation is caught by the final in-transaction check', async () => { const t = setup(); t.compute.mockImplementationOnce(async () => { t.state.scanPermissions = { agent: false }; return []; });
+    expect(await code(t.service.scan('CRM', 'interest', t.actor, t.input))).toBe('MATCH_SCAN_FAILED_RETRY_NEW'); expect(t.state.movements).toHaveLength(0); expect(t.state.wallets.agent.bakiye).toBe(100); });
+  it('office owner and super admin are exempt from the scan ban', async () => { const t = setup(); t.state.scanPermissions = { owner: false, super: false, agent: true };
+    expect(await t.service.quote('CRM', 'interest', { id: 'owner', role: Role.EMLAKCI }, {}).catch(() => 'n/a')).not.toHaveProperty('reason');
+    expect(await t.service.quote('CRM', 'interest', { id: 'super', role: Role.SUPER_ADMIN }, {})).toMatchObject({ eligible: true }); });
+  it('super admin reaches another agent private portfolio even when the block lookup would deny (§0)', async () => { const t = setup(); t.db.userBlock.findFirst.mockResolvedValue({ id: 'block' });
+    t.unit.isPoolVisible = false; t.unit.project.ownerId = 'outsider';
+    expect(await t.service.quote('PRIVATE_PORTFOLIO', 'unit', { id: 'super', role: Role.SUPER_ADMIN }, {})).toMatchObject({ eligible: true });
+    expect(await t.service.quote('PRIVATE_PORTFOLIO', 'unit', { id: 'agent', role: Role.EMLAKCI }, {}).catch(() => 'denied')).toBe('denied'); });
   it('rejects old price, stale criteria and low balance before computing', async () => {
     for (const extra of [{ expectedCostPk: 6 }, { expectedSourceVersion: 'old-version' }]) { const t = setup(); expect(await code(t.service.scan('CRM', 'interest', t.actor, { ...t.input, ...extra }))).toBe('MATCH_SCAN_RECONFIRM'); expect(t.compute).not.toHaveBeenCalled(); }
     const t = setup(); t.state.wallets.agent.bakiye = 1; expect(await code(t.service.scan('CRM', 'interest', t.actor, t.input))).toBe('MATCH_SCAN_RECONFIRM'); expect(t.state.attempts).toHaveLength(0);

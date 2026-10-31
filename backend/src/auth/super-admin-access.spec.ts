@@ -72,7 +72,7 @@ describe('Talep visibility and owner management', () => {
     return { db, service: service as any };
   }
   it('Super can view all active audience segments', async () => {
-    const { service } = setup(Role.SUPER_ADMIN); expect(await service.networkPostVisibilityFilter('super')).toHaveProperty('User.usersBlocked.none.blockedId', 'super');
+    const { service } = setup(Role.SUPER_ADMIN); expect(await service.networkPostVisibilityFilter('super')).toEqual({ User: {} }); // §0: süper admine engelleme filtresi uygulanmaz
   });
   it('normal roles keep their own audience filter', async () => {
     const { service } = setup(Role.EMLAKCI); const filter = await service.networkPostVisibilityFilter('member');

@@ -13,6 +13,27 @@ import {
   SETTINGS_PREFIX,
 } from './notification-settings';
 
+// pendingActions başlıkları: sayıya duyarlı Türkçe metin (bilinmeyen tür için genel sayaç).
+const PENDING_TITLES: Record<string, (count: number) => string> = {
+  NEW_MESSAGE: (n) => `${n} okunmamış mesaj`,
+  REQUEST_MATCH: (n) => `${n} talep eşleşmesi`,
+  LOW_PK: () => 'PK bakiyeniz düşük',
+  MEMBERSHIP_EXPIRING: () => 'Üyelik / deneme süreniz bitiyor',
+  ROLE_CHANGED: (n) => `${n} rol / yetki değişikliği`,
+  PROJECT_POOL_ACCEPTED: (n) => `${n} proje havuza kabul edildi`,
+  ADMIN_ANNOUNCEMENT: (n) => `${n} yönetim duyurusu`,
+  CONTACT_UNLOCKED: (n) => `${n} iletişim erişimi açıldı`,
+  OFFICE_JOIN_DECIDED: (n) => `${n} ofis başvuru sonucu`,
+  OFFICE_JOIN_REQUEST: (n) => `${n} danışman başvurusu onay bekliyor`,
+  SISTER_INVITE: (n) => `${n} kardeş ofis daveti bekliyor`,
+  SISTER_INVITE_REJECTED: (n) => `${n} kardeş ofis daveti reddedildi`,
+  SISTER_PRIVATE_REQUEST: (n) => `${n} özel bilgi isteği bekliyor`,
+  SISTER_PRIVATE_APPROVED: (n) => `${n} özel bilgi isteği onaylandı`,
+  SISTER_PRIVATE_REJECTED: (n) => `${n} özel bilgi isteği reddedildi`,
+};
+export const pendingActionTitle = (type: string, count: number) =>
+  (PENDING_TITLES[type] || ((n: number) => `${n} okunmamış bildirim`))(count);
+
 export type NotificationInput = {
   type: string;
   priority: 'ACIL' | 'ONEMLI' | 'BILGI';
@@ -203,7 +224,7 @@ export class NotificationsService {
               Array<{ type: string; actionUrl: string; count: bigint }>
             >`
         SELECT type, "actionUrl", count(*) AS count FROM "NetworkNotification"
-        WHERE "userId" = ${userId} AND "isRead" = false AND "actionUrl" IS NOT NULL AND type <> 'OFFICE_JOIN_REQUEST'
+        WHERE "userId" = ${userId} AND "isRead" = false AND "actionUrl" IS NOT NULL AND type NOT IN ('OFFICE_JOIN_REQUEST', 'SISTER_INVITE', 'SISTER_PRIVATE_REQUEST')
         GROUP BY type, "actionUrl" ORDER BY type, "actionUrl"`,
             // Office approval remains an action even after its notification has been read.
             tx.$queryRaw<Array<{ count: bigint }>>`
@@ -212,21 +233,10 @@ export class NotificationsService {
           ]),
         { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
       );
-    const labels: Record<string, string> = {
-      NEW_MESSAGE: 'Yeni mesajlar',
-      REQUEST_MATCH: 'Talep eşleşmeleri',
-      LOW_PK: 'Düşük PK bakiyesi',
-      MEMBERSHIP_EXPIRING: 'Üyelik / deneme bitişi',
-      ROLE_CHANGED: 'Rol / yetki değişikliği',
-      PROJECT_POOL_ACCEPTED: 'Havuz kabulü',
-      ADMIN_ANNOUNCEMENT: 'Admin duyuruları',
-      CONTACT_UNLOCKED: 'İletişim erişimleri',
-      OFFICE_JOIN_DECIDED: 'Ofis başvuru sonucu',
-    };
     const pendingActions = groups.map((row) => ({
       type: row.type,
       count: Number(row.count),
-      title: labels[row.type] || 'Bildirimler',
+      title: pendingActionTitle(row.type, Number(row.count)),
       actionUrl: row.actionUrl,
     }));
     const officeCount = Number(requests[0]?.count || 0);
@@ -234,10 +244,59 @@ export class NotificationsService {
       pendingActions.unshift({
         type: 'OFFICE_JOIN_REQUEST',
         count: officeCount,
-        title: 'Onay bekleyen ofis başvuruları',
+        title: pendingActionTitle('OFFICE_JOIN_REQUEST', officeCount),
         actionUrl: '/office',
       });
+    pendingActions.unshift(...(await this.sisterPendingActions(userId)));
     return { unreadCount, urgentCount, pendingActions };
+  }
+
+  // Kardeş Ofis: sahibi olunan ofislere gelen bekleyen davetler ve özel bilgi istekleri (okunsa da bekler).
+  private async sisterPendingActions(userId: string) {
+    const offices = await this.prisma.office.findMany({
+      where: { ownerUserId: userId, isActive: true },
+      select: { id: true },
+    });
+    const ids = offices.map((office) => office.id);
+    if (!ids.length) return [];
+    const [links, requests] = await Promise.all([
+      this.prisma.officeSisterLink.findMany({
+        where: {
+          status: 'BEKLIYOR',
+          OR: [{ officeAId: { in: ids } }, { officeBId: { in: ids } }],
+        },
+        select: { officeAId: true, officeBId: true, invitedByOfficeId: true },
+      }),
+      this.prisma.sisterPrivateInfoRequest.groupBy({
+        by: ['ownerOfficeId'],
+        where: { ownerOfficeId: { in: ids }, status: 'BEKLIYOR' },
+        _count: { _all: true },
+      }),
+    ]);
+    const actions: Array<{ type: string; count: number; title: string; actionUrl: string }> = [];
+    for (const officeId of ids) {
+      const invites = links.filter(
+        (link) =>
+          (link.officeAId === officeId || link.officeBId === officeId) &&
+          link.invitedByOfficeId !== officeId,
+      ).length;
+      if (invites)
+        actions.push({
+          type: 'SISTER_INVITE',
+          count: invites,
+          title: pendingActionTitle('SISTER_INVITE', invites),
+          actionUrl: `/office-sisters?officeId=${officeId}`,
+        });
+      const asked = requests.find((row) => row.ownerOfficeId === officeId)?._count._all || 0;
+      if (asked)
+        actions.push({
+          type: 'SISTER_PRIVATE_REQUEST',
+          count: asked,
+          title: pendingActionTitle('SISTER_PRIVATE_REQUEST', asked),
+          actionUrl: `/office-sister-requests?officeId=${officeId}`,
+        });
+    }
+    return actions;
   }
 
   async read(userId: string, id: string) {

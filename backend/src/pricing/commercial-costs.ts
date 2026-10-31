@@ -8,11 +8,14 @@ export const COST_DEFAULTS = {
   COST_OZEL_BILGI: 25,
   COST_TALEP_YAYIN: 25,
   COST_TALEP_ACIL_EK: 10,
-  COST_ESLESME_TARAMA: 25,
   COST_YETKI_MEKTUBU_ASIM: 5,
 } as const;
 
 export type CostKey = keyof typeof COST_DEFAULTS;
+
+// Yedek değeri OLMAYAN yönetilen ücret anahtarları (§0-B): ayar yoksa işlem güvenli hatayla durur.
+// COST_ESLESME_TARAMA: ücretli eşleşme taraması genel tarifesi; 0 = ücretsiz tarama.
+export const COST_NO_DEFAULT_KEYS = ['COST_ESLESME_TARAMA'] as const;
 
 export const COST_PREFIX = 'COST_';
 
@@ -55,6 +58,7 @@ export const LIMIT_PREFIX = 'LIMIT_';
 export const isManagedCommercialKey = (key: string) =>
   key === 'LIMIT_PK_DUSUK_UYARI' ||
   Object.prototype.hasOwnProperty.call(COST_DEFAULTS, key) ||
+  (COST_NO_DEFAULT_KEYS as readonly string[]).includes(key) ||
   Object.prototype.hasOwnProperty.call(LIMIT_DEFAULTS, key) ||
   Object.prototype.hasOwnProperty.call(LIMIT_LIST_DEFAULTS, key);
 

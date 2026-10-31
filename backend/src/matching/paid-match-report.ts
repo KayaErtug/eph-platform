@@ -9,8 +9,8 @@ export const ACTIVE_MATCH_UNIT: Prisma.UnitWhereInput = {
 };
 
 export function visiblePaidUnits(user: { id: string; role: Role }): Prisma.UnitWhereInput {
-  const blockScope: Prisma.UnitWhereInput = { project: { owner: visibleAuthor(user.id) } };
-  if (user.role === Role.SUPER_ADMIN) return blockScope;
+  if (user.role === Role.SUPER_ADMIN) return {};
+  const blockScope: Prisma.UnitWhereInput = { project: { owner: visibleAuthor(user.id, user.role) } };
   return { AND: [blockScope, { OR: [{ project: { ownerId: user.id } }, { isPoolVisible: true, OR: [
     { poolAudience: { is: null } }, { poolAudience: { is: { mode: 'PUBLIC' } } },
     { poolAudience: { is: { roles: { has: user.role } } } },

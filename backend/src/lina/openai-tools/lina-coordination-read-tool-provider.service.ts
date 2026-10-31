@@ -18,6 +18,9 @@ const ALL_EPH_ROLES: Role[] = [
   Role.MODERATOR,
 ];
 
+// §0: süper admin için sahiplik filtresi uygulanmaz (küresel okuma).
+const isSuperAdmin = (role: unknown) => role === Role.SUPER_ADMIN;
+
 const NO_INPUT_SCHEMA: LinaToolJsonSchema = {
   type: 'object',
   properties: {},
@@ -43,9 +46,9 @@ export class LinaCoordinationReadToolProviderService
           const interests = await this.prisma.customerInterest.findMany({
             where: {
               isActive: true,
-              customer: {
-                ownerId: context.userId,
-              },
+              ...(isSuperAdmin(context.role)
+                ? {}
+                : { customer: { ownerId: context.userId } }),
             },
             select: {
               id: true,
@@ -140,7 +143,7 @@ export class LinaCoordinationReadToolProviderService
         handler: async (_input, context) => {
           const posts = await this.prisma.networkPost.findMany({
             where: {
-              userId: context.userId,
+              ...(isSuperAdmin(context.role) ? {} : { userId: context.userId }),
               isActive: true,
             },
             select: {
@@ -180,7 +183,9 @@ export class LinaCoordinationReadToolProviderService
             where: {
               isPoolVisible: true,
               project: {
-                ownerId: context.userId,
+                ...(isSuperAdmin(context.role)
+                  ? {}
+                  : { ownerId: context.userId }),
                 isActive: true,
               },
             },

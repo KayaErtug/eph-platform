@@ -59,13 +59,14 @@ export class CoordinationRecalculationService implements OnModuleInit {
 
   async getAlerts(rawUser: CoordinationUser) {
     const user = await this.resolveUser(rawUser);
+    const global = user.role === Role.SUPER_ADMIN; // §0: süper admin küresel kapsam
     const [interests, posts, scans] = await Promise.all([
-      this.prisma.customerInterest.findMany({ where: { isActive: true, customer: { ownerId: user.id } },
+      this.prisma.customerInterest.findMany({ where: { isActive: true, ...(global ? {} : { customer: { ownerId: user.id } }) },
         select: { id: true, title: true, updatedAt: true }, orderBy: { updatedAt: 'desc' }, take: 100 }),
-      this.prisma.networkPost.findMany({ where: { userId: user.id, isActive: true, expiresAt: { gt: new Date() },
+      this.prisma.networkPost.findMany({ where: { ...(global ? {} : { userId: user.id }), isActive: true, expiresAt: { gt: new Date() },
         type: { in: ['PORTFOY_ARIYORUM', 'KAT_KARSILIGI_ARSA_ARIYORUM'] } },
         select: { id: true, title: true, updatedAt: true }, orderBy: { updatedAt: 'desc' }, take: 100 }),
-      this.prisma.matchScanAttempt.findMany({ where: { userId: user.id, status: 'COMPLETED' },
+      this.prisma.matchScanAttempt.findMany({ where: { ...(global ? {} : { userId: user.id }), status: 'COMPLETED' },
         orderBy: { completedAt: 'desc' }, select: { sourceType: true, sourceId: true, completedAt: true }, take: 1000 }),
     ]);
     const latest = new Map<string, Date>();
@@ -84,7 +85,7 @@ export class CoordinationRecalculationService implements OnModuleInit {
 
   async getLinaOpportunities(rawUser: CoordinationUser) {
     const user = await this.resolveUser(rawUser);
-    const scans = await this.prisma.matchScanAttempt.findMany({ where: { userId: user.id, status: 'COMPLETED' },
+    const scans = await this.prisma.matchScanAttempt.findMany({ where: { ...(user.role === Role.SUPER_ADMIN ? {} : { userId: user.id }), status: 'COMPLETED' },
       orderBy: { startedAt: 'desc' }, take: 100 });
     const seen = new Set<string>();
     const latest = scans.filter(scan => {

@@ -13,6 +13,9 @@ import {
 
 import { CrmService } from "../../crm/crm.service";
 import { PrismaService } from "../../prisma/prisma.service";
+import { randomUUID } from "node:crypto";
+import { resolveOfficeWallet } from "../../office/office-wallet.rules";
+import { readCost } from "../../pricing/commercial-costs";
 import { NetworkService } from "../../network/network.service";
 import { getCardProfileBinding } from "../../property-card/property-card-profile.registry";
 import { LinaAuditService } from "../lina-audit.service";
@@ -67,12 +70,24 @@ type ParsedCustomerFields = {
   notes?: string;
 };
 
+type NetworkCreateInput = Parameters<NetworkService["create"]>[0];
+
+// Onay planı: kullanıcıya gösterilen nihai payload, ücret ve cüzdan kaynağı DB'de saklanır.
+// Onaydan sonra AI ile yeniden çıkarım yapılmaz; payload aynen NetworkService.create'e gider.
 type PendingNetworkRequestCreation = {
+  planId?: string;
   userId: string;
   createdAt: number;
   expiresAt: number;
   sourceModule: LinaActionSourceModule;
-  sourceText: string;
+  sourceText?: string;
+  payload?: NetworkCreateInput;
+  costPk?: number;
+  baseCostPk?: number;
+  urgentExtraPk?: number;
+  walletSource?: "PERSONAL" | "OFFICE";
+  walletOfficeId?: string | null;
+  walletLabel?: string;
 };
 
 
@@ -166,15 +181,6 @@ export class LinaActionEngineService {
 
       if (networkRequestPrepare) {
         return networkRequestPrepare;
-      }
-
-      if (this.isConfirmedNetworkRequestCreate(message, history)) {
-        return await this.createNetworkRequestFromHistory(
-          user,
-          sourceModule,
-          history,
-          message,
-        );
       }
 
       if (this.isInformationalQuestion(message)) {
@@ -350,11 +356,7 @@ export class LinaActionEngineService {
 
     const explicitSave = /(kaydet|olustur|ekle)/.test(normalized);
 
-    if (
-      !mentionsRequestCenter ||
-      !explicitSave ||
-      this.isConfirmationWord(message)
-    ) {
+    if (!mentionsRequestCenter || !explicitSave) {
       return null;
     }
 
@@ -372,87 +374,7 @@ export class LinaActionEngineService {
       };
     }
 
-    const now = Date.now();
-
-    await this.savePending(user.id, PENDING_NETWORK_KIND, {
-      userId: user.id,
-      createdAt: now,
-      expiresAt: now + PENDING_ACTION_TTL_MS,
-      sourceModule,
-      sourceText,
-    });
-
-    this.audit(
-      user,
-      sourceModule,
-      "network_request_create_prepare",
-      "allowed",
-    );
-
-    return {
-      handled: true,
-      success: true,
-      action: "network_request_create",
-      requiresConfirmation: true,
-      message:
-        "Talep Merkezi kaydı hazır. Kaydetmek için 5 dakika içinde yalnızca “Onayla” deyin. Vazgeçmek için “İptal” deyin.",
-    };
-  }
-
-  private isConfirmedNetworkRequestCreate(
-    message: string,
-    history: LinaActionHistoryItem[],
-  ): boolean {
-    const normalized = this.normalize(message);
-    const mentionsRequestCenter =
-      normalized.includes("talep merkezi") ||
-      normalized.includes("talep merkezine");
-    const explicitSave = /(kaydet|olustur|ekle)/.test(normalized);
-    const explicitConfirmation = this.isConfirmationWord(message);
-
-    if (mentionsRequestCenter && explicitSave && explicitConfirmation) {
-      return true;
-    }
-
-    if (!explicitConfirmation) {
-      return false;
-    }
-
-    const lastAssistantMessage = [...history]
-      .reverse()
-      .find((item) => item.role === "assistant")?.content;
-
-    if (!lastAssistantMessage) {
-      return false;
-    }
-
-    const assistantNormalized = this.normalize(lastAssistantMessage);
-    return (
-      assistantNormalized.includes("talep merkezi") &&
-      /(kaydet|kaydetmek|kaydedil)/.test(assistantNormalized)
-    );
-  }
-
-  private async createNetworkRequestFromHistory(
-    user: LinaResolvedUser,
-    sourceModule: LinaActionSourceModule,
-    history: LinaActionHistoryItem[],
-    currentMessage: string,
-  ): Promise<LinaActionExecutionResult> {
-    const sourceText = this.findNetworkRequestSourceText(
-      history,
-      currentMessage,
-    );
-
-    if (!sourceText) {
-      return {
-        handled: true,
-        success: false,
-        message:
-          "Talep Merkezi kaydı için önceki talep metnini bulamadım. Talebinizi kriterleriyle birlikte tekrar yazın.",
-      };
-    }
-
+    // Çıkarım yalnız burada, onaydan ÖNCE yapılır; kullanıcı nihai içeriği ve ücreti görerek onaylar.
     const draftResult = await this.linaNetworkRequestDraftService.create(
       sourceText,
     );
@@ -483,25 +405,164 @@ export class LinaActionEngineService {
           }
         : undefined;
 
-    const post = await this.networkService.create(
-      {
-        userId: user.id,
-        type: draft.category,
-        title: draft.title,
-        description: draft.detail,
-        city: draft.city,
-        areas: draft.areas,
-        minArea: draft.minArea,
-        maxBudget: draft.maxBudget,
-        propertyTypes: [draft.propertyType],
-        roomCounts: draft.roomCounts,
-        cardProfileCriteria,
-        priceCurrency: draft.currency,
-        urgency: draft.urgency,
-        tags: [`Talep Türü:${draft.requestIntent}`],
-      },
-      user.id,
+    const payload = {
+      userId: user.id,
+      type: draft.category,
+      title: draft.title,
+      description: draft.detail,
+      city: draft.city,
+      areas: draft.areas,
+      minArea: draft.minArea,
+      maxBudget: draft.maxBudget,
+      propertyTypes: [draft.propertyType],
+      roomCounts: draft.roomCounts,
+      cardProfileCriteria,
+      priceCurrency: draft.currency,
+      urgency: draft.urgency,
+      tags: [`Talep Türü:${draft.requestIntent}`],
+    } as NetworkCreateInput;
+
+    const quote = await this.quoteNetworkRequestPublish(user.id, payload);
+    const now = Date.now();
+
+    const plan: PendingNetworkRequestCreation = {
+      planId: randomUUID(),
+      userId: user.id,
+      createdAt: now,
+      expiresAt: now + PENDING_ACTION_TTL_MS,
+      sourceModule,
+      sourceText,
+      payload,
+      ...quote,
+    };
+
+    await this.savePending(user.id, PENDING_NETWORK_KIND, plan);
+
+    this.audit(
+      user,
+      sourceModule,
+      "network_request_create_prepare",
+      "allowed",
     );
+
+    return {
+      handled: true,
+      success: true,
+      action: "network_request_create",
+      requiresConfirmation: true,
+      message: this.networkPublishConfirmMessage(plan),
+    };
+  }
+
+  // Güncel DB ücreti (COST_TALEP_YAYIN + acilse COST_TALEP_ACIL_EK) ve varsayılan cüzdan kaynağı.
+  private async quoteNetworkRequestPublish(
+    userId: string,
+    payload: NetworkCreateInput,
+  ) {
+    const isUrgent = String(payload.urgency || "").toUpperCase() === "ACIL";
+    const baseCostPk = await readCost(this.prisma, "COST_TALEP_YAYIN");
+    const urgentExtraPk = isUrgent
+      ? await readCost(this.prisma, "COST_TALEP_ACIL_EK")
+      : 0;
+    const wallet = await resolveOfficeWallet(this.prisma, userId, {});
+
+    return {
+      costPk: baseCostPk + urgentExtraPk,
+      baseCostPk,
+      urgentExtraPk,
+      walletSource: wallet.walletSource,
+      walletOfficeId: wallet.walletOfficeId,
+      walletLabel:
+        wallet.walletSource === "OFFICE" ? "ofis cüzdanı" : "kişisel cüzdan",
+    };
+  }
+
+  private networkPublishConfirmMessage(
+    plan: PendingNetworkRequestCreation,
+  ): string {
+    const payload = plan.payload;
+    const budget = payload?.maxBudget
+      ? `, en çok ${payload.maxBudget} ${payload.priceCurrency || "TRY"}`
+      : "";
+    const summary = [payload?.title, payload?.city].filter(Boolean).join(" · ");
+
+    return `Bu talep Talep Merkezi'nde yayınlanacak${summary ? ` (${summary}${budget})` : ""}. Ücret: ${plan.costPk} PK (cüzdan: ${plan.walletLabel}). Onaylıyor musunuz? 5 dakika içinde yalnızca “Onayla” deyin. Vazgeçmek için “İptal” deyin.`;
+  }
+
+  // Plan tek kez tüketilir: DB'de AKTIF→KAPANDI geçişini yalnız bir çağrı kazanır.
+  private async claimNetworkPlan(userId: string, planId: string): Promise<boolean> {
+    const result = await this.prisma.linaTaslak.updateMany({
+      where: {
+        kullaniciId: userId,
+        tur: PENDING_NETWORK_KIND,
+        durum: "AKTIF",
+        alanlar: { path: ["planId"], equals: planId },
+      },
+      data: { durum: "KAPANDI" },
+    });
+
+    return result.count === 1;
+  }
+
+  private async publishNetworkRequestPlan(
+    user: LinaResolvedUser,
+    sourceModule: LinaActionSourceModule,
+    plan: PendingNetworkRequestCreation,
+  ): Promise<LinaActionExecutionResult> {
+    if (!plan.payload) {
+      await this.dropPending(user.id, PENDING_NETWORK_KIND);
+
+      return {
+        handled: true,
+        success: false,
+        message:
+          "Bekleyen Talep Merkezi taslağı güncel değil. Talebi yeniden kaydetmeyi isteyin.",
+      };
+    }
+
+    // Ücret veya cüzdan onaydan sonra değiştiyse yayınlama; yeni tutarla tekrar onay iste.
+    const quote = await this.quoteNetworkRequestPublish(user.id, plan.payload);
+
+    if (
+      quote.costPk !== plan.costPk ||
+      quote.walletSource !== plan.walletSource ||
+      quote.walletOfficeId !== (plan.walletOfficeId ?? null)
+    ) {
+      const now = Date.now();
+      const renewed: PendingNetworkRequestCreation = {
+        ...plan,
+        ...quote,
+        planId: randomUUID(),
+        createdAt: now,
+        expiresAt: now + PENDING_ACTION_TTL_MS,
+      };
+
+      await this.savePending(user.id, PENDING_NETWORK_KIND, renewed);
+      this.audit(
+        user,
+        sourceModule,
+        "network_request_create_reprice",
+        "blocked",
+      );
+
+      return {
+        handled: true,
+        success: false,
+        action: "network_request_create",
+        requiresConfirmation: true,
+        message: `Ücret veya cüzdan bilgisi değişti, yayınlanmadı. ${this.networkPublishConfirmMessage(renewed)}`,
+      };
+    }
+
+    if (!plan.planId || !(await this.claimNetworkPlan(user.id, plan.planId))) {
+      return {
+        handled: true,
+        success: false,
+        message: "Bu talep için onay zaten işlendi.",
+      };
+    }
+
+    const post = await this.networkService.create(plan.payload, user.id);
 
     this.audit(
       user,
@@ -513,7 +574,7 @@ export class LinaActionEngineService {
     return {
       handled: true,
       success: true,
-      message: `Talebiniz Talep Merkezi'ne kaydedildi: ${draft.title}.`,
+      message: `Talebiniz Talep Merkezi'nde yayınlandı: ${plan.payload.title}. Ücret: ${plan.costPk} PK.`,
       data: post,
     };
   }
@@ -1091,18 +1152,10 @@ export class LinaActionEngineService {
           message: "Bekleyen Talep Merkezi kayıt taslağı iptal edildi.",
         };
       } else if (this.isConfirmationWord(message)) {
-        await this.dropPending(user.id, PENDING_NETWORK_KIND);
-
-        return await this.createNetworkRequestFromHistory(
+        return await this.publishNetworkRequestPlan(
           user,
           pendingNetwork.sourceModule || sourceModule,
-          [
-            {
-              role: "user",
-              content: pendingNetwork.sourceText,
-            },
-          ],
-          message,
+          pendingNetwork,
         );
       }
     }
