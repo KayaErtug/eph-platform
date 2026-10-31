@@ -1360,7 +1360,7 @@ export class UnitsService {
               .slice(separatorIndex + 1)
               .replace(/[-]/g, ' ')
               .replace(/[<>]/g, '')
-              .replace(/s+/g, ' ')
+              .replace(/\s+/g, ' ')
               .trim()
               .slice(0, 120);
 
