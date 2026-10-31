@@ -232,7 +232,9 @@ export class MarketTickerService implements OnModuleInit {
     if (!this.items.size) await this.refresh();
     const manual = await this.manualItems();
     const cached = [...this.items.values()];
-    const items = MARKET_CODES.map(code => manual.get(code)?.item ?? this.items.get(code)?.data).filter((i): i is TickerItem => Boolean(i));
+    const items = MARKET_CODES.map(code => manual.get(code)?.item ?? this.items.get(code)?.data).filter((i): i is TickerItem => Boolean(i))
+      // 1.0.22 (EPH-29) istemcisi her kalemde sayısal changePct ister; null tüm şeridi düşürüyordu.
+      .map(i => ({ ...i, changePct: i.changePct ?? 0 }));
     const loan = await this.loan();
     const times = [...cached.map(c => c.at), ...[...manual.values()].map(m => m.at), ...(loan ? [loan.updatedAt, loan.consumerUpdatedAt].filter((t): t is string => Boolean(t)) : [])].sort();
     return { updatedAt: times.length ? times[times.length - 1] : null, items, loan };
