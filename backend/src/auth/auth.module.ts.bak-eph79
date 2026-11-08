@@ -1,0 +1,57 @@
+import { Module } from '@nestjs/common';
+import { JwtModule } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
+
+import { InvitationsModule } from '../invitations/invitations.module';
+import { MailService } from '../mail.service';
+import { UsersModule } from '../users/users.module';
+import { AuthController } from './auth.controller';
+import { AuthService } from './auth.service';
+import { EmailVerificationV2Service } from './email/email-verification-v2.service';
+import { FirebasePhoneRegistrationService } from './firebase/firebase-phone-registration.service';
+import { FirebasePhoneVerificationService } from './firebase/firebase-phone-verification.service';
+import { PhoneVerificationSecurityService } from './firebase/phone-verification-security.service';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { RolesGuard } from './guards/roles.guard';
+import { PendingRegistrationService } from './registration/pending-registration.service';
+import { RegistrationV2Service } from './registration/registration-v2.service';
+import { JwtStrategy } from './strategies/jwt.strategy';
+
+@Module({
+  imports: [
+    UsersModule,
+    InvitationsModule,
+    PassportModule,
+    JwtModule.register({
+      secret: process.env.JWT_SECRET || 'sm-super-secret-jwt-key-degistirin',
+      signOptions: { expiresIn: '7d' },
+    }),
+  ],
+  providers: [
+    AuthService,
+    RegistrationV2Service,
+    PendingRegistrationService,
+
+    FirebasePhoneVerificationService,
+    PhoneVerificationSecurityService,
+    FirebasePhoneRegistrationService,
+
+    EmailVerificationV2Service,
+
+    JwtStrategy,
+    JwtAuthGuard,
+    RolesGuard,
+    MailService,
+  ],
+  controllers: [AuthController],
+  exports: [
+    JwtAuthGuard,
+    RolesGuard,
+    JwtModule,
+    RegistrationV2Service,
+    FirebasePhoneVerificationService,
+    PhoneVerificationSecurityService,
+    FirebasePhoneRegistrationService,
+  ],
+})
+export class AuthModule {}

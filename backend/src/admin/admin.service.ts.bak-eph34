@@ -1,0 +1,4487 @@
+import { COST_PREFIX, LIMIT_DEFAULTS, LIMIT_DESCRIPTIONS, LIMIT_LIST_DEFAULTS, LIMIT_PREFIX, isManagedCommercialKey, parseLimitList } from "../pricing/commercial-costs";
+import { readTrialPolicy, resolveInitialTrialDays } from "../pricing/trial-policy";
+import { MARKET_CODES, MARKET_LOAN_SETTING_KEY, MARKET_LOAN_SOURCE_KEY, MARKET_MANUAL_PREFIX } from "../market/market-ticker.service";
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from "@nestjs/common";
+import { companyName, requiresCompanyName } from '../profile/company-name';
+import { PrismaService } from "../prisma/prisma.service";
+import { MailService } from "../mail.service";
+import { MembershipService } from "../membership/membership.service";
+import { SupabaseService } from "../supabase/supabase.service";
+import {
+  AuditAction,
+  Prisma,
+  Capability,
+  DocumentType,
+  ProfessionalVerificationStatus,
+  Role,
+  UyelikDurumu,
+  UyelikPaketKodu,
+  UyelikPaketSegmenti,
+  PortfolioCreditLotTuru,
+  KontorHareketTuru,
+  KontorIslemTuru,
+} from "@prisma/client";
+import * as bcrypt from "bcryptjs";
+import { resolvePermission } from "../auth/permission.resolver";
+
+type AdminActor = {
+  id?: string;
+  role?: Role | string;
+  email?: string;
+  ipAddress?: string;
+  userAgent?: string;
+};
+
+type SuspendDuration = "ONE_HOUR" | "ONE_DAY" | "ONE_WEEK" | "ONE_MONTH" | "PERMANENT";
+
+@Injectable()
+export class AdminService {
+  constructor(
+    private prisma: PrismaService,
+    private mail: MailService,
+    private supabase: SupabaseService,
+    private membershipService: MembershipService,
+  ) {}
+
+  private async createProfessionalDocumentSignedUrl(
+    storedValue: string,
+  ) {
+    try {
+      return await this.supabase.createSignedUrl(
+        "documents",
+        storedValue,
+        300,
+      );
+    } catch (error) {
+      console.error(
+        "Admin mesleki belge signed URL üretilemedi:",
+        error instanceof Error ? error.message : error,
+      );
+
+      return null;
+    }
+  }
+
+  private generateInviteCode(): string {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    const part = (len: number) =>
+      Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+    return `EMK-${part(4)}-${part(4)}`;
+  }
+
+  private generateReferralCode(): string {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let code = "EPH-";
+
+    for (let i = 0; i < 8; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+
+    return code;
+  }
+
+  private async generateUniqueReferralCode(): Promise<string> {
+    let code = this.generateReferralCode();
+
+    let existingUser = await this.prisma.user.findFirst({
+      where: { referralCode: code },
+    });
+
+    let existingCandidate = await this.prisma.referralCandidate.findFirst({
+      where: { referralCode: code },
+    });
+
+    while (existingUser || existingCandidate) {
+      code = this.generateReferralCode();
+
+      existingUser = await this.prisma.user.findFirst({
+        where: { referralCode: code },
+      });
+
+      existingCandidate = await this.prisma.referralCandidate.findFirst({
+        where: { referralCode: code },
+      });
+    }
+
+    return code;
+  }
+
+  private readonly tersTurkAlfabesi: Record<string, string> = {
+    A: "29",
+    B: "28",
+    C: "27",
+    Ç: "26",
+    D: "25",
+    E: "24",
+    F: "23",
+    G: "22",
+    Ğ: "21",
+    H: "20",
+    I: "19",
+    İ: "18",
+    J: "17",
+    K: "16",
+    L: "15",
+    M: "14",
+    N: "13",
+    O: "12",
+    Ö: "11",
+    P: "10",
+    R: "09",
+    S: "08",
+    Ş: "07",
+    T: "06",
+    U: "05",
+    Ü: "04",
+    V: "03",
+    Y: "02",
+    Z: "01",
+  };
+
+  private readonly rolKodlari: Record<Role, string> = {
+    EMLAKCI: "EML",
+    MUTEAHHIT: "MUT",
+    INSAAT_FIRMASI: "INS",
+    MODERATOR: "MOD",
+    ADMIN: "ADM",
+    SUPER_ADMIN: "SUP",
+    ADAY: "ADA",
+  };
+
+  private guvenlikKoduUret(length = 7): string {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+
+    return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  }
+
+  private normalizeName(value: string): string {
+    return value
+      .trim()
+      .replace(/\s+/g, " ")
+      .toLocaleUpperCase("tr-TR");
+  }
+
+  private getHarfKodu(harf: string): string {
+    const kod = this.tersTurkAlfabesi[harf.toLocaleUpperCase("tr-TR")];
+
+    if (!kod) {
+      throw new BadRequestException(`Referans kodu üretilemedi. Desteklenmeyen karakter: ${harf}`);
+    }
+
+    return kod;
+  }
+
+  private adayAdSoyadAyir(firstName: string, lastName: string) {
+    const ad = this.normalizeName(firstName);
+    const soyad = this.normalizeName(lastName);
+
+    if (!ad || !soyad) {
+      throw new BadRequestException("Referans kodu için ad ve soyad gereklidir.");
+    }
+
+    if (ad.length < 2 || soyad.length < 2) {
+      throw new BadRequestException("Referans kodu için ad ve soyad en az 2 harf olmalıdır.");
+    }
+
+    return { ad, soyad };
+  }
+
+  private generateProfessionalReferralCode(firstName: string, lastName: string, role: Role): string {
+    const { ad, soyad } = this.adayAdSoyadAyir(firstName, lastName);
+
+    const adIlk = this.getHarfKodu(ad[0]);
+    const soyadIlk = this.getHarfKodu(soyad[0]);
+    const adIkinci = this.getHarfKodu(ad[1]);
+    const soyadIkinci = this.getHarfKodu(soyad[1]);
+
+    return `EPH-${adIlk}-${this.rolKodlari[role]}${soyadIlk}-${adIkinci}${soyadIkinci}${this.guvenlikKoduUret()}`;
+  }
+
+  private async generateUniqueProfessionalReferralCode(firstName: string, lastName: string, role: Role): Promise<string> {
+    let code = this.generateProfessionalReferralCode(firstName, lastName, role);
+
+    let existingUser = await this.prisma.user.findFirst({
+      where: { referralCode: code },
+    });
+
+    let existingCandidate = await this.prisma.referralCandidate.findFirst({
+      where: { referralCode: code },
+    });
+
+    let existingInvitation = await this.prisma.invitation.findUnique({
+      where: { code },
+    });
+
+    while (existingUser || existingCandidate || existingInvitation) {
+      code = this.generateProfessionalReferralCode(firstName, lastName, role);
+
+      existingUser = await this.prisma.user.findFirst({
+        where: { referralCode: code },
+      });
+
+      existingCandidate = await this.prisma.referralCandidate.findFirst({
+        where: { referralCode: code },
+      });
+
+      existingInvitation = await this.prisma.invitation.findUnique({
+        where: { code },
+      });
+    }
+
+    return code;
+  }
+
+  private normalizeApplicationStatus(status?: string) {
+    if (!status || status === "all") {
+      return {};
+    }
+
+    return { status: status as any };
+  }
+
+  private getActorId(actor?: AdminActor): string {
+    const actorId = actor?.id;
+
+    if (!actorId) {
+      throw new ForbiddenException("Yönetici kimliği doğrulanamadı.");
+    }
+
+    return actorId;
+  }
+
+  private getActorRole(actor?: AdminActor): Role | string {
+    const role = actor?.role;
+
+    if (!role) {
+      throw new ForbiddenException("Yönetici rolü doğrulanamadı.");
+    }
+
+    return role;
+  }
+
+  private isSoftwareTeam(actor?: AdminActor): boolean {
+    return this.getActorRole(actor) === Role.SUPER_ADMIN;
+  }
+
+  private isAdmin(actor?: AdminActor): boolean {
+    return this.getActorRole(actor) === Role.ADMIN;
+  }
+
+  private requireSoftwareTeam(actor?: AdminActor) {
+    if (!this.isSoftwareTeam(actor)) {
+      throw new ForbiddenException("Bu işlem sadece Yazılım Ekibi tarafından yapılabilir.");
+    }
+  }
+
+  private requireAdminOrSoftwareTeam(actor?: AdminActor) {
+    if (!this.isAdmin(actor) && !this.isSoftwareTeam(actor)) {
+      throw new ForbiddenException(
+        "Bu işlem sadece Admin veya Yazılım Ekibi tarafından yapılabilir.",
+      );
+    }
+  }
+
+  async getNumericSystemSetting(
+    key: string,
+    fallback: number,
+  ): Promise<number> {
+    const setting = await this.prisma.systemSetting.findUnique({
+      where: { key },
+      select: { valueJson: true },
+    });
+
+    if (!setting) {
+      return fallback;
+    }
+
+    const raw = setting.valueJson as unknown;
+
+    if (typeof raw === "number" && Number.isFinite(raw)) {
+      return raw;
+    }
+
+    if (
+      typeof raw === "object" &&
+      raw !== null &&
+      "value" in raw
+    ) {
+      const value = Number(
+        (raw as Record<string, unknown>)["value"],
+      );
+
+      if (Number.isFinite(value)) {
+        return value;
+      }
+    }
+
+    const parsed = Number(raw);
+
+    return Number.isFinite(parsed)
+      ? parsed
+      : fallback;
+  }
+
+  async resolveOperationalPermission(
+    actor: AdminActor | undefined,
+    permissionKey: string,
+  ) {
+    return resolvePermission(
+      this.prisma,
+      this.getActorId(actor),
+      this.getActorRole(actor) as Role,
+      permissionKey,
+    );
+  }
+
+
+  private normalizeCapabilities(capabilities?: Array<Capability | string>): Capability[] {
+    const values = Array.isArray(capabilities) ? capabilities : [];
+    const normalized = values
+      .map((item) => String(item || "").trim().toUpperCase())
+      .filter(Boolean);
+
+    const unique = Array.from(new Set(normalized));
+
+    unique.forEach((item) => {
+      if (!Object.values(Capability).includes(item as Capability)) {
+        throw new BadRequestException("Geçersiz ek yetki.");
+      }
+    });
+
+    return unique as Capability[];
+  }
+
+  private readonly ilPlakaKodlari: Record<string, string> = {
+    ADANA: "01",
+    ADIYAMAN: "02",
+    AFYONKARAHISAR: "03",
+    AĞRI: "04",
+    AMASYA: "05",
+    ANKARA: "06",
+    ANTALYA: "07",
+    ARTVIN: "08",
+    AYDIN: "09",
+    BALIKESIR: "10",
+    BILECIK: "11",
+    BINGOL: "12",
+    BITLIS: "13",
+    BOLU: "14",
+    BURDUR: "15",
+    BURSA: "16",
+    CANAKKALE: "17",
+    CANKIRI: "18",
+    CORUM: "19",
+    DENIZLI: "20",
+    DIYARBAKIR: "21",
+    EDIRNE: "22",
+    ELAZIG: "23",
+    ERZINCAN: "24",
+    ERZURUM: "25",
+    ESKISEHIR: "26",
+    GAZIANTEP: "27",
+    GIRESUN: "28",
+    GUMUSHANE: "29",
+    HAKKARI: "30",
+    HATAY: "31",
+    ISPARTA: "32",
+    MERSIN: "33",
+    ISTANBUL: "34",
+    IZMIR: "35",
+    KARS: "36",
+    KASTAMONU: "37",
+    KAYSERI: "38",
+    KIRKLARELI: "39",
+    KIRSEHIR: "40",
+    KOCAELI: "41",
+    KONYA: "42",
+    KUTAHYA: "43",
+    MALATYA: "44",
+    MANISA: "45",
+    KAHRAMANMARAS: "46",
+    MARDIN: "47",
+    MUGLA: "48",
+    MUS: "49",
+    NEVSEHIR: "50",
+    NIGDE: "51",
+    ORDU: "52",
+    RIZE: "53",
+    SAKARYA: "54",
+    SAMSUN: "55",
+    SIIRT: "56",
+    SINOP: "57",
+    SIVAS: "58",
+    TEKIRDAG: "59",
+    TOKAT: "60",
+    TRABZON: "61",
+    TUNCELI: "62",
+    SANLIURFA: "63",
+    USAK: "64",
+    VAN: "65",
+    YOZGAT: "66",
+    ZONGULDAK: "67",
+    AKSARAY: "68",
+    BAYBURT: "69",
+    KARAMAN: "70",
+    KIRIKKALE: "71",
+    BATMAN: "72",
+    SIRNAK: "73",
+    BARTIN: "74",
+    ARDAHAN: "75",
+    IGDIR: "76",
+    YALOVA: "77",
+    KARABUK: "78",
+    KILIS: "79",
+    OSMANIYE: "80",
+    DUZCE: "81",
+  };
+
+  private normalizeCityName(value?: string | null): string {
+    return String(value || "")
+      .trim()
+      .toLocaleUpperCase("tr-TR")
+      .replace(/Ç/g, "C")
+      .replace(/Ğ/g, "G")
+      .replace(/İ/g, "I")
+      .replace(/İ/g, "I")
+      .replace(/Ö/g, "O")
+      .replace(/Ş/g, "S")
+      .replace(/Ü/g, "U");
+  }
+
+  private normalizeMemberPlateCode(cityPlateCode?: string | null, city?: string | null): string {
+    const rawPlate = String(cityPlateCode || "").trim();
+    const plateDigits = rawPlate.match(/\d{1,2}/)?.[0];
+
+    if (plateDigits) {
+      return plateDigits.padStart(2, "0").slice(-2);
+    }
+
+    const normalizedCity = this.normalizeCityName(city);
+
+    return this.ilPlakaKodlari[normalizedCity] || "00";
+  }
+
+  private getMemberYear(memberSince?: Date | string | null, createdAt?: Date | string | null): string {
+    const baseDate = memberSince || createdAt || new Date();
+    const date = baseDate instanceof Date ? baseDate : new Date(baseDate);
+
+    if (Number.isNaN(date.getTime())) {
+      return String(new Date().getFullYear());
+    }
+
+    return String(date.getFullYear());
+  }
+
+  private async getNextMemberSequence(): Promise<number> {
+    const users = await this.prisma.user.findMany({
+      where: {
+        memberCode: { not: null },
+      },
+      select: {
+        memberCode: true,
+      },
+    });
+
+    const maxSequence = users.reduce((max, user) => {
+      const match = String(user.memberCode || "").match(/^EPH-\d{2}-\d{4}-(\d{6})$/);
+      const sequence = match ? Number(match[1]) : 0;
+
+      return Number.isFinite(sequence) && sequence > max ? sequence : max;
+    }, 0);
+
+    return maxSequence + 1;
+  }
+
+  private async generateUniqueMemberCode(user: {
+    cityPlateCode?: string | null;
+    city?: string | null;
+    memberSince?: Date | string | null;
+    createdAt?: Date | string | null;
+  }): Promise<string> {
+    const plateCode = this.normalizeMemberPlateCode(user.cityPlateCode, user.city);
+    const year = this.getMemberYear(user.memberSince, user.createdAt);
+    let sequence = await this.getNextMemberSequence();
+    let memberCode = `EPH-${plateCode}-${year}-${String(sequence).padStart(6, "0")}`;
+
+    let existing = await this.prisma.user.findUnique({
+      where: { memberCode },
+      select: { id: true },
+    });
+
+    while (existing) {
+      sequence += 1;
+      memberCode = `EPH-${plateCode}-${year}-${String(sequence).padStart(6, "0")}`;
+      existing = await this.prisma.user.findUnique({
+        where: { memberCode },
+        select: { id: true },
+      });
+    }
+
+    return memberCode;
+  }
+
+  private maskSoftwareTeamUserForActor<T extends Record<string, any>>(user: T | null, actor?: AdminActor): T | null {
+    if (!user) {
+      return user;
+    }
+
+    if (actor?.role === Role.SUPER_ADMIN) {
+      return user;
+    }
+
+    if (user.role !== Role.SUPER_ADMIN) {
+      return user;
+    }
+
+    return {
+      ...user,
+      firstName: "Yazılım",
+      lastName: "Ekibi",
+      email: "gizli@eph.local",
+      phone: "Gizli",
+      profileImageUrl: null,
+      memberCode: "Gizli",
+      city: "Gizli",
+      district: "Gizli",
+      cityPlateCode: null,
+      referralCode: null,
+      documents: Array.isArray(user.documents) ? [] : user.documents,
+      restrictions: Array.isArray(user.restrictions) ? [] : user.restrictions,
+    } as T;
+  }
+
+  private maskSoftwareTeamNestedUser<T extends Record<string, any>>(user: T | null | undefined, actor?: AdminActor): T | null | undefined {
+    if (!user) {
+      return user;
+    }
+
+    if (actor?.role === Role.SUPER_ADMIN || user.role !== Role.SUPER_ADMIN) {
+      return user;
+    }
+
+    return {
+      ...user,
+      firstName: "Yazılım",
+      lastName: "Ekibi",
+      email: "gizli@eph.local",
+      phone: "Gizli",
+      profileImageUrl: null,
+      memberCode: "Gizli",
+      city: "Gizli",
+      district: "Gizli",
+      cityPlateCode: null,
+      referralCode: null,
+    } as T;
+  }
+
+  private maskSoftwareTeamVisitForActor<T extends Record<string, any>>(visit: T, actor?: AdminActor): T {
+    if (!visit.user) {
+      return visit;
+    }
+
+    return {
+      ...visit,
+      user: this.maskSoftwareTeamNestedUser(visit.user, actor),
+    } as T;
+  }
+
+  private ensureReason(reason?: string): string {
+    const cleanReason = String(reason || "").trim();
+
+    if (!cleanReason) {
+      throw new BadRequestException("İşlem sebebi zorunludur.");
+    }
+
+    return cleanReason;
+  }
+
+  private normalizeSuspendDuration(duration?: string): SuspendDuration {
+    const value = String(duration || "ONE_HOUR").trim().toUpperCase();
+
+    if (["ONE_HOUR", "1_HOUR", "1_SAAT", "SAAT", "HOUR"].includes(value)) {
+      return "ONE_HOUR";
+    }
+
+    if (["ONE_DAY", "1_DAY", "1_GUN", "1_GÜN", "GUN", "GÜN", "DAY"].includes(value)) {
+      return "ONE_DAY";
+    }
+
+    if (["ONE_WEEK", "1_WEEK", "1_HAFTA", "HAFTA", "WEEK"].includes(value)) {
+      return "ONE_WEEK";
+    }
+
+    if (["ONE_MONTH", "1_MONTH", "1_AY", "AY", "MONTH"].includes(value)) {
+      return "ONE_MONTH";
+    }
+
+    if (["PERMANENT", "SURESIZ", "SÜRESİZ", "KALICI"].includes(value)) {
+      return "PERMANENT";
+    }
+
+    throw new BadRequestException("Geçersiz askıya alma süresi.");
+  }
+
+  private calculateSuspendEndDate(duration: SuspendDuration): Date | null {
+    const endsAt = new Date();
+
+    if (duration === "ONE_HOUR") {
+      endsAt.setHours(endsAt.getHours() + 1);
+      return endsAt;
+    }
+
+    if (duration === "ONE_DAY") {
+      endsAt.setDate(endsAt.getDate() + 1);
+      return endsAt;
+    }
+
+    if (duration === "ONE_WEEK") {
+      endsAt.setDate(endsAt.getDate() + 7);
+      return endsAt;
+    }
+
+    if (duration === "ONE_MONTH") {
+      endsAt.setMonth(endsAt.getMonth() + 1);
+      return endsAt;
+    }
+
+    return null;
+  }
+
+  private async logAdminAction(data: {
+    actor?: AdminActor;
+    targetUserId?: string;
+    action: string;
+    entityType: string;
+    entityId?: string;
+    description?: string;
+    metadata?: Record<string, any>;
+  }) {
+    try {
+      await this.prisma.adminActionLog.create({
+        data: {
+          actorId: data.actor?.id || null,
+          targetUserId: data.targetUserId || null,
+          action: data.action,
+          entityType: data.entityType,
+          entityId: data.entityId || null,
+          description: data.description || null,
+          metadata: data.metadata || undefined,
+          ipAddress: data.actor?.ipAddress || null,
+          userAgent: data.actor?.userAgent || null,
+        },
+      });
+    } catch (error) {
+      console.error("Admin işlem logu yazılamadı:", error);
+    }
+  }
+
+  async getStats(actor?: AdminActor) {
+    const permission = await this.resolveOperationalPermission(actor, "REPORT_VIEW");
+    if (!permission.enabled) {
+      throw new ForbiddenException("Rapor görüntüleme yetkiniz bulunmuyor.");
+    }
+
+    const totalUsers = await this.prisma.user.count();
+    const pendingUsers = await this.prisma.user.count({
+      where: {
+        isApproved: false,
+        isVerified: true,
+      },
+    });
+    const approvedUsers = await this.prisma.user.count({ where: { isApproved: true } });
+    const totalInvitations = await this.prisma.invitation.count();
+    const pendingDocuments = await this.prisma.document.count({ where: { status: "PENDING" } });
+    const pendingNominations = await this.prisma.nomination.count({ where: { status: "PENDING" } });
+    const pendingApplications = await this.prisma.application.count({ where: { status: "PENDING" } });
+    const totalReferralCandidates = await this.prisma.referralCandidate.count();
+    const activeReferralCandidates = await this.prisma.referralCandidate.count({
+      where: { isActive: true },
+    });
+
+    const byRole = await this.prisma.user.groupBy({
+      by: ["role"],
+      _count: { role: true },
+    });
+
+    return {
+      totalUsers,
+      pendingUsers,
+      approvedUsers,
+      totalInvitations,
+      pendingDocuments,
+      pendingNominations,
+      pendingApplications,
+      totalReferralCandidates,
+      activeReferralCandidates,
+      byRole: byRole.map((r) => ({ role: r.role, count: r._count.role })),
+    };
+  }
+
+  async getDashboardSummary(actor?: AdminActor) {
+    const reportPermission = await this.resolveOperationalPermission(actor, "REPORT_VIEW");
+    if (!reportPermission.enabled) {
+      throw new ForbiddenException("Rapor görüntüleme yetkiniz bulunmuyor.");
+    }
+    const auditPermission = await this.resolveOperationalPermission(actor, "AUDIT_VIEW");
+    const canViewAudit = auditPermission.enabled;
+
+    const now = new Date();
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const [
+      announcementTotal,
+      announcementActive,
+      announcementPassive,
+      systemMessageTotal,
+      systemMessageToday,
+      systemMessageRecipients,
+    ] = await Promise.all([
+      this.prisma.platformAnnouncement.count(),
+      this.prisma.platformAnnouncement.count({ where: { isActive: true } }),
+      this.prisma.platformAnnouncement.count({ where: { isActive: false } }),
+      this.prisma.systemMessage.count(),
+      this.prisma.systemMessage.count({ where: { createdAt: { gte: startOfToday } } }),
+      this.prisma.systemMessage.aggregate({
+        _sum: {
+          recipientCount: true,
+        },
+      }),
+    ]);
+
+    if (!canViewAudit) {
+      return {
+        auditSummary: {
+          canView: false,
+          totalLogs: 0,
+          todayLogs: 0,
+          lastActionAt: null,
+          topAction: null,
+        },
+        recentActions: [],
+        announcementCount: announcementActive,
+        announcementSummary: {
+          total: announcementTotal,
+          active: announcementActive,
+          passive: announcementPassive,
+        },
+        systemMessageCount: systemMessageTotal,
+        systemMessageSummary: {
+          total: systemMessageTotal,
+          today: systemMessageToday,
+          recipientTotal: systemMessageRecipients._sum.recipientCount || 0,
+        },
+      };
+    }
+
+    const [
+      totalLogs,
+      todayLogs,
+      lastAction,
+      topActionResult,
+      recentActions,
+    ] = await Promise.all([
+      this.prisma.adminActionLog.count(),
+      this.prisma.adminActionLog.count({ where: { createdAt: { gte: startOfToday } } }),
+      this.prisma.adminActionLog.findFirst({
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true },
+      }),
+      this.prisma.adminActionLog.groupBy({
+        by: ["action"],
+        _count: { action: true },
+        orderBy: { _count: { action: "desc" } },
+        take: 1,
+      }),
+      this.prisma.adminActionLog.findMany({
+        take: 10,
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          action: true,
+          entityType: true,
+          entityId: true,
+          description: true,
+          createdAt: true,
+          actor: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              role: true,
+              memberCode: true,
+              profileImageUrl: true,
+            },
+          },
+          targetUser: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              role: true,
+              memberCode: true,
+              profileImageUrl: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    return {
+      auditSummary: {
+        canView: true,
+        totalLogs,
+        todayLogs,
+        lastActionAt: lastAction?.createdAt || null,
+        topAction: topActionResult[0]?.action || null,
+      },
+      recentActions: recentActions.map((item) => ({
+        ...item,
+        actor: this.maskSoftwareTeamNestedUser(item.actor, actor),
+        targetUser: this.maskSoftwareTeamNestedUser(item.targetUser, actor),
+      })),
+      announcementCount: announcementActive,
+      announcementSummary: {
+        total: announcementTotal,
+        active: announcementActive,
+        passive: announcementPassive,
+      },
+      systemMessageCount: systemMessageTotal,
+      systemMessageSummary: {
+        total: systemMessageTotal,
+        today: systemMessageToday,
+        recipientTotal: systemMessageRecipients._sum.recipientCount || 0,
+      },
+    };
+  }
+
+  async getTrafficSummary(actor?: AdminActor) {
+    const permission = await this.resolveOperationalPermission(actor, "REPORT_VIEW");
+    if (!permission.enabled) {
+      throw new ForbiddenException("Rapor görüntüleme yetkiniz bulunmuyor.");
+    }
+
+    const now = new Date();
+
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const startOfWeek = new Date(now);
+    const day = startOfWeek.getDay();
+    const diffToMonday = day === 0 ? 6 : day - 1;
+    startOfWeek.setDate(startOfWeek.getDate() - diffToMonday);
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const onlineSince = new Date(now.getTime() - 5 * 60 * 1000);
+    const awaySince = new Date(now.getTime() - 20 * 60 * 1000);
+
+    const [
+      totalVisits,
+      todayVisits,
+      weekVisits,
+      monthVisits,
+      totalUsers,
+      onlineUsers,
+      awayUsers,
+      lastVisits,
+      topPages,
+      topUserGroups,
+    ] = await Promise.all([
+      this.prisma.userVisit.count(),
+      this.prisma.userVisit.count({ where: { createdAt: { gte: startOfToday } } }),
+      this.prisma.userVisit.count({ where: { createdAt: { gte: startOfWeek } } }),
+      this.prisma.userVisit.count({ where: { createdAt: { gte: startOfMonth } } }),
+      this.prisma.user.count(),
+      this.prisma.userVisit.findMany({
+        where: {
+          userId: { not: null },
+          createdAt: { gte: onlineSince },
+        },
+        distinct: ["userId"],
+        select: { userId: true },
+      }),
+      this.prisma.userVisit.findMany({
+        where: {
+          userId: { not: null },
+          createdAt: {
+            gte: awaySince,
+            lt: onlineSince,
+          },
+        },
+        distinct: ["userId"],
+        select: { userId: true },
+      }),
+      this.prisma.userVisit.findMany({
+        take: 30,
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          page: true,
+          ip: true,
+          userAgent: true,
+          createdAt: true,
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              role: true,
+              city: true,
+              district: true,
+              cityPlateCode: true,
+              memberCode: true,
+              profileImageUrl: true,
+            },
+          },
+        },
+      }),
+      this.prisma.userVisit.groupBy({
+        by: ["page"],
+        _count: { page: true },
+        orderBy: { _count: { page: "desc" } },
+        take: 10,
+      }),
+      this.prisma.userVisit.groupBy({
+        by: ["userId"],
+        where: { userId: { not: null } },
+        _count: { userId: true },
+        _max: { createdAt: true },
+        orderBy: { _count: { userId: "desc" } },
+        take: 10,
+      }),
+    ]);
+
+    const topUserIds = topUserGroups
+      .map((item) => item.userId)
+      .filter((id): id is string => Boolean(id));
+
+    const topUsers = topUserIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: topUserIds } },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            role: true,
+            city: true,
+            district: true,
+            cityPlateCode: true,
+            memberCode: true,
+            profileImageUrl: true,
+          },
+        })
+      : [];
+
+    const topUsersMap = new Map(topUsers.map((user) => [user.id, user]));
+
+    const onlineCount = onlineUsers.length;
+    const awayCount = awayUsers.filter((item) => !onlineUsers.some((online) => online.userId === item.userId)).length;
+    const offlineCount = Math.max(totalUsers - onlineCount - awayCount, 0);
+
+    return {
+      counts: {
+        totalVisits,
+        todayVisits,
+        weekVisits,
+        monthVisits,
+        totalUsers,
+        onlineCount,
+        awayCount,
+        offlineCount,
+      },
+      lastVisits: lastVisits.map((visit) => this.maskSoftwareTeamVisitForActor(visit, actor)),
+      topPages: topPages.map((item) => ({
+        page: item.page,
+        count: item._count.page,
+      })),
+      topUsers: topUserGroups.map((item) => ({
+        user: item.userId ? this.maskSoftwareTeamNestedUser(topUsersMap.get(item.userId) || null, actor) : null,
+        count: item._count.userId,
+        lastSeenAt: item._max.createdAt,
+      })),
+    };
+  }
+
+  async getUsers(filter?: "pending" | "approved" | "all", actor?: AdminActor) {
+    const now = new Date();
+
+    const where =
+      filter === "pending"
+        ? {
+            isApproved: false,
+            isVerified: true,
+          }
+        : filter === "approved"
+          ? { isApproved: true }
+          : {};
+
+    const users = await this.prisma.user.findMany({
+      where,
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        profileImageUrl: true,
+        role: true,
+        memberCode: true,
+        memberSince: true,
+        city: true,
+        district: true,
+        cityPlateCode: true,
+        isApproved: true,
+        isVerified: true,
+        emailVerifiedAt: true,
+        professionalVerificationStatus: true,
+        profileCompleted: true,
+        profileCompletedAt: true,
+        nominationPoints: true,
+        nominationQuota: true,
+        referralCode: true,
+        createdAt: true,
+        documents: {
+          select: {
+            id: true,
+            type: true,
+            status: true,
+            fileUrl: true,
+            fileName: true,
+            createdAt: true,
+          },
+        },
+        capabilities: {
+          select: {
+            id: true,
+            capability: true,
+            createdAt: true,
+            createdBy: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                role: true,
+              },
+            },
+          },
+          orderBy: { createdAt: "asc" },
+        },
+        office: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            city: true,
+            district: true,
+          },
+        },
+        teamMemberships: {
+          where: { isActive: true },
+          select: {
+            id: true,
+            joinedAt: true,
+            team: {
+              select: {
+                id: true,
+                name: true,
+                leaderId: true,
+                office: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+          take: 1,
+        },
+        restrictions: {
+          where: {
+            isActive: true,
+            OR: [{ endsAt: null }, { endsAt: { gt: now } }],
+          },
+          select: {
+            id: true,
+            type: true,
+            reason: true,
+            startsAt: true,
+            endsAt: true,
+            isActive: true,
+            createdAt: true,
+            createdBy: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                role: true,
+              },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const userIds = users.map((user) => user.id);
+    const userPhones = users
+      .map((user) => user.phone)
+      .filter((phone): phone is string => Boolean(phone));
+
+    const phoneVerificationRows = userPhones.length
+      ? await this.prisma.phoneVerificationSecurity.findMany({
+          where: {
+            phone: {
+              in: userPhones,
+            },
+          },
+          select: {
+            phone: true,
+            verifiedAt: true,
+          },
+        })
+      : [];
+
+    const phoneVerificationMap = new Map(
+      phoneVerificationRows.map((item) => [item.phone, item]),
+    );
+
+    const uyelikler = userIds.length
+      ? await this.prisma.kullaniciUyelikPaketi.findMany({
+          where: {
+            kullaniciId: {
+              in: userIds,
+            },
+          },
+          select: {
+            id: true,
+            kullaniciId: true,
+            paketId: true,
+            durum: true,
+            baslangicTarihi: true,
+            bitisTarihi: true,
+            pilotPaketMi: true,
+            testPaketiMi: true,
+          },
+          orderBy: {
+            baslangicTarihi: "desc",
+          },
+        })
+      : [];
+
+    const paketIds = Array.from(
+      new Set(uyelikler.map((uyelik) => uyelik.paketId)),
+    );
+
+    const paketler = paketIds.length
+      ? await this.prisma.uyelikPaketi.findMany({
+          where: {
+            id: {
+              in: paketIds,
+            },
+          },
+          select: {
+            id: true,
+            paketKodu: true,
+            paketAdi: true,
+          },
+        })
+      : [];
+
+    const paketMap = new Map(
+      paketler.map((paket) => [paket.id, paket]),
+    );
+
+    const sonUyelikMap = new Map<
+      string,
+      (typeof uyelikler)[number]
+    >();
+
+    for (const uyelik of uyelikler) {
+      if (!sonUyelikMap.has(uyelik.kullaniciId)) {
+        sonUyelikMap.set(uyelik.kullaniciId, uyelik);
+      }
+    }
+
+    return users.map((user) => {
+      const maskedUser = this.maskSoftwareTeamUserForActor(user, actor);
+      const aktifUyelik = sonUyelikMap.get(user.id) || null;
+      const paket = aktifUyelik
+        ? paketMap.get(aktifUyelik.paketId) || null
+        : null;
+
+      return {
+        ...maskedUser,
+        phoneVerifiedAt:
+          phoneVerificationMap.get(user.phone)?.verifiedAt || null,
+        aktifUyelik: aktifUyelik
+          ? {
+              id: aktifUyelik.id,
+              paketId: aktifUyelik.paketId,
+              paketKodu: paket?.paketKodu || null,
+              paketAdi: paket?.paketAdi || null,
+              durum: aktifUyelik.durum,
+              baslangicTarihi:
+                aktifUyelik.baslangicTarihi,
+              bitisTarihi: aktifUyelik.bitisTarihi,
+              pilotPaketMi: aktifUyelik.pilotPaketMi,
+              testPaketiMi: aktifUyelik.testPaketiMi,
+            }
+          : null,
+        capabilities: (user.capabilities || []).map((capability) => ({
+          ...capability,
+          createdBy: this.maskSoftwareTeamNestedUser(capability.createdBy, actor),
+        })),
+        restrictions: (user.restrictions || []).map((restriction) => ({
+          ...restriction,
+          createdBy: this.maskSoftwareTeamNestedUser(restriction.createdBy, actor),
+        })),
+      };
+    });
+  }
+
+  async updateUserCapabilities(
+    id: string,
+    capabilities: Array<Capability | string>,
+    actor?: AdminActor,
+  ) {
+    const permission = await this.resolveOperationalPermission(actor, "CAPABILITY_MANAGE");
+    if (!permission.enabled) {
+      throw new ForbiddenException("Kullanıcı ek yetkilerini yönetme yetkiniz bulunmuyor.");
+    }
+
+    const actorId = this.getActorId(actor);
+    const normalizedCapabilities = this.normalizeCapabilities(capabilities);
+
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        capabilities: {
+          select: { capability: true },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException("Kullanıcı bulunamadı.");
+    }
+
+    if (user.role === Role.SUPER_ADMIN) {
+      throw new BadRequestException("Yazılım Ekibi hesabına organizasyon ek yetkisi atanamaz.");
+    }
+
+    if (
+      normalizedCapabilities.includes(Capability.OFFICE_OWNER) &&
+      user.role !== Role.EMLAKCI
+    ) {
+      throw new BadRequestException(
+        "OFFICE_OWNER ek yetkisi yalnız Emlakçı rolüne atanabilir.",
+      );
+    }
+
+    const currentCapabilities = user.capabilities.map((item) => item.capability);
+    const capabilitiesToAdd = normalizedCapabilities.filter(
+      (capability) => !currentCapabilities.includes(capability),
+    );
+    const capabilitiesToRemove = currentCapabilities.filter(
+      (capability) => !normalizedCapabilities.includes(capability),
+    );
+
+    const officeOwnerChanged =
+      user.role === Role.EMLAKCI &&
+      (
+        capabilitiesToAdd.includes(Capability.OFFICE_OWNER) ||
+        capabilitiesToRemove.includes(Capability.OFFICE_OWNER)
+      );
+
+    await this.prisma.$transaction([
+      ...(capabilitiesToRemove.length
+        ? [
+            this.prisma.userCapability.deleteMany({
+              where: {
+                userId: id,
+                capability: { in: capabilitiesToRemove },
+              },
+            }),
+          ]
+        : []),
+      ...capabilitiesToAdd.map((capability) =>
+        this.prisma.userCapability.upsert({
+          where: {
+            userId_capability: {
+              userId: id,
+              capability,
+            },
+          },
+          update: {
+            createdById: actorId,
+          },
+          create: {
+            userId: id,
+            capability,
+            createdById: actorId,
+          },
+        }),
+      ),
+      ...(officeOwnerChanged
+        ? [
+            this.prisma.document.updateMany({
+              where: { userId: id },
+              data: { status: "PENDING" },
+            }),
+            this.prisma.user.update({
+              where: { id },
+              data: {
+                professionalVerificationStatus:
+                  ProfessionalVerificationStatus.REVIEW_REQUIRED,
+                profileCompleted: false,
+                profileCompletedAt: null,
+              },
+            }),
+          ]
+        : []),
+    ]);
+
+    const updated = await this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        profileImageUrl: true,
+        role: true,
+        isApproved: true,
+        capabilities: {
+          select: {
+            id: true,
+            capability: true,
+            createdAt: true,
+            createdBy: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                role: true,
+              },
+            },
+          },
+          orderBy: { createdAt: "asc" },
+        },
+      },
+    });
+
+    await this.logAdminAction({
+      actor,
+      targetUserId: id,
+      action: "USER_CAPABILITIES_UPDATED",
+      entityType: "UserCapability",
+      entityId: id,
+      description: `${user.email} kullanıcısının organizasyon ek yetkileri güncellendi.`,
+      metadata: {
+        oldCapabilities: currentCapabilities,
+        newCapabilities: normalizedCapabilities,
+        added: capabilitiesToAdd,
+        removed: capabilitiesToRemove,
+      },
+    });
+
+    return {
+      success: true,
+      message: "Ek yetkiler güncellendi.",
+      user: updated,
+    };
+  }
+
+  async approveUser(id: string, actor?: AdminActor) {
+    const permission = await this.resolveOperationalPermission(actor, "USER_APPROVE");
+    if (!permission.enabled) {
+      throw new ForbiddenException("Kullanıcı onaylama yetkiniz bulunmuyor.");
+    }
+
+    const user = await this.prisma.user.findUnique({ where: { id } });
+
+    if (!user) {
+      throw new NotFoundException("Kullanıcı bulunamadı.");
+    }
+
+    if (!user.isVerified) {
+      throw new BadRequestException(
+        "E-posta doğrulaması tamamlanmamış kullanıcı onaylanamaz.",
+      );
+    }
+
+    const memberCode = user.memberCode || (await this.generateUniqueMemberCode(user));
+
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data: {
+        isApproved: true,
+        ...(user.memberCode ? {} : { memberCode }),
+        ...(!user.memberSince ? { memberSince: new Date() } : {}),
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        profileImageUrl: true,
+        role: true,
+        memberCode: true,
+        memberSince: true,
+        isApproved: true,
+      },
+    });
+
+    await this.logAdminAction({
+      actor,
+      targetUserId: id,
+      action: "USER_APPROVED",
+      entityType: "User",
+      entityId: id,
+      description: `${user.email} kullanıcısı onaylandı.`,
+    });
+
+    try {
+      await this.mail.sendUserApproved(user.email, user.firstName);
+    } catch {}
+
+    return updated;
+  }
+
+  async rejectUser(id: string, actor?: AdminActor) {
+    const permission = await this.resolveOperationalPermission(actor, "USER_DELETE");
+    if (!permission.enabled) {
+      throw new ForbiddenException("Kullanıcı silme yetkiniz bulunmuyor.");
+    }
+    this.requireSoftwareTeam(actor);
+
+    const user = await this.prisma.user.findUnique({ where: { id } });
+
+    if (!user) {
+      throw new NotFoundException("Kullanıcı bulunamadı.");
+    }
+
+    if (user.id === this.getActorId(actor)) {
+      throw new BadRequestException("Kendi hesabınızı silemezsiniz.");
+    }
+
+    const deleted = await this.prisma.user.delete({ where: { id } });
+
+    await this.logAdminAction({
+      actor,
+      targetUserId: id,
+      action: "USER_DELETED",
+      entityType: "User",
+      entityId: id,
+      description: `${user.email} kullanıcısı Yazılım Ekibi tarafından silindi.`,
+      metadata: {
+        deletedUserRole: user.role,
+      },
+    });
+
+    return deleted;
+  }
+
+  async suspendUser(
+    id: string,
+    actor?: AdminActor,
+    body?: {
+      reason?: string;
+      duration?: SuspendDuration | string;
+    },
+  ) {
+    const permission = await this.resolveOperationalPermission(actor, "USER_SUSPEND");
+    if (!permission.enabled) {
+      throw new ForbiddenException("Kullanıcı askıya alma yetkiniz bulunmuyor.");
+    }
+
+    const actorId = this.getActorId(actor);
+    const reason = this.ensureReason(body?.reason);
+
+    const user = await this.prisma.user.findUnique({ where: { id } });
+
+    if (!user) {
+      throw new NotFoundException("Kullanıcı bulunamadı.");
+    }
+
+    if (user.id === actorId) {
+      throw new BadRequestException("Kendi hesabınızı askıya alamazsınız.");
+    }
+
+    let duration: SuspendDuration = this.normalizeSuspendDuration(body?.duration);
+
+    if (this.isAdmin(actor)) {
+      if (user.role === Role.ADMIN || user.role === Role.SUPER_ADMIN) {
+        throw new ForbiddenException("Admin, Admin veya Yazılım Ekibi hesabını askıya alamaz.");
+      }
+
+      duration = "ONE_HOUR";
+
+      const last24Hours = new Date();
+      last24Hours.setHours(last24Hours.getHours() - 24);
+
+      const adminSuspendCount = await this.prisma.userRestriction.count({
+        where: {
+          createdById: actorId,
+          type: "GECICI_ASKI" as any,
+          createdAt: { gte: last24Hours },
+        },
+      });
+
+      if (adminSuspendCount >= 1) {
+        throw new ForbiddenException(
+          "Admin askıya alma hakkınızı son 24 saat içinde kullandınız. Yeni hak 24 saat sonra açılır.",
+        );
+      }
+    }
+
+    if (!this.isAdmin(actor) && !this.isSoftwareTeam(actor)) {
+      throw new ForbiddenException("Bu işlem için yetkiniz yok.");
+    }
+
+    const endsAt = this.calculateSuspendEndDate(duration);
+    const restrictionType = duration === "PERMANENT" ? "KALICI_ASKI" : "GECICI_ASKI";
+
+    await this.prisma.userRestriction.updateMany({
+      where: {
+        userId: id,
+        isActive: true,
+        type: {
+          in: ["GECICI_ASKI", "KALICI_ASKI"] as any,
+        },
+      },
+      data: {
+        isActive: false,
+        liftedAt: new Date(),
+        liftedNote: "Yeni askıya alma işlemi nedeniyle önceki aktif askı kapatıldı.",
+      },
+    });
+
+    const restriction = await this.prisma.userRestriction.create({
+      data: {
+        userId: id,
+        createdById: actorId,
+        type: restrictionType as any,
+        reason,
+        startsAt: new Date(),
+        endsAt,
+        isActive: true,
+      },
+    });
+
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data: { isApproved: false },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        profileImageUrl: true,
+        role: true,
+        isApproved: true,
+      },
+    });
+
+    await this.logAdminAction({
+      actor,
+      targetUserId: id,
+      action: this.isSoftwareTeam(actor) ? "USER_SUSPENDED_BY_SOFTWARE_TEAM" : "USER_SUSPENDED_BY_ADMIN",
+      entityType: "UserRestriction",
+      entityId: restriction.id,
+      description:
+        duration === "PERMANENT"
+          ? `${user.email} kullanıcısı süresiz askıya alındı.`
+          : `${user.email} kullanıcısı süreli askıya alındı.`,
+      metadata: {
+        duration,
+        endsAt,
+        reason,
+        targetRole: user.role,
+      },
+    });
+
+    try {
+      await this.mail.sendUserSuspended(user.email, user.firstName);
+    } catch {}
+
+    return {
+      user: updated,
+      restriction,
+      message:
+        duration === "PERMANENT"
+          ? "Kullanıcı süresiz askıya alındı."
+          : "Kullanıcı süreli askıya alındı.",
+    };
+  }
+
+  async changeUserRole(id: string, role: Role | string, actor?: AdminActor) {
+    const permission = await this.resolveOperationalPermission(actor, "ROLE_CHANGE");
+    if (!permission.enabled) {
+      throw new ForbiddenException("Kullanıcı rolünü değiştirme yetkiniz bulunmuyor.");
+    }
+
+    const normalizedRole =
+      String(role || "").trim().toUpperCase() as Role;
+
+    if (!Object.values(Role).includes(normalizedRole)) {
+      throw new BadRequestException("Geçersiz rol.");
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+    });
+
+    if (!user) {
+      throw new NotFoundException("Kullanıcı bulunamadı.");
+    }
+
+    if (user.id === this.getActorId(actor)) {
+      throw new BadRequestException(
+        "Kendi rolünüzü değiştiremezsiniz.",
+      );
+    }
+
+    if (
+      normalizedRole === Role.SUPER_ADMIN ||
+      user.role === Role.SUPER_ADMIN
+    ) {
+      const superAdminPermission = await this.resolveOperationalPermission(actor, "SUPER_ADMIN_MANAGE");
+      if (!superAdminPermission.enabled) {
+        throw new ForbiddenException("Yazılım Ekibi hesabını yönetme yetkiniz bulunmuyor.");
+      }
+    }
+
+    const roleChanged =
+      user.role !== normalizedRole;
+
+    const professionalRole =
+      normalizedRole === Role.EMLAKCI ||
+      normalizedRole === Role.MUTEAHHIT ||
+      normalizedRole === Role.INSAAT_FIRMASI;
+
+    const updated = await this.prisma.$transaction(
+      async (tx) => {
+        if (
+          roleChanged &&
+          normalizedRole !== Role.EMLAKCI
+        ) {
+          await tx.userCapability.deleteMany({
+            where: {
+              userId: id,
+              capability: Capability.OFFICE_OWNER,
+            },
+          });
+        }
+
+        if (roleChanged && professionalRole) {
+          await tx.document.updateMany({
+            where: { userId: id },
+            data: { status: "PENDING" },
+          });
+        }
+
+        return tx.user.update({
+          where: { id },
+          data: {
+            role: normalizedRole,
+            ...(roleChanged
+              ? {
+                  professionalVerificationStatus:
+                    professionalRole
+                      ? ProfessionalVerificationStatus.REVIEW_REQUIRED
+                      : null,
+                  ...(professionalRole
+                    ? {
+                        profileCompleted: false,
+                        profileCompletedAt: null,
+                      }
+                    : {}),
+                }
+              : {}),
+          },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            profileImageUrl: true,
+            role: true,
+            isApproved: true,
+            professionalVerificationStatus: true,
+          },
+        });
+      },
+    );
+
+    await this.logAdminAction({
+      actor,
+      targetUserId: id,
+      action: "USER_ROLE_CHANGED",
+      entityType: "User",
+      entityId: id,
+      description: `${user.email} kullanıcısının rolü değiştirildi.`,
+      metadata: {
+        oldRole: user.role,
+        newRole: normalizedRole,
+        professionalVerificationReset:
+          roleChanged && professionalRole,
+      },
+    });
+
+    return updated;
+  }
+
+  async createUser(
+    data: {
+      firstName: string;
+      lastName: string;
+      email: string;
+      phone: string;
+      password: string;
+      role: Role | string;
+    },
+    actor?: AdminActor,
+  ) {
+    this.requireSoftwareTeam(actor);
+
+    const normalizedRole = String(data.role || "").trim().toUpperCase() as Role;
+
+    if (!Object.values(Role).includes(normalizedRole)) {
+      throw new BadRequestException("Geçersiz rol.");
+    }
+
+    if (
+      normalizedRole === Role.ADMIN ||
+      normalizedRole === Role.MODERATOR ||
+      normalizedRole === Role.SUPER_ADMIN
+    ) {
+      this.requireSoftwareTeam(actor);
+    }
+
+    if (normalizedRole === Role.SUPER_ADMIN) {
+      const superAdminPermission = await this.resolveOperationalPermission(actor, "SUPER_ADMIN_MANAGE");
+      if (!superAdminPermission.enabled) {
+        throw new ForbiddenException("Yazılım Ekibi hesabını oluşturma yetkiniz bulunmuyor.");
+      }
+    }
+
+    const existing = await this.prisma.user.findUnique({
+      where: { email: data.email },
+    });
+
+    if (existing) {
+      throw new BadRequestException("Bu e-posta zaten kayıtlı.");
+    }
+
+    const passwordHash = await bcrypt.hash(data.password, 10);
+    const referralCode = await this.generateUniqueReferralCode();
+
+    const created = await this.prisma.user.create({
+      data: {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        phone: data.phone,
+        passwordHash,
+        role: normalizedRole,
+        isApproved: true,
+        isVerified: true,
+        professionalVerificationStatus:
+          normalizedRole === Role.EMLAKCI ||
+          normalizedRole === Role.MUTEAHHIT ||
+          normalizedRole === Role.INSAAT_FIRMASI
+            ? ProfessionalVerificationStatus.PENDING
+            : null,
+        referralCode,
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        profileImageUrl: true,
+        role: true,
+        city: true,
+        district: true,
+        cityPlateCode: true,
+        memberCode: true,
+        memberSince: true,
+        createdAt: true,
+        isApproved: true,
+        referralCode: true,
+      },
+    });
+
+    const createdMemberCode = await this.generateUniqueMemberCode(created);
+
+    const createdWithMemberCode = await this.prisma.user.update({
+      where: { id: created.id },
+      data: {
+        memberCode: createdMemberCode,
+        memberSince: new Date(),
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        profileImageUrl: true,
+        role: true,
+        city: true,
+        district: true,
+        cityPlateCode: true,
+        memberCode: true,
+        memberSince: true,
+        isApproved: true,
+        referralCode: true,
+      },
+    });
+
+    await this.logAdminAction({
+      actor,
+      targetUserId: created.id,
+      action: "USER_CREATED",
+      entityType: "User",
+      entityId: created.id,
+      description: `${created.email} kullanıcısı oluşturuldu.`,
+      metadata: {
+        createdRole: created.role,
+      },
+    });
+
+    return createdWithMemberCode;
+  }
+
+  async assignMemberCodeToUser(id: string, actor?: AdminActor) {
+    this.requireSoftwareTeam(actor);
+
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        profileImageUrl: true,
+        role: true,
+        memberCode: true,
+        memberSince: true,
+        city: true,
+        district: true,
+        cityPlateCode: true,
+        isApproved: true,
+        isVerified: true,
+        nominationPoints: true,
+        nominationQuota: true,
+        referralCode: true,
+        createdAt: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException("Kullanıcı bulunamadı.");
+    }
+
+    if (user.memberCode) {
+      return {
+        success: true,
+        message: "Kullanıcının üye numarası zaten var.",
+        user,
+      };
+    }
+
+    const memberCode = await this.generateUniqueMemberCode(user);
+
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data: {
+        memberCode,
+        ...(!user.memberSince ? { memberSince: new Date() } : {}),
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        profileImageUrl: true,
+        role: true,
+        memberCode: true,
+        memberSince: true,
+        city: true,
+        district: true,
+        cityPlateCode: true,
+        isApproved: true,
+        isVerified: true,
+        nominationPoints: true,
+        nominationQuota: true,
+        referralCode: true,
+        createdAt: true,
+      },
+    });
+
+    await this.logAdminAction({
+      actor,
+      targetUserId: id,
+      action: "USER_MEMBER_CODE_ASSIGNED",
+      entityType: "User",
+      entityId: id,
+      description: `${user.email} kullanıcısına ${memberCode} üye numarası atandı.`,
+      metadata: {
+        memberCode,
+        plateCode: memberCode.split("-")[1],
+      },
+    });
+
+    return {
+      success: true,
+      message: "Üye numarası oluşturuldu.",
+      user: updated,
+    };
+  }
+
+  async assignMissingMemberCodes(actor?: AdminActor) {
+    this.requireSoftwareTeam(actor);
+
+    const users = await this.prisma.user.findMany({
+      where: {
+        isApproved: true,
+        memberCode: null,
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        city: true,
+        cityPlateCode: true,
+        memberSince: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    const updatedUsers = [];
+
+    for (const user of users) {
+      const memberCode = await this.generateUniqueMemberCode(user);
+
+      const updated = await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          memberCode,
+          ...(!user.memberSince ? { memberSince: new Date() } : {}),
+        },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          role: true,
+          memberCode: true,
+          memberSince: true,
+          city: true,
+          district: true,
+          cityPlateCode: true,
+          isApproved: true,
+        },
+      });
+
+      updatedUsers.push(updated);
+    }
+
+    await this.logAdminAction({
+      actor,
+      action: "MISSING_MEMBER_CODES_ASSIGNED",
+      entityType: "User",
+      description: `${updatedUsers.length} kullanıcıya toplu üye numarası atandı.`,
+      metadata: {
+        count: updatedUsers.length,
+        memberCodes: updatedUsers.map((user) => user.memberCode),
+      },
+    });
+
+    return {
+      success: true,
+      message: `${updatedUsers.length} kullanıcıya üye numarası oluşturuldu.`,
+      count: updatedUsers.length,
+      users: updatedUsers,
+    };
+  }
+
+  async getReferralCodes(actor?: AdminActor) {
+    const users = await this.prisma.user.findMany({
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        role: true,
+        isApproved: true,
+        referralCode: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const candidates = await this.prisma.referralCandidate.findMany({
+      orderBy: { createdAt: "desc" },
+    });
+
+    return {
+      users: users.map((user) => this.maskSoftwareTeamUserForActor(user, actor)),
+      candidates,
+    };
+  }
+
+  async createReferralCandidate(data: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    role: Role;
+  }) {
+    const firstName = data.firstName.trim();
+    const lastName = data.lastName.trim();
+    const email = data.email.trim().toLowerCase();
+    const phone = data.phone.trim();
+    const role = data.role;
+
+    if (!Object.values(Role).includes(role)) {
+      throw new BadRequestException("Geçersiz rol.");
+    }
+
+    const existingUser = await this.prisma.user.findFirst({
+      where: {
+        OR: [{ email }, { phone }],
+      },
+    });
+
+    if (existingUser) {
+      throw new BadRequestException("Bu e-posta veya telefonla kayıtlı kullanıcı var.");
+    }
+
+    const existingCandidate = await this.prisma.referralCandidate.findFirst({
+      where: {
+        OR: [{ email }, { phone }],
+      },
+    });
+
+    if (existingCandidate) {
+      throw new BadRequestException("Bu kişi için daha önce referans kodu oluşturulmuş.");
+    }
+
+    const existingInvitation = await this.prisma.invitation.findFirst({
+      where: {
+        OR: [{ adayEposta: email }, { adayAdSoyad: `${firstName} ${lastName}` }],
+      },
+    });
+
+    if (existingInvitation) {
+      throw new BadRequestException("Bu kişi için daha önce davet kodu oluşturulmuş.");
+    }
+
+    const referralCode = await this.generateUniqueProfessionalReferralCode(firstName, lastName, role);
+
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30);
+
+    const [candidate, invitation] = await this.prisma.$transaction([
+      this.prisma.referralCandidate.create({
+        data: {
+          referralCode,
+          firstName,
+          lastName,
+          email,
+          phone,
+          role,
+          isActive: true,
+        },
+      }),
+      this.prisma.invitation.create({
+        data: {
+          code: referralCode,
+          role,
+          adayAdSoyad: `${firstName} ${lastName}`,
+          adayEposta: email,
+          pilotDavetiMi: true,
+          expiresAt,
+          maxUses: 1,
+          onayYetkiSeviyesi: "MODERATOR_ADMIN_SUPER_ADMIN" as any,
+        },
+      }),
+    ]);
+
+    try {
+      await this.mail.sendReferralInvitation({
+        email,
+        name: `${firstName} ${lastName}`,
+        role,
+        referralCode,
+        expiresAt,
+      });
+    } catch (error: any) {
+      console.error("Referans davet maili gönderilemedi:", error?.message || error);
+    }
+
+    await this.logAdminAction({
+      action: "REFERRAL_INVITATION_CREATED",
+      entityType: "Invitation",
+      entityId: invitation.id,
+      description: `${email} adresi için referans davet kodu oluşturuldu.`,
+      metadata: {
+        referralCode,
+        role,
+        candidateId: candidate.id,
+        expiresAt,
+      },
+    });
+
+    return {
+      ...candidate,
+      invitation,
+      mailSent: true,
+    };
+  }
+
+  async deactivateReferralCandidate(id: string) {
+    const candidate = await this.prisma.referralCandidate.findUnique({
+      where: { id },
+    });
+
+    if (!candidate) {
+      throw new NotFoundException("Referans kaydı bulunamadı.");
+    }
+
+    return this.prisma.referralCandidate.update({
+      where: { id },
+      data: { isActive: false },
+    });
+  }
+
+  async deleteReferralCandidate(id: string, actor?: AdminActor) {
+    this.requireSoftwareTeam(actor);
+
+    const candidate = await this.prisma.referralCandidate.findUnique({
+      where: { id },
+    });
+
+    if (!candidate) {
+      throw new NotFoundException("Referans kaydı bulunamadı.");
+    }
+
+    if (candidate.usedAt) {
+      throw new BadRequestException("Kullanılmış referans kodu silinemez. Sadece pasifleştirilebilir.");
+    }
+
+    const invitation = await this.prisma.invitation.findUnique({
+      where: { code: candidate.referralCode },
+    });
+
+    await this.prisma.$transaction([
+      ...(invitation
+        ? [
+            this.prisma.invitation.delete({
+              where: { code: candidate.referralCode },
+            }),
+          ]
+        : []),
+      this.prisma.referralCandidate.delete({
+        where: { id },
+      }),
+    ]);
+
+    await this.logAdminAction({
+      actor,
+      action: "REFERRAL_INVITATION_DELETED",
+      entityType: "ReferralCandidate",
+      entityId: id,
+      description: `${candidate.email} adresine ait referans kodu Yazılım Ekibi tarafından silindi.`,
+      metadata: {
+        referralCode: candidate.referralCode,
+        role: candidate.role,
+        candidateEmail: candidate.email,
+        invitationId: invitation?.id || null,
+      },
+    });
+
+    return {
+      success: true,
+      message: "Referans kodu silindi.",
+      deletedReferralCode: candidate.referralCode,
+    };
+  }
+
+  async getInvitations() {
+    return this.prisma.invitation.findMany({
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  private requiredProfessionalDocumentTypes(
+    role: Role,
+    capabilities: Capability[],
+  ): DocumentType[] {
+    if (role === Role.EMLAKCI) {
+      return capabilities.includes(Capability.OFFICE_OWNER)
+        ? [DocumentType.YETKI_BELGESI]
+        : [DocumentType.MYK_BELGESI];
+    }
+
+    if (
+      role === Role.MUTEAHHIT ||
+      role === Role.INSAAT_FIRMASI
+    ) {
+      return [
+        DocumentType.YAMBIS_BELGESI,
+        DocumentType.VERGI_LEVHASI,
+      ];
+    }
+
+    return [];
+  }
+
+  private async syncProfessionalVerificationStatus(
+    userId: string,
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        role: true,
+        companyName: true,
+        professionalVerificationStatus: true,
+        capabilities: {
+          select: {
+            capability: true,
+          },
+        },
+        documents: {
+          select: {
+            type: true,
+            status: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException("Kullanıcı bulunamadı.");
+    }
+
+    if (user.professionalVerificationStatus === null) {
+      return null;
+    }
+
+    const requiredTypes =
+      this.requiredProfessionalDocumentTypes(
+        user.role,
+        user.capabilities.map(
+          (item) => item.capability,
+        ),
+      );
+
+    if (!requiredTypes.length) {
+      return user.professionalVerificationStatus;
+    }
+
+    const states = requiredTypes.map((requiredType) => {
+      const matching = user.documents.filter(
+        (document) => document.type === requiredType,
+      );
+
+      const approved = matching.some(
+        (document) => document.status === "APPROVED",
+      );
+
+      const rejected =
+        !approved &&
+        matching.some(
+          (document) => document.status === "REJECTED",
+        );
+
+      return {
+        requiredType,
+        approved,
+        rejected,
+      };
+    });
+
+    let nextStatus: ProfessionalVerificationStatus =
+      ProfessionalVerificationStatus.PENDING;
+
+    const hasEmployer = !requiresCompanyName(user.role) || (typeof user.companyName === 'string' && user.companyName.trim().length >= 2);
+    if (hasEmployer && states.every((state) => state.approved)) {
+      nextStatus =
+        ProfessionalVerificationStatus.VERIFIED;
+    } else if (
+      states.some((state) => state.rejected)
+    ) {
+      nextStatus =
+        ProfessionalVerificationStatus.REJECTED;
+    }
+
+    const verified =
+      nextStatus ===
+      ProfessionalVerificationStatus.VERIFIED;
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        professionalVerificationStatus: nextStatus,
+        profileCompleted: verified,
+        profileCompletedAt: verified
+          ? new Date()
+          : null,
+      },
+    });
+
+    return nextStatus;
+  }
+
+  async getDocuments(
+    filter?: "pending" | "approved" | "rejected" | "all",
+    actor?: AdminActor,
+  ) {
+    const permission = await this.resolveOperationalPermission(actor, "DOCUMENT_VIEW");
+    if (!permission.enabled) {
+      throw new ForbiddenException("Belge görüntüleme yetkiniz bulunmuyor.");
+    }
+
+    const where =
+      filter === "pending"
+        ? { status: "PENDING" as const }
+        : filter === "approved"
+          ? { status: "APPROVED" as const }
+          : filter === "rejected"
+            ? { status: "REJECTED" as const }
+            : {};
+
+    const documents = await this.prisma.document.findMany({
+      where,
+      include: {
+        user: {
+          select: {
+            id: true,
+            companyName: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            profileImageUrl: true,
+            role: true,
+            professionalVerificationStatus: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return Promise.all(
+      documents.map(async (document) => ({
+        ...document,
+        fileUrl:
+          await this.createProfessionalDocumentSignedUrl(
+            document.fileUrl,
+          ),
+      })),
+    );
+  }
+
+  async approveDocument(id: string, actor?: AdminActor) {
+    const permission = await this.resolveOperationalPermission(actor, "DOCUMENT_APPROVE");
+    if (!permission.enabled) {
+      throw new ForbiddenException("Belge onaylama yetkiniz bulunmuyor.");
+    }
+
+    const doc = await this.prisma.document.findUnique({
+      where: { id },
+    });
+
+    if (!doc) {
+      throw new NotFoundException("Belge bulunamadı.");
+    }
+
+    const owner = await this.prisma.user.findUnique({
+      where: { id: doc.userId }, select: { role: true, companyName: true },
+    });
+    if (!owner) throw new NotFoundException('Kullanıcı bulunamadı.');
+    if (requiresCompanyName(owner.role)) companyName(owner.companyName);
+
+    const updated = await this.prisma.document.update({
+      where: { id },
+      data: { status: "APPROVED" },
+    });
+
+    const professionalVerificationStatus =
+      await this.syncProfessionalVerificationStatus(
+        updated.userId,
+      );
+
+    const trialMembership =
+      professionalVerificationStatus ===
+      ProfessionalVerificationStatus.VERIFIED
+        ? await this.membershipService.startTrialMembership(
+            updated.userId,
+          )
+        : null;
+
+    return {
+      ...updated,
+      fileUrl:
+        await this.createProfessionalDocumentSignedUrl(
+          updated.fileUrl,
+        ),
+      professionalVerificationStatus,
+      trialMembership,
+    };
+  }
+
+  async rejectDocument(id: string, actor?: AdminActor) {
+    const permission = await this.resolveOperationalPermission(actor, "DOCUMENT_REJECT");
+    if (!permission.enabled) {
+      throw new ForbiddenException("Belge reddetme yetkiniz bulunmuyor.");
+    }
+
+    const doc = await this.prisma.document.findUnique({
+      where: { id },
+    });
+
+    if (!doc) {
+      throw new NotFoundException("Belge bulunamadı.");
+    }
+
+    const updated = await this.prisma.document.update({
+      where: { id },
+      data: { status: "REJECTED" },
+    });
+
+    const professionalVerificationStatus =
+      await this.syncProfessionalVerificationStatus(
+        updated.userId,
+      );
+
+    return {
+      ...updated,
+      fileUrl:
+        await this.createProfessionalDocumentSignedUrl(
+          updated.fileUrl,
+        ),
+      professionalVerificationStatus,
+    };
+  }
+
+  async getNominations(status?: string) {
+    const where = status && status !== "all" ? { status: status as any } : {};
+
+    return this.prisma.nomination.findMany({
+      where,
+      include: {
+        nominator: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            profileImageUrl: true,
+            role: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  async updateNominationStatus(id: string, status: string, adminNote?: string) {
+    const nomination = await this.prisma.nomination.findUnique({
+      where: { id },
+    });
+
+    if (!nomination) {
+      throw new NotFoundException("Tavsiye bulunamadı.");
+    }
+
+    const updated = await this.prisma.nomination.update({
+      where: { id },
+      data: {
+        status: status as any,
+        ...(adminNote !== undefined && { adminNote }),
+      },
+    });
+
+    if (status === "APPROVED") {
+      await this.prisma.user.update({
+        where: { id: nomination.nominatorId },
+        data: { nominationPoints: { increment: 1 } },
+      });
+    }
+
+    return updated;
+  }
+
+  async getApplications(status?: string) {
+    return this.prisma.application.findMany({
+      where: this.normalizeApplicationStatus(status),
+      include: {
+        referrer: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            profileImageUrl: true,
+            role: true,
+          },
+        },
+        reviewedBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            role: true,
+          },
+        },
+      },
+      orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+    });
+  }
+
+  async getApplicationDashboard(status?: string) {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const [applications, pending, approvedThisMonth, rejectedThisMonth, pilotThisMonth, total] =
+      await Promise.all([
+        this.getApplications(status),
+        this.prisma.application.count({ where: { status: "PENDING" as any } }),
+        this.prisma.application.count({
+          where: {
+            status: "APPROVED" as any,
+            reviewedAt: { gte: startOfMonth },
+          },
+        }),
+        this.prisma.application.count({
+          where: {
+            status: "REJECTED" as any,
+            rejectedAt: { gte: startOfMonth },
+          },
+        }),
+        this.prisma.application.count({
+          where: {
+            pilotBasvuruMu: true,
+            createdAt: { gte: startOfMonth },
+          },
+        }),
+        this.prisma.application.count(),
+      ]);
+
+    return {
+      summary: {
+        pending,
+        approvedThisMonth,
+        rejectedThisMonth,
+        pilotThisMonth,
+        total,
+      },
+      items: applications,
+    };
+  }
+
+  async getApplicationDetail(id: string) {
+    const application = await this.prisma.application.findUnique({
+      where: { id },
+      include: {
+        referrer: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            profileImageUrl: true,
+            role: true,
+          },
+        },
+        reviewedBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    if (!application) {
+      throw new NotFoundException("Başvuru bulunamadı.");
+    }
+
+    return application;
+  }
+
+  async approveApplication(id: string, adminNote?: string) {
+    return this.updateApplicationStatus(id, "APPROVED", adminNote);
+  }
+
+  async rejectApplication(id: string, adminNote?: string, rejectReason?: string) {
+    return this.updateApplicationStatus(id, "REJECTED", adminNote, rejectReason);
+  }
+
+  async updateApplicationNote(id: string, adminNote: string) {
+    const application = await this.prisma.application.findUnique({
+      where: { id },
+    });
+
+    if (!application) {
+      throw new NotFoundException("Başvuru bulunamadı.");
+    }
+
+    return this.prisma.application.update({
+      where: { id },
+      data: {
+        adminNote,
+      },
+    });
+  }
+
+  async deleteApplication(id: string, actor?: AdminActor) {
+    this.requireSoftwareTeam(actor);
+
+    const application = await this.prisma.application.findUnique({
+      where: { id },
+    });
+
+    if (!application) {
+      throw new NotFoundException("Başvuru bulunamadı.");
+    }
+
+    const deleted = await this.prisma.application.delete({
+      where: { id },
+    });
+
+    await this.logAdminAction({
+      actor,
+      action: "APPLICATION_DELETED",
+      entityType: "Application",
+      entityId: id,
+      description: `${application.applicantEmail} başvurusu Yazılım Ekibi tarafından kalıcı olarak silindi.`,
+      metadata: {
+        applicantName: application.applicantName,
+        applicantEmail: application.applicantEmail,
+        applicantPhone: application.applicantPhone,
+        requestedRole: application.requestedRole,
+        status: application.status,
+        basvuruTuru: application.basvuruTuru,
+        pilotBasvuruMu: application.pilotBasvuruMu,
+        referralCode: application.referralCode,
+      },
+    });
+
+    return {
+      success: true,
+      message: "Başvuru kalıcı olarak silindi.",
+      deletedApplication: deleted,
+    };
+  }
+
+  async updateApplicationStatus(id: string, status: string, adminNote?: string, rejectReason?: string) {
+    const application = await this.prisma.application.findUnique({
+      where: { id },
+    });
+
+    if (!application) {
+      throw new NotFoundException("Başvuru bulunamadı.");
+    }
+
+    const normalizedStatus = status as any;
+    const now = new Date();
+
+    const updated = await this.prisma.application.update({
+      where: { id },
+      data: {
+        status: normalizedStatus,
+        ...(adminNote !== undefined && { adminNote }),
+        ...(status === "APPROVED" && {
+          reviewedAt: now,
+          rejectedAt: null,
+          rejectedById: null,
+          rejectReason: null,
+        }),
+        ...(status === "REJECTED" && {
+          rejectedAt: now,
+          rejectReason: rejectReason || adminNote || "Başvuru reddedildi.",
+        }),
+      },
+      include: {
+        referrer: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            profileImageUrl: true,
+            role: true,
+          },
+        },
+        reviewedBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    try {
+      if (status === "APPROVED") {
+        await this.mail.sendApplicationApproved(
+          application.applicantEmail,
+          application.applicantName,
+        );
+      }
+
+      if (status === "INVITED") {
+        const code = this.generateInviteCode();
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 30);
+
+        await this.prisma.invitation.create({
+          data: {
+            code,
+            role: application.requestedRole as any,
+            status: "PENDING",
+            maxUses: 1,
+            usedCount: 0,
+            expiresAt,
+          },
+        });
+
+        await this.mail.sendApplicationInvited(
+          application.applicantEmail,
+          application.applicantName,
+          code,
+        );
+      }
+    } catch (e: any) {
+      console.error("Mail hatası:", e.message);
+    }
+
+    if (status === "REGISTERED" && application.referrerId) {
+      await this.prisma.user.update({
+        where: { id: application.referrerId },
+        data: { nominationPoints: { increment: 1 } },
+      });
+    }
+
+    return updated;
+  }
+
+  private resolveMembershipSegment(
+    role: Role | string,
+  ): UyelikPaketSegmenti {
+    if (role === Role.EMLAKCI) {
+      return UyelikPaketSegmenti.EMLAK_PRO;
+    }
+
+    if (
+      role === Role.MUTEAHHIT ||
+      role === Role.INSAAT_FIRMASI
+    ) {
+      return UyelikPaketSegmenti.MUTEAHHIT;
+    }
+
+    throw new BadRequestException(
+      "Bu kullanıcı rolü için üyelik paketi atanamaz.",
+    );
+  }
+
+  async getUserMembershipPackages(
+    userId: string,
+    actor?: AdminActor,
+  ) {
+    const permission = await this.resolveOperationalPermission(actor, "MEMBERSHIP_VIEW");
+    if (!permission.enabled) {
+      throw new ForbiddenException("Üyelik görüntüleme yetkiniz bulunmuyor.");
+    }
+    this.requireSoftwareTeam(actor);
+
+    const normalizedUserId = String(userId || "").trim();
+
+    if (!normalizedUserId) {
+      throw new BadRequestException(
+        "Kullanıcı kimliği zorunludur.",
+      );
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: normalizedUserId },
+      select: {
+        id: true,
+        role: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException(
+        "Kullanıcı bulunamadı.",
+      );
+    }
+
+    if (user.role === Role.SUPER_ADMIN) {
+      throw new BadRequestException(
+        "Yazılım Ekibi hesabının üyelik paketi değiştirilemez.",
+      );
+    }
+
+    const segment =
+      this.resolveMembershipSegment(user.role);
+
+    const paketler =
+      await this.prisma.uyelikPaketi.findMany({
+        where: {
+          segment,
+          aktifMi: true,
+        },
+        orderBy: {
+          fiyat: "asc",
+        },
+      });
+
+    return {
+      segment,
+      paketler: paketler.map((paket) => ({
+        id: paket.id,
+        paketKodu: paket.paketKodu,
+        paketAdi: paket.paketAdi,
+        fiyat:
+          paket.fiyat === null
+            ? null
+            : Number(paket.fiyat),
+        paraBirimi: paket.paraBirimi,
+        aylikPaketPk: paket.aylikPaketPk,
+        aktifPortfoyLimiti:
+          paket.aktifPortfoyLimiti,
+        aylikTalepLimiti:
+          paket.aylikTalepLimiti,
+        aylikHavuzGonderimLimiti:
+          paket.aylikHavuzGonderimLimiti,
+        aylikMatchLimiti:
+          paket.aylikMatchLimiti,
+        projeLimiti: paket.projeLimiti,
+        projeIlanLimiti:
+          paket.projeIlanLimiti,
+        denemeGunSayisi:
+          paket.denemeGunSayisi,
+      })),
+    };
+  }
+
+  async updateUserMembership(
+    userId: string,
+    body: {
+      paketKodu: string;
+      gunSayisi?: number;
+      aySayisi?: number;
+      gerekce?: string;
+    },
+    actor?: AdminActor,
+  ) {
+    const permission = await this.resolveOperationalPermission(actor, "MEMBERSHIP_CHANGE");
+    if (!permission.enabled) {
+      throw new ForbiddenException("Üyelik değiştirme yetkiniz bulunmuyor.");
+    }
+    this.requireSoftwareTeam(actor);
+
+    const actorId = this.getActorId(actor);
+    const normalizedUserId =
+      String(userId || "").trim();
+
+    const paketKodu =
+      String(body?.paketKodu || "")
+        .trim()
+        .toUpperCase() as UyelikPaketKodu;
+
+    const gerekceMetni =
+      String(body?.gerekce || "").trim();
+
+    const gerekce =
+      gerekceMetni ||
+      "Yazılım Ekibi tarafından üyelik paketi güncellendi.";
+
+    if (!normalizedUserId) {
+      throw new BadRequestException(
+        "Kullanıcı kimliği zorunludur.",
+      );
+    }
+
+    if (
+      !Object.values(UyelikPaketKodu).includes(
+        paketKodu,
+      )
+    ) {
+      throw new BadRequestException(
+        "Geçersiz üyelik paketi.",
+      );
+    }
+
+    if (gerekceMetni.length > 120) {
+      throw new BadRequestException(
+        "Üyelik değişiklik gerekçesi en fazla 120 karakter olabilir.",
+      );
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`
+        SELECT pg_advisory_xact_lock(
+          hashtext(${`admin-membership:${normalizedUserId}`})
+        )
+      `;
+
+      const user = await tx.user.findUnique({
+        where: {
+          id: normalizedUserId,
+        },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          role: true,
+        },
+      });
+
+      if (!user) {
+        throw new NotFoundException(
+          "Kullanıcı bulunamadı.",
+        );
+      }
+
+      if (user.role === Role.SUPER_ADMIN) {
+        throw new BadRequestException(
+          "Yazılım Ekibi hesabının üyelik paketi değiştirilemez.",
+        );
+      }
+
+      const segment =
+        this.resolveMembershipSegment(user.role);
+
+      const paket =
+        await tx.uyelikPaketi.findUnique({
+          where: {
+            paketKodu_segment: {
+              paketKodu,
+              segment,
+            },
+          },
+        });
+
+      if (!paket || !paket.aktifMi) {
+        throw new NotFoundException(
+          "Kullanıcının segmentine uygun aktif üyelik paketi bulunamadı.",
+        );
+      }
+
+      const mevcutUyelik =
+        await tx.kullaniciUyelikPaketi.findFirst({
+          where: {
+            kullaniciId: normalizedUserId,
+          },
+          orderBy: {
+            baslangicTarihi: "desc",
+          },
+        });
+
+      const now = new Date();
+      const bitisTarihi = new Date(now);
+
+      if (
+        paketKodu === UyelikPaketKodu.DENEME
+      ) {
+        const initialTrialDays = resolveInitialTrialDays(
+          paket,
+          await readTrialPolicy(tx),
+        );
+
+        if (
+          body?.gunSayisi !== undefined &&
+          Number(body.gunSayisi) !== initialTrialDays
+        ) {
+          throw new BadRequestException(
+            `İlk deneme paketi yalnız ${initialTrialDays} gün olabilir.`,
+          );
+        }
+
+        const denemePaketleri =
+          await tx.uyelikPaketi.findMany({
+            where: {
+              paketKodu: UyelikPaketKodu.DENEME,
+            },
+            select: {
+              id: true,
+            },
+          });
+
+        const oncekiDeneme =
+          await tx.kullaniciUyelikPaketi.findFirst({
+            where: {
+              kullaniciId: normalizedUserId,
+              paketId: {
+                in: denemePaketleri.map(
+                  (item) => item.id,
+                ),
+              },
+            },
+            select: {
+              id: true,
+            },
+          });
+
+        if (oncekiDeneme) {
+          throw new BadRequestException(
+            "Bu kullanıcı daha önce deneme paketinden yararlanmıştır. İkinci kez deneme paketi atanamaz.",
+          );
+        }
+
+        const ucretliPaketler =
+          await tx.uyelikPaketi.findMany({
+            where: {
+              paketKodu: {
+                in: [
+                  UyelikPaketKodu.BRONZ,
+                  UyelikPaketKodu.GUMUS,
+                  UyelikPaketKodu.ALTIN,
+                ],
+              },
+            },
+            select: {
+              id: true,
+            },
+          });
+
+        const oncekiUcretliUyelik =
+          await tx.kullaniciUyelikPaketi.findFirst({
+            where: {
+              kullaniciId: normalizedUserId,
+              paketId: {
+                in: ucretliPaketler.map(
+                  (item) => item.id,
+                ),
+              },
+            },
+            select: {
+              id: true,
+            },
+          });
+
+        if (oncekiUcretliUyelik) {
+          throw new BadRequestException(
+            "Ücretli paket kullanmış kullanıcıya sonradan deneme paketi atanamaz.",
+          );
+        }
+
+        bitisTarihi.setUTCDate(
+          bitisTarihi.getUTCDate() + initialTrialDays,
+        );
+      } else {
+        const aySayisi =
+          body?.aySayisi === undefined
+            ? 1
+            : Number(body.aySayisi);
+
+        if (
+          !Number.isInteger(aySayisi) ||
+          aySayisi <= 0 ||
+          aySayisi > 36
+        ) {
+          throw new BadRequestException(
+            "Üyelik süresi 1-36 ay arasında olmalıdır.",
+          );
+        }
+
+        bitisTarihi.setUTCMonth(
+          bitisTarihi.getUTCMonth() + aySayisi,
+        );
+      }
+
+      await tx.kullaniciUyelikPaketi.updateMany({
+        where: {
+          kullaniciId: normalizedUserId,
+          durum: UyelikDurumu.AKTIF,
+        },
+        data: {
+          durum: UyelikDurumu.PASIF,
+        },
+      });
+
+      const yeniUyelik =
+        await tx.kullaniciUyelikPaketi.create({
+          data: {
+            kullaniciId: normalizedUserId,
+            paketId: paket.id,
+            durum: UyelikDurumu.AKTIF,
+            baslangicTarihi: now,
+            bitisTarihi,
+            pilotPaketMi:
+              mevcutUyelik?.pilotPaketMi || false,
+            testPaketiMi:
+              mevcutUyelik?.testPaketiMi || false,
+            notlar: gerekce,
+          },
+        });
+
+      const packagePk =
+        Number(paket.aylikPaketPk || 0);
+
+      let creditLot = null;
+
+      if (packagePk > 0) {
+        creditLot =
+          await tx.portfolioCreditLot.create({
+            data: {
+              kullaniciId: normalizedUserId,
+              lotTuru:
+                PortfolioCreditLotTuru.PAKET,
+              ilkMiktar: packagePk,
+              kalanMiktar: packagePk,
+              sonKullanmaTarihi:
+                yeniUyelik.bitisTarihi,
+              kaynakKayitTuru:
+                "ADMIN_MEMBERSHIP",
+              kaynakKayitId:
+                yeniUyelik.id,
+              uyelikId:
+                yeniUyelik.id,
+              dedupeKey:
+                `admin-membership:${yeniUyelik.id}:package-pk`,
+              aciklama:
+                `${paket.paketAdi} üyelik paketi aylık PK tanımı`,
+              aktifMi: true,
+            },
+          });
+
+        await tx.kontorCuzdani.upsert({
+          where: {
+            kullaniciId:
+              normalizedUserId,
+          },
+          update: {},
+          create: {
+            kullaniciId:
+              normalizedUserId,
+            bakiye: 0,
+            toplamYukleme: 0,
+            toplamHarcama: 0,
+            toplamHediye: 0,
+            aktifMi: true,
+          },
+        });
+
+        await tx.$queryRaw`
+          SELECT "id"
+          FROM "KontorCuzdani"
+          WHERE "kullaniciId" = ${normalizedUserId}
+          FOR UPDATE
+        `;
+
+        const wallet =
+          await tx.kontorCuzdani.findUnique({
+            where: {
+              kullaniciId:
+                normalizedUserId,
+            },
+          });
+
+        if (!wallet) {
+          throw new BadRequestException(
+            "Kullanıcı PK cüzdanı oluşturulamadı.",
+          );
+        }
+
+        const updatedWallet =
+          await tx.kontorCuzdani.update({
+            where: {
+              kullaniciId:
+                normalizedUserId,
+            },
+            data: {
+              bakiye: {
+                increment: packagePk,
+              },
+              toplamYukleme: {
+                increment: packagePk,
+              },
+              aktifMi: true,
+            },
+          });
+
+        await tx.kontorHareketi.create({
+          data: {
+            kullaniciId:
+              normalizedUserId,
+            hareketTuru:
+              KontorHareketTuru.YUKLEME,
+            islemTuru:
+              KontorIslemTuru.DIGER,
+            miktar: packagePk,
+            oncekiBakiye:
+              wallet.bakiye,
+            sonrakiBakiye:
+              updatedWallet.bakiye,
+            aciklama:
+              `${paket.paketAdi} üyelik paketi PK yüklemesi`,
+            ilgiliKayitTuru:
+              "ADMIN_MEMBERSHIP",
+            ilgiliKayitId:
+              yeniUyelik.id,
+            olusturanId:
+              actorId,
+          },
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          actorId,
+          targetUserId:
+            normalizedUserId,
+          action:
+            AuditAction.UPDATE_USER_PACKAGE,
+          entityType:
+            "KullaniciUyelikPaketi",
+          entityId:
+            yeniUyelik.id,
+          description: gerekce,
+          metadata: {
+            eskiUyelikId:
+              mevcutUyelik?.id || null,
+            eskiPaketId:
+              mevcutUyelik?.paketId || null,
+            yeniUyelikId:
+              yeniUyelik.id,
+            yeniPaketId:
+              paket.id,
+            yeniPaketKodu:
+              paket.paketKodu,
+            yeniPaketAdi:
+              paket.paketAdi,
+            segment:
+              paket.segment,
+            bitisTarihi:
+              bitisTarihi.toISOString(),
+            packagePk,
+            portfolioCreditLotId:
+              creditLot?.id || null,
+          },
+          ipAddress:
+            actor?.ipAddress,
+          userAgent:
+            actor?.userAgent,
+        },
+      });
+
+      const kullaniciAdi =
+        `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
+        user.email;
+
+      return {
+        success: true,
+        mesaj:
+          `${kullaniciAdi} kullanıcısının üyelik paketi ${paket.paketAdi} olarak güncellendi.`,
+        segment,
+        uyelik: {
+          id: yeniUyelik.id,
+          paketId: paket.id,
+          paketKodu:
+            paket.paketKodu,
+          paketAdi:
+            paket.paketAdi,
+          durum:
+            yeniUyelik.durum,
+          baslangicTarihi:
+            yeniUyelik.baslangicTarihi,
+          bitisTarihi:
+            yeniUyelik.bitisTarihi,
+          pilotPaketMi:
+            yeniUyelik.pilotPaketMi,
+          testPaketiMi:
+            yeniUyelik.testPaketiMi,
+        },
+        packagePk,
+        portfolioCreditLotId:
+          creditLot?.id || null,
+      };
+    });
+  }
+
+  // Piyasa şeridi ayarları: kod → açıklama. Sayısal anahtarlar ondalık (> 0), kaynak anahtarı metindir.
+  private marketSettingDefinitions(): Record<string, string> {
+    return {
+      [MARKET_LOAN_SETTING_KEY]: "Konut kredisi aylık faiz oranı (%). Doluysa piyasa şeridinde otomatik kaynağın yerine geçer.",
+      [MARKET_LOAN_SOURCE_KEY]: "Konut kredisi faizinin kaynak adı (ör. Akbank İlk Evim). Boşsa 'Yönetici' yazılır.",
+      ...Object.fromEntries(MARKET_CODES.map((c) => [MARKET_MANUAL_PREFIX + c, `${c} elle değer. Doluysa piyasa şeridinde otomatik kaynağın yerine geçer (kaynak: Yönetici).`])),
+    };
+  }
+
+  private systemSettingResponse(setting: {
+    key: string;
+    valueJson: Prisma.JsonValue;
+    description: string | null;
+    updatedAt: Date;
+    updatedById: string | null;
+  }) {
+    const raw = setting.valueJson;
+    const inner = typeof raw === "object" && raw !== null && !Array.isArray(raw) ? raw.value : raw;
+    const value: number | string | number[] = Array.isArray(inner)
+      ? inner as number[]
+      : setting.key === MARKET_LOAN_SOURCE_KEY ? String(inner ?? "") : Number(inner);
+
+    return {
+      key: setting.key,
+      value,
+      description: setting.description,
+      updatedAt: setting.updatedAt,
+      updatedById: setting.updatedById,
+    };
+  }
+
+  async getSystemSettings(actor?: AdminActor) {
+    this.requireSoftwareTeam(actor);
+
+    const settings = await this.prisma.systemSetting.findMany({
+      where: {
+        OR: [{ key: { in: ["TRIAL_INITIAL_DAYS", "TRIAL_EXTENSION_DAYS", "TRIAL_MAX_EXTENSIONS", "POOL_PRIVATE_INFO_COST", "MATCH_SCAN_COST_PK", "MATCH_SCAN_COST_REQUEST_PK", "MATCH_SCAN_COST_PRIVATE_PORTFOLIO_PK", "MATCH_SCAN_COST_POOL_PROPERTY_PK", "MATCH_SCAN_COST_CRM_PK"] } }, { key: { startsWith: COST_PREFIX } }, { key: { startsWith: LIMIT_PREFIX } }, { key: { startsWith: "MARKET_" } }],
+      },
+      orderBy: { key: "asc" },
+    });
+
+    const list: Array<ReturnType<AdminService["systemSettingResponse"]> | { key: string; value: number | number[] | null; description: string; updatedAt: null; updatedById: null }> =
+      settings.map((setting) => this.systemSettingResponse(setting));
+    // Henüz kaydı olmayan piyasa ayarları da ekranda açıklamalı görünür (değer boş).
+    for (const [key, description] of Object.entries(this.marketSettingDefinitions())) {
+      if (!settings.some((s) => s.key === key)) list.push({ key, value: null, description, updatedAt: null, updatedById: null });
+      else {
+        const row = list.find((r) => r.key === key);
+        if (row && !row.description) row.description = description;
+      }
+    }
+    // Kaydı olmayan açıklamalı limitler yedek (kod) değeriyle listelenir; updatedAt null = henüz kaydedilmedi.
+    const limitDefaults: Record<string, number | readonly number[]> = { ...LIMIT_DEFAULTS, ...LIMIT_LIST_DEFAULTS };
+    for (const [key, description] of Object.entries(LIMIT_DESCRIPTIONS)) {
+      const row = list.find((r) => r.key === key);
+      if (!row) {
+        const fallback = limitDefaults[key];
+        list.push({ key, value: Array.isArray(fallback) ? [...fallback] : fallback as number, description, updatedAt: null, updatedById: null });
+      } else if (!row.description) row.description = description;
+    }
+    return list.sort((a, b) => a.key.localeCompare(b.key));
+  }
+
+  // GET /admin/trial-policy: mobilin süre/buton metinlerini sunucudan üretmesi için.
+  async getTrialPolicy() {
+    const policy = await readTrialPolicy(this.prisma);
+    const packages = await this.prisma.uyelikPaketi.findMany({
+      where: { paketKodu: UyelikPaketKodu.DENEME, aktifMi: true },
+      select: { denemeGunSayisi: true },
+    });
+    const days = [...new Set(packages.map((p) => p.denemeGunSayisi).filter((d): d is number => typeof d === "number" && d > 0))];
+    const initialDays = days.length === 1 ? days[0] : policy.initialDays;
+    return {
+      initialDays,
+      extensionDays: policy.extensionDays,
+      maxExtensions: policy.maxExtensions,
+      maxTotalDays: initialDays + policy.extensionDays * policy.maxExtensions,
+    };
+  }
+
+  async updateSystemSetting(
+    key: string,
+    body: { value: number | string | null | number[]; description?: string },
+    actor?: AdminActor,
+  ) {
+    this.requireSoftwareTeam(actor);
+
+    const marketDescription = this.marketSettingDefinitions()[key];
+    if (marketDescription) return this.updateMarketSetting(key, marketDescription, body, actor);
+
+    if (Object.prototype.hasOwnProperty.call(LIMIT_LIST_DEFAULTS, key)) return this.updateLimitList(key, body, actor);
+
+    const isCommercialCost = isManagedCommercialKey(key);
+    if (!isCommercialCost && !["TRIAL_INITIAL_DAYS", "TRIAL_EXTENSION_DAYS", "TRIAL_MAX_EXTENSIONS", "POOL_PRIVATE_INFO_COST", "MATCH_SCAN_COST_PK", "MATCH_SCAN_COST_REQUEST_PK", "MATCH_SCAN_COST_PRIVATE_PORTFOLIO_PK", "MATCH_SCAN_COST_POOL_PROPERTY_PK", "MATCH_SCAN_COST_CRM_PK"].includes(key)) {
+      throw new BadRequestException("Desteklenmeyen sistem ayarı.");
+    }
+
+    const minimum =
+      key.startsWith(LIMIT_PREFIX) ? 1 :
+      isCommercialCost ||
+      key === "TRIAL_MAX_EXTENSIONS" ||
+      key === "POOL_PRIVATE_INFO_COST" ||
+      key === "MATCH_SCAN_COST_PK" ||
+      key === "MATCH_SCAN_COST_REQUEST_PK" ||
+      key === "MATCH_SCAN_COST_PRIVATE_PORTFOLIO_PK" ||
+      key === "MATCH_SCAN_COST_POOL_PROPERTY_PK" ||
+      key === "MATCH_SCAN_COST_CRM_PK"
+        ? 0
+        : 1;
+    if (!body || typeof body.value !== "number" || !Number.isSafeInteger(body.value) || body.value < minimum) {
+      throw new BadRequestException(`Değer en az ${minimum} olan bir tam sayı olmalıdır.`);
+    }
+    if (body.description !== undefined && typeof body.description !== "string") {
+      throw new BadRequestException("Açıklama metin olmalıdır.");
+    }
+
+    const actorId = this.getActorId(actor);
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`system-setting:${key}`}))::text AS locked`;
+      const existing = await tx.systemSetting.findUnique({ where: { key } });
+      // Yönetilen (varsayılanı olan) anahtar henüz kayıtlı değilse ilk kayıt burada oluşur.
+      if (!existing && !isCommercialCost) {
+        throw new NotFoundException("Sistem ayarı bulunamadı.");
+      }
+
+      const previousValue = existing ? this.systemSettingResponse(existing).value : null;
+      const raw = existing?.valueJson;
+      const valueJson: Prisma.InputJsonValue = typeof raw === "object" && raw !== null && !Array.isArray(raw)
+        ? { ...raw, value: body.value } as Prisma.InputJsonObject
+        : existing ? body.value : { value: body.value };
+      const updated = await tx.systemSetting.upsert({
+        where: { key },
+        create: { key, valueJson, description: body.description ?? LIMIT_DESCRIPTIONS[key], updatedById: actorId },
+        update: { valueJson, description: body.description, updatedById: actorId },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          actorId,
+          action: AuditAction.UPDATE_SYSTEM_SETTING,
+          entityType: "SystemSetting",
+          entityId: updated.id,
+          description: `Sistem ayarı güncellendi: ${key}`,
+          metadata: { key, previousValue, newValue: body.value },
+          ipAddress: actor?.ipAddress,
+          userAgent: actor?.userAgent,
+        },
+      });
+
+      return this.systemSettingResponse(updated);
+    });
+  }
+
+  // MARKET_* ayarları: kayıt yoksa oluşturulur; değişiklik AuditLog'a kim/ne zaman/eski/yeni ile yazılır.
+  private async updateMarketSetting(
+    key: string,
+    defaultDescription: string,
+    body: { value: number | string | null | number[]; description?: string },
+    actor?: AdminActor,
+  ) {
+    const isText = key === MARKET_LOAN_SOURCE_KEY;
+    const isBlank = body?.value === null || (typeof body?.value === "string" && body.value.trim() === "");
+    if (!isText && isBlank) return this.clearMarketSetting(key, defaultDescription, actor);
+    let value: number | string;
+    if (isText) {
+      if (typeof body?.value !== "string" || body.value.trim().length > 80) {
+        throw new BadRequestException("Kaynak en fazla 80 karakterlik metin olmalıdır.");
+      }
+      value = body.value.trim();
+    } else {
+      const n = typeof body?.value === "string" ? Number(body.value.replace(",", ".")) : body?.value;
+      if (typeof n !== "number" || !Number.isFinite(n) || n <= 0) {
+        throw new BadRequestException("Değer 0'dan büyük bir sayı olmalıdır.");
+      }
+      value = n;
+    }
+    if (body.description !== undefined && typeof body.description !== "string") {
+      throw new BadRequestException("Açıklama metin olmalıdır.");
+    }
+
+    const actorId = this.getActorId(actor);
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`system-setting:${key}`}))::text AS locked`;
+      const existing = await tx.systemSetting.findUnique({ where: { key } });
+      const previousValue = existing ? this.systemSettingResponse(existing).value : null;
+      const raw = existing?.valueJson;
+      const valueJson: Prisma.InputJsonValue = typeof raw === "object" && raw !== null && !Array.isArray(raw)
+        ? { ...raw, value } as Prisma.InputJsonObject
+        : value;
+      const description = body.description ?? existing?.description ?? defaultDescription;
+      const updated = await tx.systemSetting.upsert({
+        where: { key },
+        create: { key, valueJson, description, updatedById: actorId },
+        update: { valueJson, description, updatedById: actorId },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          actorId,
+          action: AuditAction.UPDATE_SYSTEM_SETTING,
+          entityType: "SystemSetting",
+          entityId: updated.id,
+          description: `Sistem ayarı güncellendi: ${key}`,
+          metadata: { key, previousValue, newValue: value },
+          ipAddress: actor?.ipAddress,
+          userAgent: actor?.userAgent,
+        },
+      });
+
+      return this.systemSettingResponse(updated);
+    });
+  }
+
+  // Dizi değerli LIMIT_* ayarı ({ value: number[] }): tekrarsız, pozitif tam sayı listesi.
+  private async updateLimitList(
+    key: string,
+    body: { value: number | string | null | number[]; description?: string },
+    actor?: AdminActor,
+  ) {
+    const value = Array.isArray(body?.value) ? parseLimitList(body.value) : null;
+    if (!value || value.length > 20 || new Set(value).size !== value.length) {
+      throw new BadRequestException("Değer, tekrarsız pozitif tam sayılardan oluşan en fazla 20 elemanlı bir liste olmalıdır.");
+    }
+    if (body.description !== undefined && typeof body.description !== "string") {
+      throw new BadRequestException("Açıklama metin olmalıdır.");
+    }
+    const sorted = [...value].sort((a, b) => a - b);
+    const actorId = this.getActorId(actor);
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`system-setting:${key}`}))::text AS locked`;
+      const existing = await tx.systemSetting.findUnique({ where: { key } });
+      const previousValue = existing ? this.systemSettingResponse(existing).value : null;
+      const description = body.description ?? existing?.description ?? LIMIT_DESCRIPTIONS[key];
+      const updated = await tx.systemSetting.upsert({
+        where: { key },
+        create: { key, valueJson: { value: sorted }, description, updatedById: actorId },
+        update: { valueJson: { value: sorted }, description, updatedById: actorId },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorId,
+          action: AuditAction.UPDATE_SYSTEM_SETTING,
+          entityType: "SystemSetting",
+          entityId: updated.id,
+          description: `Sistem ayarı güncellendi: ${key}`,
+          metadata: { key, previousValue, newValue: sorted },
+          ipAddress: actor?.ipAddress,
+          userAgent: actor?.userAgent,
+        },
+      });
+      return this.systemSettingResponse(updated);
+    });
+  }
+
+  // Sayısal MARKET_* ayarı boş/null gelirse kayıt silinir; kalem otomatik kaynağa döner. AuditLog: eski değer → null.
+  private async clearMarketSetting(key: string, description: string, actor?: AdminActor) {
+    const actorId = this.getActorId(actor);
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`system-setting:${key}`}))::text AS locked`;
+      const existing = await tx.systemSetting.findUnique({ where: { key } });
+      if (existing) {
+        await tx.systemSetting.delete({ where: { key } });
+        await tx.auditLog.create({
+          data: {
+            actorId,
+            action: AuditAction.UPDATE_SYSTEM_SETTING,
+            entityType: "SystemSetting",
+            entityId: existing.id,
+            description: `Sistem ayarı silindi (otomatik kaynağa dönüldü): ${key}`,
+            metadata: { key, previousValue: this.systemSettingResponse(existing).value, newValue: null },
+            ipAddress: actor?.ipAddress,
+            userAgent: actor?.userAgent,
+          },
+        });
+      }
+      return { key, value: null, description, updatedAt: null, updatedById: null };
+    });
+  }
+
+  async getPermissionDefinitions(
+    actor?: AdminActor,
+  ) {
+    this.requireSoftwareTeam(actor);
+
+    return this.prisma.permissionDefinition.findMany({
+      where: {
+        active: true,
+      },
+      orderBy: [
+        { category: "asc" },
+        { key: "asc" },
+      ],
+    });
+  }
+
+  async getUserPermissionProfile(
+    userId: string,
+    actor?: AdminActor,
+  ) {
+    this.requireSoftwareTeam(actor);
+
+    const normalizedUserId =
+      String(userId || "").trim();
+
+    const user = await this.prisma.user.findUnique({
+      where: {
+        id: normalizedUserId,
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        role: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException(
+        "Kullanıcı bulunamadı.",
+      );
+    }
+
+    const definitions =
+      await this.prisma.permissionDefinition.findMany({
+        where: {
+          active: true,
+        },
+        include: {
+          rolePolicies: {
+            where: {
+              role: user.role,
+            },
+          },
+          overrides: {
+            where: {
+              userId: normalizedUserId,
+            },
+          },
+        },
+        orderBy: [
+          { category: "asc" },
+          { key: "asc" },
+        ],
+      });
+
+    const now = new Date();
+
+    const permissions = definitions.map(
+      (permission) => {
+        const rolePolicy =
+          permission.rolePolicies[0] || null;
+
+        const override =
+          permission.overrides[0] || null;
+
+        const overrideActive =
+          !!override &&
+          (!override.validFrom ||
+            override.validFrom <= now) &&
+          (!override.validUntil ||
+            override.validUntil >= now);
+
+        const enabled =
+          permission.superAdminOnly
+            ? user.role === Role.SUPER_ADMIN
+            : overrideActive &&
+                override?.enabled !== null
+              ? override.enabled
+              : rolePolicy
+                ? rolePolicy.enabled
+                : permission.defaultEnabled;
+
+        const numericLimit =
+          overrideActive &&
+          override?.numericLimit !== null
+            ? override.numericLimit
+            : rolePolicy?.numericLimit ??
+              permission.defaultNumericLimit ??
+              null;
+
+        const metadata =
+          overrideActive && override?.metadata
+            ? override.metadata
+            : rolePolicy?.metadata ??
+              permission.metadata ??
+              null;
+
+        return {
+          id: permission.id,
+          key: permission.key,
+          category: permission.category,
+          label: permission.label,
+          description: permission.description,
+          delegable: permission.delegable,
+          superAdminOnly:
+            permission.superAdminOnly,
+          enabled,
+          numericLimit,
+          metadata,
+          source:
+            permission.superAdminOnly &&
+            user.role === Role.SUPER_ADMIN
+              ? "SUPER_ADMIN"
+              : overrideActive
+                ? "USER_OVERRIDE"
+                : rolePolicy
+                  ? "ROLE_POLICY"
+                  : "PERMISSION_DEFAULT",
+          rolePolicy: rolePolicy
+            ? {
+                enabled:
+                  rolePolicy.enabled,
+                numericLimit:
+                  rolePolicy.numericLimit,
+                metadata:
+                  rolePolicy.metadata,
+              }
+            : null,
+          override: override
+            ? {
+                id: override.id,
+                enabled:
+                  override.enabled,
+                numericLimit:
+                  override.numericLimit,
+                validFrom:
+                  override.validFrom,
+                validUntil:
+                  override.validUntil,
+                metadata:
+                  override.metadata,
+                active:
+                  overrideActive,
+              }
+            : null,
+        };
+      },
+    );
+
+    return {
+      user,
+      permissions,
+    };
+  }
+
+  async updateUserPermissionOverride(
+    userId: string,
+    permissionKey: string,
+    body: {
+      enabled?: boolean | null;
+      numericLimit?: number | null;
+      validFrom?: string | null;
+      validUntil?: string | null;
+      metadata?: Prisma.InputJsonObject | null;
+    },
+    actor?: AdminActor,
+  ) {
+    this.requireSoftwareTeam(actor);
+
+    const actorId = this.getActorId(actor);
+
+    const normalizedUserId =
+      String(userId || "").trim();
+
+    const normalizedPermissionKey =
+      String(permissionKey || "")
+        .trim()
+        .toUpperCase();
+
+    const user = await this.prisma.user.findUnique({
+      where: {
+        id: normalizedUserId,
+      },
+      select: {
+        id: true,
+        role: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException(
+        "Kullanıcı bulunamadı.",
+      );
+    }
+
+    if (user.role === Role.SUPER_ADMIN) {
+      throw new ForbiddenException(
+        "Süper Admin yetkileri kısıtlanamaz.",
+      );
+    }
+
+    const permission =
+      await this.prisma.permissionDefinition.findUnique({
+        where: {
+          key: normalizedPermissionKey,
+        },
+      });
+
+    if (!permission || !permission.active) {
+      throw new NotFoundException(
+        "Aktif yetki tanımı bulunamadı.",
+      );
+    }
+
+    const previous =
+      await this.prisma.userPermissionOverride.findUnique({
+        where: {
+          userId_permissionId: {
+            userId: normalizedUserId,
+            permissionId: permission.id,
+          },
+        },
+      });
+
+    if (
+      permission.superAdminOnly ||
+      !permission.delegable
+    ) {
+      throw new ForbiddenException(
+        "Bu yetki kullanıcıya devredilemez.",
+      );
+    }
+
+    if (
+      body.numericLimit !== undefined &&
+      body.numericLimit !== null &&
+      (
+        !Number.isInteger(body.numericLimit) ||
+        body.numericLimit < 0
+      )
+    ) {
+      throw new BadRequestException(
+        "Sayısal limit sıfır veya pozitif tam sayı olmalıdır.",
+      );
+    }
+
+    const validFrom =
+      body.validFrom
+        ? new Date(body.validFrom)
+        : null;
+
+    const validUntil =
+      body.validUntil
+        ? new Date(body.validUntil)
+        : null;
+
+    if (
+      validFrom &&
+      Number.isNaN(validFrom.getTime())
+    ) {
+      throw new BadRequestException(
+        "Yetki başlangıç tarihi geçersiz.",
+      );
+    }
+
+    if (
+      validUntil &&
+      Number.isNaN(validUntil.getTime())
+    ) {
+      throw new BadRequestException(
+        "Yetki bitiş tarihi geçersiz.",
+      );
+    }
+
+    if (
+      validFrom &&
+      validUntil &&
+      validUntil < validFrom
+    ) {
+      throw new BadRequestException(
+        "Yetki bitiş tarihi başlangıç tarihinden önce olamaz.",
+      );
+    }
+
+    const updated =
+      await this.prisma.userPermissionOverride.upsert({
+        where: {
+          userId_permissionId: {
+            userId: normalizedUserId,
+            permissionId: permission.id,
+          },
+        },
+        update: {
+          enabled:
+            body.enabled === undefined
+              ? undefined
+              : body.enabled,
+          numericLimit:
+            body.numericLimit === undefined
+              ? undefined
+              : body.numericLimit,
+          validFrom:
+            body.validFrom === undefined
+              ? undefined
+              : validFrom,
+          validUntil:
+            body.validUntil === undefined
+              ? undefined
+              : validUntil,
+          metadata:
+            body.metadata === undefined
+              ? undefined
+              : body.metadata === null
+                ? Prisma.DbNull
+                : body.metadata,
+          updatedById: actorId,
+        },
+        create: {
+          userId: normalizedUserId,
+          permissionId: permission.id,
+          enabled:
+            body.enabled ?? null,
+          numericLimit:
+            body.numericLimit ?? null,
+          validFrom,
+          validUntil,
+          metadata:
+            body.metadata === null
+              ? Prisma.DbNull
+              : body.metadata,
+          updatedById: actorId,
+        },
+      });
+
+    await this.prisma.auditLog.create({
+      data: {
+        actorId,
+        targetUserId:
+          normalizedUserId,
+        action:
+          AuditAction.UPDATE_USER_PERMISSION,
+        entityType:
+          "UserPermissionOverride",
+        entityId:
+          updated.id,
+        description:
+          `Kullanıcı yetkisi güncellendi: ${permission.key}`,
+        metadata: {
+          permissionKey:
+            permission.key,
+          oldValue: previous
+            ? {
+                enabled: previous.enabled,
+                numericLimit: previous.numericLimit,
+                validFrom: previous.validFrom?.toISOString() ?? null,
+                validUntil: previous.validUntil?.toISOString() ?? null,
+              }
+            : null,
+          enabled:
+            updated.enabled,
+          numericLimit:
+            updated.numericLimit,
+          validFrom:
+            updated.validFrom?.toISOString() ??
+            null,
+          validUntil:
+            updated.validUntil?.toISOString() ??
+            null,
+          overrideMetadata:
+            updated.metadata ?? null,
+        },
+        ipAddress:
+          actor?.ipAddress,
+        userAgent:
+          actor?.userAgent,
+      },
+    });
+
+    return this.getUserPermissionProfile(
+      normalizedUserId,
+      actor,
+    );
+  }
+
+  async deleteUserPermissionOverride(
+    userId: string,
+    permissionKey: string,
+    actor?: AdminActor,
+  ) {
+    this.requireSoftwareTeam(actor);
+
+    const actorId = this.getActorId(actor);
+
+    const normalizedUserId =
+      String(userId || "").trim();
+
+    const normalizedPermissionKey =
+      String(permissionKey || "")
+        .trim()
+        .toUpperCase();
+
+    const permission =
+      await this.prisma.permissionDefinition.findUnique({
+        where: {
+          key: normalizedPermissionKey,
+        },
+      });
+
+    if (!permission) {
+      throw new NotFoundException(
+        "Yetki tanımı bulunamadı.",
+      );
+    }
+
+    const existing =
+      await this.prisma.userPermissionOverride.findUnique({
+        where: {
+          userId_permissionId: {
+            userId: normalizedUserId,
+            permissionId: permission.id,
+          },
+        },
+      });
+
+    if (existing) {
+      await this.prisma.userPermissionOverride.delete({
+        where: {
+          id: existing.id,
+        },
+      });
+
+      await this.prisma.auditLog.create({
+        data: {
+          actorId,
+          targetUserId:
+            normalizedUserId,
+          action:
+            AuditAction.UPDATE_USER_PERMISSION,
+          entityType:
+            "UserPermissionOverride",
+          entityId:
+            existing.id,
+          description:
+            `Kullanıcı özel yetkisi kaldırıldı: ${permission.key}`,
+          metadata: {
+            permissionKey:
+              permission.key,
+            action:
+              "DELETE_OVERRIDE",
+            oldValue: {
+              enabled: existing.enabled,
+              numericLimit: existing.numericLimit,
+              validFrom: existing.validFrom?.toISOString() ?? null,
+              validUntil: existing.validUntil?.toISOString() ?? null,
+            },
+          },
+          ipAddress:
+            actor?.ipAddress,
+          userAgent:
+            actor?.userAgent,
+        },
+      });
+    }
+
+    return this.getUserPermissionProfile(
+      normalizedUserId,
+      actor,
+    );
+  }
+
+  async setUserPermissionsBulk(
+    userId: string,
+    body: { permissions?: Record<string, boolean> },
+    actor?: AdminActor,
+  ) {
+    this.requireSoftwareTeam(actor);
+
+    const actorId = this.getActorId(actor);
+    const normalizedUserId = String(userId || "").trim();
+    const requested = body?.permissions;
+
+    if (
+      !requested ||
+      typeof requested !== "object" ||
+      Object.values(requested).some((value) => typeof value !== "boolean")
+    ) {
+      throw new BadRequestException("Yetki listesi geçersiz.");
+    }
+
+    const before = await this.getUserPermissionProfile(normalizedUserId, actor);
+
+    if (before.user.role === Role.SUPER_ADMIN) {
+      throw new ForbiddenException("Süper Admin yetkileri kısıtlanamaz.");
+    }
+
+    const byKey = new Map(before.permissions.map((item) => [item.key, item]));
+    const changes: Array<{ id: string; key: string; oldEnabled: boolean; newEnabled: boolean }> = [];
+
+    for (const [rawKey, newEnabled] of Object.entries(requested)) {
+      const key = String(rawKey).trim().toUpperCase();
+      const current = byKey.get(key);
+
+      if (!current) {
+        throw new NotFoundException(`Aktif yetki tanımı bulunamadı: ${key}`);
+      }
+
+      if (current.superAdminOnly || !current.delegable) {
+        throw new ForbiddenException(`Bu yetki kullanıcıya devredilemez: ${key}`);
+      }
+
+      if (current.enabled !== newEnabled) {
+        changes.push({ id: current.id, key, oldEnabled: current.enabled, newEnabled });
+      }
+    }
+
+    if (changes.length > 0) {
+      await this.prisma.$transaction(async (tx) => {
+        for (const change of changes) {
+          const override = await tx.userPermissionOverride.upsert({
+            where: {
+              userId_permissionId: {
+                userId: normalizedUserId,
+                permissionId: change.id,
+              },
+            },
+            update: { enabled: change.newEnabled, updatedById: actorId },
+            create: {
+              userId: normalizedUserId,
+              permissionId: change.id,
+              enabled: change.newEnabled,
+              updatedById: actorId,
+            },
+          });
+
+          await tx.auditLog.create({
+            data: {
+              actorId,
+              targetUserId: normalizedUserId,
+              action: AuditAction.UPDATE_USER_PERMISSION,
+              entityType: "UserPermissionOverride",
+              entityId: override.id,
+              description: `Kullanıcı yetkisi güncellendi: ${change.key}`,
+              metadata: {
+                permissionKey: change.key,
+                oldValue: { enabled: change.oldEnabled },
+                newValue: { enabled: change.newEnabled },
+              },
+              ipAddress: actor?.ipAddress,
+              userAgent: actor?.userAgent,
+            },
+          });
+        }
+      });
+    }
+
+    return this.getUserPermissionProfile(normalizedUserId, actor);
+  }
+
+  async extendUserTrial(
+    userId: string,
+    body: {
+      gunSayisi: number;
+      gerekce?: string;
+    },
+    actor?: AdminActor,
+  ) {
+    this.requireAdminOrSoftwareTeam(actor);
+
+    const actorId = this.getActorId(actor);
+
+    const {
+      initialDays: trialInitialDays,
+      extensionDays: trialExtensionDays,
+      maxExtensions: trialMaxExtensions,
+    } = await readTrialPolicy(this.prisma);
+
+    const trialExtendPermission =
+      await this.resolveOperationalPermission(actor, "TRIAL_EXTEND");
+
+    if (!trialExtendPermission.enabled) {
+      throw new ForbiddenException(
+        "Deneme süresi uzatma yetkiniz bulunmuyor.",
+      );
+    }
+
+    const normalizedUserId = String(userId || "").trim();
+    const gunSayisi = Number(body?.gunSayisi);
+    const gerekceMetni =
+      String(body?.gerekce || "").trim();
+    const gerekce =
+      gerekceMetni ||
+      "Yazılım Ekibi tarafından deneme süresi uzatıldı.";
+
+    if (!normalizedUserId) {
+      throw new BadRequestException("Kullanıcı kimliği zorunludur.");
+    }
+
+    if (
+      !Number.isInteger(gunSayisi) ||
+      gunSayisi !== trialExtensionDays
+    ) {
+      throw new BadRequestException(
+        `Deneme süresi yalnız ${trialExtensionDays} gün uzatılabilir.`,
+      );
+    }
+
+    if (gerekceMetni.length > 50) {
+      throw new BadRequestException(
+        "Uzatma gerekçesi en fazla 50 karakter olabilir.",
+      );
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`
+        SELECT pg_advisory_xact_lock(
+          hashtext(${`trial-extend:${normalizedUserId}`})
+        )
+      `;
+
+      const user = await tx.user.findUnique({
+        where: { id: normalizedUserId },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          role: true,
+        },
+      });
+
+      if (!user) {
+        throw new NotFoundException("Kullanıcı bulunamadı.");
+      }
+
+      if (user.role === Role.SUPER_ADMIN) {
+        throw new BadRequestException(
+          "Yazılım Ekibi hesabının üyelik süresi değiştirilemez.",
+        );
+      }
+
+      if (this.isAdmin(actor)) {
+        const numericLimit = trialExtendPermission.numericLimit;
+        const metadata = trialExtendPermission.metadata || {};
+
+        const limitScope = String(
+          metadata["limitScope"] || "",
+        ).toUpperCase();
+
+        const limitPeriod = String(
+          metadata["limitPeriod"] || "",
+        ).toUpperCase();
+
+        if (
+          numericLimit !== null &&
+          limitScope === "PER_TARGET_USER" &&
+          limitPeriod === "YEAR"
+        ) {
+          const now = new Date();
+
+          const yearStart = new Date(
+            Date.UTC(now.getUTCFullYear(), 0, 1),
+          );
+
+          const nextYearStart = new Date(
+            Date.UTC(now.getUTCFullYear() + 1, 0, 1),
+          );
+
+          const usedCount = await tx.auditLog.count({
+            where: {
+              actorId,
+              targetUserId: normalizedUserId,
+              action: AuditAction.TRIAL_UZAT,
+              createdAt: {
+                gte: yearStart,
+                lt: nextYearStart,
+              },
+            },
+          });
+
+          if (usedCount >= numericLimit) {
+            throw new ForbiddenException(
+              `Bu kullanıcı için yıllık deneme uzatma limitiniz dolmuştur. Yıllık limit: ${numericLimit}.`,
+            );
+          }
+        }
+      }
+
+      const mevcutUyelik =
+        await tx.kullaniciUyelikPaketi.findFirst({
+          where: {
+            kullaniciId: normalizedUserId,
+          },
+          orderBy: {
+            baslangicTarihi: "desc",
+          },
+        });
+
+      if (!mevcutUyelik) {
+        throw new NotFoundException(
+          "Kullanıcının üyelik paketi bulunamadı.",
+        );
+      }
+
+      if (!mevcutUyelik.bitisTarihi) {
+        throw new BadRequestException(
+          "Süresiz üyelik paketinin bitiş tarihi uzatılamaz.",
+        );
+      }
+
+      const paket = await tx.uyelikPaketi.findUnique({
+        where: {
+          id: mevcutUyelik.paketId,
+        },
+        select: {
+          id: true,
+          paketKodu: true,
+          paketAdi: true,
+        },
+      });
+
+      if (!paket || paket.paketKodu !== "DENEME") {
+        throw new BadRequestException(
+          "Kullanıcının güncel üyelik paketi DENEME değildir.",
+        );
+      }
+
+        const toplamUzatmaSayisi =
+          await tx.auditLog.count({
+            where: {
+              targetUserId: normalizedUserId,
+              action: AuditAction.TRIAL_UZAT,
+            },
+          });
+
+        if (toplamUzatmaSayisi >= trialMaxExtensions) {
+          throw new BadRequestException(
+            `Bu kullanıcı için izin verilen azami deneme uzatma sayısına ulaşıldı. Limit: ${trialMaxExtensions}.`,
+          );
+        }
+
+        const eskiBitisTarihi =
+          mevcutUyelik.bitisTarihi;
+
+        const maksimumToplamGun =
+          trialInitialDays +
+          trialExtensionDays * trialMaxExtensions;
+
+        const maksimumBitisTarihi =
+          new Date(mevcutUyelik.baslangicTarihi);
+
+        maksimumBitisTarihi.setUTCDate(
+          maksimumBitisTarihi.getUTCDate() + maksimumToplamGun,
+        );
+
+        const yeniBitisTarihi =
+          new Date(eskiBitisTarihi);
+
+        yeniBitisTarihi.setUTCDate(
+          yeniBitisTarihi.getUTCDate() + trialExtensionDays,
+        );
+
+        if (
+          yeniBitisTarihi >
+          maksimumBitisTarihi
+        ) {
+          throw new BadRequestException(
+            `Deneme süresi toplam ${maksimumToplamGun} günü aşamaz.`,
+          );
+        }
+
+      const uzatmaBaslangici =
+        new Date(eskiBitisTarihi);
+
+      const guncelUyelik =
+        await tx.kullaniciUyelikPaketi.update({
+          where: {
+            id: mevcutUyelik.id,
+          },
+          data: {
+            durum: UyelikDurumu.AKTIF,
+            bitisTarihi: yeniBitisTarihi,
+          },
+        });
+
+      await tx.auditLog.create({
+        data: {
+          actorId,
+          targetUserId: normalizedUserId,
+          action: AuditAction.TRIAL_UZAT,
+          entityType: "KullaniciUyelikPaketi",
+          entityId: mevcutUyelik.id,
+          description: gerekce,
+          metadata: {
+            gunSayisi,
+            paketKodu: paket.paketKodu,
+            paketAdi: paket.paketAdi,
+            eskiDurum: mevcutUyelik.durum,
+            yeniDurum: UyelikDurumu.AKTIF,
+            eskiBitisTarihi:
+              eskiBitisTarihi?.toISOString() || null,
+            uzatmaBaslangici:
+              uzatmaBaslangici.toISOString(),
+            yeniBitisTarihi:
+              yeniBitisTarihi.toISOString(),
+            trialPolicy: {
+              initialDays: trialInitialDays,
+              extensionDays: trialExtensionDays,
+              maxExtensions: trialMaxExtensions,
+            },
+            actorPermission: {
+              source: trialExtendPermission.source,
+              numericLimit: trialExtendPermission.numericLimit,
+              limitScope:
+                String(
+                  trialExtendPermission.metadata?.["limitScope"] || "",
+                ) || null,
+              limitPeriod:
+                String(
+                  trialExtendPermission.metadata?.["limitPeriod"] || "",
+                ) || null,
+            },
+            previousExtensionCount:
+              toplamUzatmaSayisi,
+          },
+          ipAddress: actor?.ipAddress,
+          userAgent: actor?.userAgent,
+        },
+      });
+
+      const kullaniciAdi =
+        `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
+        user.email;
+
+      return {
+        success: true,
+        mesaj: `${kullaniciAdi} kullanıcısının deneme süresi ${gunSayisi} gün uzatıldı.`,
+        kullanici: {
+          id: user.id,
+          ad: kullaniciAdi,
+          email: user.email,
+        },
+        uyelik: {
+          id: guncelUyelik.id,
+          paketKodu: paket.paketKodu,
+          durum: guncelUyelik.durum,
+          eklenenGun: gunSayisi,
+          eskiBitisTarihi,
+          yeniBitisTarihi:
+            guncelUyelik.bitisTarihi,
+        },
+      };
+    });
+  }
+
+
+}

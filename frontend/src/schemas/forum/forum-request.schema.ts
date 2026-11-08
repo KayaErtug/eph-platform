@@ -5,6 +5,17 @@ import {
   type EPHSchemaOptionVisual,
   type EPHSchemaState,
 } from "@/components/schema-engine";
+import {
+  PROPERTY_TYPE_OPTIONS,
+  isKnownPropertyType,
+} from "@/components/property-type-schema";
+import {
+  getFirstBlockingTextSafetyMessage,
+  propertyTypeSupportsEPHDemandRoomRange,
+  validateEPHPropertyField,
+  validateEPHPublicDescription,
+  validateEPHPublicTitle,
+} from "@/components/create-system";
 
 export type ForumRequestCategory =
   | "PORTFOY_ARIYORUM"
@@ -164,6 +175,7 @@ export function getForumRequestCategoryVisual(
 export type ForumRequestFormState = EPHSchemaState & {
   category: ForumRequestCategory | "";
   requestIntent: string;
+  propertyType: string;
   title: string;
   city: string;
   district: string;
@@ -179,6 +191,10 @@ export type ForumRequestFormState = EPHSchemaState & {
   urgency: string;
   validFor: string;
   visibility: string;
+  allowPhoneCall: boolean;
+  contactPhone: string;
+  allowWhatsapp: boolean;
+  whatsappPhone: string;
   description: string;
 };
 
@@ -376,6 +392,13 @@ export function getForumRequestIntentVisual(intent?: string | null): EPHSchemaOp
   return FORUM_ALL_REQUEST_TYPE_OPTIONS.find((option) => option.value === normalized)?.visual || FORUM_REQUEST_CATEGORY_VISUALS.DIGER;
 }
 
+export const FORUM_PROPERTY_TYPE_OPTIONS: EPHSchemaOption[] =
+  PROPERTY_TYPE_OPTIONS.map((option) => ({
+    value: option.type,
+    label: option.label,
+    hint: `${option.mainCategory} / ${option.subCategory}`,
+  }));
+
 export const FORUM_REQUEST_CURRENCY_OPTIONS: EPHSchemaOption[] = [
   { value: "TRY", label: "Türk Lirası (₺)" },
   { value: "USD", label: "Dolar ($)" },
@@ -509,6 +532,7 @@ export function createEmptyForumRequestFormState(): ForumRequestFormState {
   return {
     category: "",
     requestIntent: "",
+    propertyType: "",
     title: "",
     city: "",
     district: "",
@@ -524,6 +548,10 @@ export function createEmptyForumRequestFormState(): ForumRequestFormState {
     urgency: "Normal",
     validFor: "7 gün",
     visibility: "TUM_EPH",
+    allowPhoneCall: false,
+    contactPhone: "",
+    allowWhatsapp: false,
+    whatsappPhone: "",
     description: "",
   };
 }
@@ -551,9 +579,9 @@ export const forumRequestSchema: EPHSchemaDefinition = {
   id: "eph.forum.request",
   version: 1,
   entity: "ForumRequest",
-  title: "Forum Talebi",
+  title: "Talep Merkezi Kaydı",
   description:
-    "Forum talep girişi, filtreleme, detay görüntüleme ve Lina analizi için ortak alan sözlüğü.",
+    "Talep Merkezi kayıt girişi, filtreleme, detay görüntüleme ve Lina analizi için ortak alan sözlüğü.",
   defaultStateByMode: {
     form: createEmptyForumRequestFormState(),
     filter: createEmptyForumRequestFilterState(),
@@ -575,13 +603,18 @@ export const forumRequestSchema: EPHSchemaDefinition = {
           order: 10,
           options: FORUM_REQUEST_CATEGORY_OPTIONS,
           searchable: true,
-          resetKeysOnChange: ["requestIntent"],
+          resetKeysOnChange: [
+            "requestIntent",
+            "propertyType",
+            "minRoom",
+            "maxRoom",
+          ],
           validation: {
             required: true,
             message: "Lütfen talep kategorisini seçin.",
           },
           lina: {
-            meaning: "Forum talebinin ana iş kategorisi",
+            meaning: "Talep Merkezi kaydının ana iş kategorisi",
             analyticsKey: "forum_request_category",
             entityPath: "forum.request.category",
             comparable: true,
@@ -618,7 +651,7 @@ export const forumRequestSchema: EPHSchemaDefinition = {
             },
           },
           lina: {
-            meaning: "Forum kategorisi içindeki yapılandırılmış alt talep türü",
+            meaning: "Talep Merkezi kategorisi içindeki yapılandırılmış alt talep türü",
             analyticsKey: "forum_request_intent",
             entityPath: "forum.request.intent",
             comparable: true,
@@ -635,6 +668,35 @@ export const forumRequestSchema: EPHSchemaDefinition = {
           options: FORUM_ALL_REQUEST_TYPE_OPTIONS,
         },
         {
+          id: "forum-property-type",
+          key: "propertyType",
+          label: "Gayrimenkul Tipi",
+          type: "single-select",
+          modes: ["form", "detail", "lina"],
+          order: 25,
+          options: FORUM_PROPERTY_TYPE_OPTIONS,
+          searchable: true,
+          hidden: (state) =>
+            String(state.category || "") !== "PORTFOY_ARIYORUM" ||
+            !String(state.requestIntent || ""),
+          resetKeysOnChange: ["minRoom", "maxRoom"],
+          validation: {
+            required: true,
+            message: "Lütfen gayrimenkul tipini seçin.",
+            validate: (value) =>
+              isKnownPropertyType(String(value || ""))
+                ? null
+                : "Geçerli bir gayrimenkul tipi seçin.",
+          },
+          lina: {
+            meaning: "Talepte aranan gayrimenkul tipi",
+            analyticsKey: "forum_property_type",
+            entityPath: "forum.request.propertyType",
+            comparable: true,
+            synonyms: ["gayrimenkul tipi", "portföy tipi", "taşınmaz türü"],
+          },
+        },
+        {
           id: "forum-title",
           key: "title",
           label: "Talep Başlığı",
@@ -644,10 +706,15 @@ export const forumRequestSchema: EPHSchemaDefinition = {
           placeholder: "Örn: Merkezefendi 3+1 daire arıyorum",
           validation: {
             required: true,
+            minLength: 5,
             maxLength: 50,
+            validate: (value) =>
+              getFirstBlockingTextSafetyMessage(
+                validateEPHPublicTitle(value),
+              ),
           },
           lina: {
-            meaning: "Forum talebinin kısa ve kullanıcı tarafından yazılmış başlığı",
+            meaning: "Talep Merkezi kaydının kısa ve kullanıcı tarafından yazılmış başlığı",
             analyticsKey: "forum_request_title",
             entityPath: "forum.request.title",
             searchable: true,
@@ -671,9 +738,18 @@ export const forumRequestSchema: EPHSchemaDefinition = {
           modes: ["form", "detail"],
           order: 10,
           placeholder: "Örn: 90",
+          validation: {
+            validate: (value, state) =>
+              validateEPHPropertyField(
+                "minArea",
+                value,
+                state,
+              ),
+          },
           hidden: (state) =>
             String(state.category || "") !== "PORTFOY_ARIYORUM" ||
-            !String(state.requestIntent || ""),
+            !String(state.requestIntent || "") ||
+            !String(state.propertyType || ""),
         },
         {
           id: "forum-max-area",
@@ -683,9 +759,18 @@ export const forumRequestSchema: EPHSchemaDefinition = {
           modes: ["form", "detail"],
           order: 20,
           placeholder: "Örn: 160",
+          validation: {
+            validate: (value, state) =>
+              validateEPHPropertyField(
+                "maxArea",
+                value,
+                state,
+              ),
+          },
           hidden: (state) =>
             String(state.category || "") !== "PORTFOY_ARIYORUM" ||
-            !String(state.requestIntent || ""),
+            !String(state.requestIntent || "") ||
+            !String(state.propertyType || ""),
         },
         {
           id: "forum-min-room",
@@ -695,9 +780,22 @@ export const forumRequestSchema: EPHSchemaDefinition = {
           modes: ["form", "detail"],
           order: 30,
           placeholder: "Örn: 2",
+          validation: {
+            validate: (value, state) =>
+              validateEPHPropertyField(
+                "minRoom",
+                value,
+                state,
+              ),
+          },
           hidden: (state) =>
             String(state.category || "") !== "PORTFOY_ARIYORUM" ||
-            !String(state.requestIntent || ""),
+            !String(state.requestIntent || "") ||
+            !String(state.propertyType || "") ||
+            !propertyTypeSupportsEPHDemandRoomRange(
+              String(state.propertyType || ""),
+              "DEMAND",
+            ),
         },
         {
           id: "forum-max-room",
@@ -707,9 +805,22 @@ export const forumRequestSchema: EPHSchemaDefinition = {
           modes: ["form", "detail"],
           order: 40,
           placeholder: "Örn: 4",
+          validation: {
+            validate: (value, state) =>
+              validateEPHPropertyField(
+                "maxRoom",
+                value,
+                state,
+              ),
+          },
           hidden: (state) =>
             String(state.category || "") !== "PORTFOY_ARIYORUM" ||
-            !String(state.requestIntent || ""),
+            !String(state.requestIntent || "") ||
+            !String(state.propertyType || "") ||
+            !propertyTypeSupportsEPHDemandRoomRange(
+              String(state.propertyType || ""),
+              "DEMAND",
+            ),
         },
         {
           id: "forum-min-budget",
@@ -719,9 +830,18 @@ export const forumRequestSchema: EPHSchemaDefinition = {
           modes: ["form", "detail"],
           order: 50,
           placeholder: "Örn: 2000000",
+          validation: {
+            validate: (value, state) =>
+              validateEPHPropertyField(
+                "minBudget",
+                value,
+                state,
+              ),
+          },
           hidden: (state) =>
             String(state.category || "") !== "PORTFOY_ARIYORUM" ||
-            !String(state.requestIntent || ""),
+            !String(state.requestIntent || "") ||
+            !String(state.propertyType || ""),
         },
         {
           id: "forum-max-budget",
@@ -731,9 +851,18 @@ export const forumRequestSchema: EPHSchemaDefinition = {
           modes: ["form", "detail"],
           order: 60,
           placeholder: "Örn: 5000000",
+          validation: {
+            validate: (value, state) =>
+              validateEPHPropertyField(
+                "maxBudget",
+                value,
+                state,
+              ),
+          },
           hidden: (state) =>
             String(state.category || "") !== "PORTFOY_ARIYORUM" ||
-            !String(state.requestIntent || ""),
+            !String(state.requestIntent || "") ||
+            !String(state.propertyType || ""),
         },
       ],
     },
@@ -823,7 +952,7 @@ export const forumRequestSchema: EPHSchemaDefinition = {
           key: "budget",
           label: "Bütçe",
           type: "money",
-          modes: ["form", "detail", "lina"],
+          modes: ["detail", "lina"],
           order: 10,
           currencyKey: "currency",
           currencies: FORUM_REQUEST_CURRENCY_OPTIONS,
@@ -942,7 +1071,7 @@ export const forumRequestSchema: EPHSchemaDefinition = {
           options: FORUM_REQUEST_VISIBILITY_OPTIONS,
           defaultValue: "TUM_EPH",
           lina: {
-            meaning: "Forum talebini görebilecek kullanıcı kitlesi",
+            meaning: "Talep Merkezi kaydını görebilecek kullanıcı kitlesi",
             analyticsKey: "request_visibility",
             entityPath: "forum.request.visibility",
             comparable: false,
@@ -988,6 +1117,87 @@ export const forumRequestSchema: EPHSchemaDefinition = {
       ],
     },
     {
+      id: "communication",
+      title: "İletişim İzinleri",
+      description:
+        "Yalnızca izin verdiğiniz kanallar diğer kullanıcılara açılır.",
+      order: 45,
+      fields: [
+        {
+          id: "forum-allow-phone-call",
+          key: "allowPhoneCall",
+          label: "Telefonla aranabilirim",
+          type: "boolean",
+          modes: ["form", "detail"],
+          order: 10,
+          defaultValue: false,
+        },
+        {
+          id: "forum-contact-phone",
+          key: "contactPhone",
+          label: "Aranmasını İstediğiniz Numara",
+          type: "text",
+          modes: ["form", "detail"],
+          order: 20,
+          placeholder: "Örn: 0 532 000 00 00",
+          hidden: (state) => !Boolean(state.allowPhoneCall),
+          validation: {
+            validate: (value, state) => {
+              if (!Boolean(state.allowPhoneCall)) return null;
+              const digits = String(value || "").replace(/\D/g, "");
+              return /^\d{10,15}$/.test(digits)
+                ? null
+                : "Aranacak telefon numarasını alan koduyla birlikte doğru girin.";
+            },
+          },
+          lina: {
+            meaning: "Talep sahibinin aranmak istediği telefon numarası",
+            analyticsKey: "forum_contact_phone",
+            entityPath: "forum.request.contactPhone",
+            pii: true,
+            searchable: false,
+            comparable: false,
+          },
+        },
+        {
+          id: "forum-allow-whatsapp",
+          key: "allowWhatsapp",
+          label: "WhatsApp’tan yazılabilir",
+          type: "boolean",
+          modes: ["form", "detail"],
+          order: 30,
+          defaultValue: false,
+        },
+        {
+          id: "forum-whatsapp-phone",
+          key: "whatsappPhone",
+          label: "WhatsApp Numaranız",
+          type: "text",
+          modes: ["form", "detail"],
+          order: 40,
+          placeholder: "Örn: 0 542 000 00 00",
+          hidden: (state) => !Boolean(state.allowWhatsapp),
+          validation: {
+            validate: (value, state) => {
+              if (!Boolean(state.allowWhatsapp)) return null;
+              const digits = String(value || "").replace(/\D/g, "");
+              return /^\d{10,15}$/.test(digits)
+                ? null
+                : "WhatsApp numarasını alan koduyla birlikte doğru girin.";
+            },
+          },
+          lina: {
+            meaning: "Talep sahibinin WhatsApp mesajı almak istediği numara",
+            analyticsKey: "forum_whatsapp_phone",
+            entityPath: "forum.request.whatsappPhone",
+            pii: true,
+            searchable: false,
+            comparable: false,
+          },
+        },
+      ],
+    },
+    {
       id: "description",
       title: "Açıklama",
       order: 50,
@@ -1004,6 +1214,12 @@ export const forumRequestSchema: EPHSchemaDefinition = {
             required: true,
             minLength: 12,
             maxLength: 200,
+            validate: (value) =>
+              getFirstBlockingTextSafetyMessage(
+                validateEPHPublicDescription(
+                  value,
+                ),
+              ),
           },
           lina: {
             meaning: "Talebin serbest metin ayrıntıları",

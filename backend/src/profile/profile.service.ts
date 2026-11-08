@@ -149,9 +149,11 @@ export class ProfileService {
     capabilities: Capability[],
   ): DocumentType[] {
     if (role === Role.EMLAKCI) {
-      return capabilities.includes(Capability.OFFICE_OWNER)
-        ? [DocumentType.YETKI_BELGESI]
-        : [DocumentType.MYK_BELGESI];
+      return [
+        DocumentType.YETKI_BELGESI,
+        DocumentType.MYK_BELGESI,
+        DocumentType.VERGI_LEVHASI,
+      ];
     }
 
     if (
@@ -195,6 +197,13 @@ export class ProfileService {
       capabilities: {
         select: {
           capability: true,
+        },
+      },
+      office: {
+        select: {
+          id: true,
+          name: true,
+          code: true,
         },
       },
       documents: {
@@ -308,8 +317,12 @@ export class ProfileService {
         })
       : null;
 
+    const effectiveCompanyName = user.companyName || user.office?.name || null;
+
     return {
       ...user,
+      companyName: effectiveCompanyName,
+      office: user.office,
       capabilities,
       registrationType,
       requiredProfessionalDocumentTypes,
@@ -766,6 +779,7 @@ export class ProfileService {
       select: {
         role: true,
         companyName: true,
+        office: { select: { id: true, name: true } },
         professionalVerificationStatus: true,
         capabilities: {
           select: {
@@ -779,7 +793,8 @@ export class ProfileService {
       throw new NotFoundException('Kullanıcı bulunamadı.');
     }
 
-    if (requiresCompanyName(user.role)) companyName(user.companyName);
+    const effectiveCompanyName = (user.companyName || user.office?.name || '').trim();
+    if (requiresCompanyName(user.role)) companyName(effectiveCompanyName);
 
     const capabilities = user.capabilities.map(
       (item) => item.capability,
@@ -868,8 +883,17 @@ export class ProfileService {
               },
             });
 
+        if (!user.companyName && user.office?.name) {
+          await tx.user.update({
+            where: { id: userId },
+            data: { companyName: user.office.name },
+          });
+        }
+
         if (
-          user.professionalVerificationStatus !== null
+          user.professionalVerificationStatus !== null &&
+          user.professionalVerificationStatus !==
+            ProfessionalVerificationStatus.VERIFIED
         ) {
           await tx.user.update({
             where: { id: userId },

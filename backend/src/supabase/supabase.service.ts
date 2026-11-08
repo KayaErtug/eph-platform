@@ -12,11 +12,16 @@ export class SupabaseService {
   private readonly supabase!: SupabaseClient;
   private readonly writeAuthMode: 'service-role' | 'anon' | 'local' =
     'local';
-  /** STORAGE_DRIVER=local ise dolu; yoksa (varsayılan supabase) null. */
+  /** AKTİF sürücü: yalnız STORAGE_DRIVER=local iken dolu; supabase seçiliyse null (ODM-7F-D/N7). */
   readonly local: LocalStorageDriver | null = null;
+  /**
+   * Aktif sürücü supabase iken: (a) Supabase kotası dolunca (402) bilinçli yerel yedek yazımı, (b) daha önce yerel yazılmış
+   * dosyaların okunması/imzalanması için. Aktif sürücü değildir; yükleme/silme/URL varsayılanı Supabase'e gider.
+   */
+  readonly localFallback: LocalStorageDriver | null = null;
 
   constructor() {
-    const driverName = String(process.env.STORAGE_DRIVER || 'supabase')
+    const driverName = String(process.env.STORAGE_DRIVER || 'local')
       .trim()
       .toLowerCase();
 
@@ -26,11 +31,17 @@ export class SupabaseService {
       );
     }
 
+    const localDriver = new LocalStorageDriver(readLocalStorageConfig());
+
     if (driverName === 'local') {
-      this.local = new LocalStorageDriver(readLocalStorageConfig());
+      this.local = localDriver;
+      this.localFallback = localDriver;
       this.logger.log('Dosya depolama sürücüsü: local');
       return;
     }
+
+    this.localFallback = localDriver;
+    this.logger.log('Dosya depolama sürücüsü: supabase (kota aşımında yerel yedek açık)');
 
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const ws = require('ws');
@@ -108,6 +119,12 @@ export class SupabaseService {
         return data;
       } catch (error) {
         lastError = error;
+        if (this.isQuotaOrRestrictedError(error) && this.localFallback) {
+          this.logger.warn(
+            `Supabase kotası aşıldı/kısıtlandı (402), dosya otomatik olarak yerel depolamaya (local driver) kaydediliyor: ${bucket}/${path}`,
+          );
+          return this.localFallback.write(bucket, path, file);
+        }
         const message = this.storageErrorMessage(
           error,
           bucket,
@@ -211,8 +228,8 @@ export class SupabaseService {
       throw new Error('Geçersiz Storage URL değeri.');
     }
 
-    if (this.local) {
-      const localPath = this.local.pathFromLocalUrl(bucket, url);
+    if (this.localFallback) {
+      const localPath = this.localFallback.pathFromLocalUrl(bucket, url);
 
       if (localPath) {
         return localPath;
@@ -270,18 +287,16 @@ export class SupabaseService {
       ),
     );
 
-    if (this.local) {
-      if (!this.local.isPrivateBucket(bucket)) {
-        return this.local.publicUrl(bucket, path);
+    // local aktifse her zaman yerel; supabase aktifse yalnız yerel yedeğe (kota fallback'i) yazılmış dosyalar yerelden imzalanır.
+    const driver = this.local ?? (this.localFallback && (await this.localFallback.exists(bucket, path)) ? this.localFallback : null);
+    if (driver) {
+      if (!driver.isPrivateBucket(bucket)) {
+        return driver.publicUrl(bucket, path);
       }
-
-      if (!(await this.local.exists(bucket, path))) {
-        throw new Error(
-          `Dosya bulunamadı (bucket: ${bucket}; path: ${path}).`,
-        );
+      if (!(await driver.exists(bucket, path))) {
+        throw new Error(`Dosya bulunamadı: ${bucket}/${path}`);
       }
-
-      return this.local.signedUrl(bucket, path, safeExpiresIn);
+      return driver.signedUrl(bucket, path, safeExpiresIn);
     }
 
     const { data, error } = await this.supabase.storage
@@ -369,6 +384,19 @@ export class SupabaseService {
       `${statusCode ? ` [${statusCode}]` : ''}: ${rawMessage}. ` +
       `Kimlik doğrulama: ${this.writeAuthMode}; ` +
       `bucket: ${bucket}; path: ${path}.${hint}`
+    );
+  }
+
+  private isQuotaOrRestrictedError(error: unknown): boolean {
+    const msg = String((error as any)?.message || error || '').toLowerCase();
+    const status = (error as any)?.status || (error as any)?.statusCode;
+    return (
+      status === 402 ||
+      msg.includes('402') ||
+      msg.includes('quota') ||
+      msg.includes('restricted') ||
+      msg.includes('exceed') ||
+      msg.includes('violation')
     );
   }
 

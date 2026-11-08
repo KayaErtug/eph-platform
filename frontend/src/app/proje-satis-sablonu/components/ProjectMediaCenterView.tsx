@@ -1,16 +1,14 @@
-﻿"use client";
+"use client";
 
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
-  Archive,
-  Check,
   CheckCircle2,
-  ClipboardList,
-  Copy,
-  FolderOpen,
+  FileImage,
   Images,
   Loader2,
+  RefreshCw,
+  Trash2,
   UploadCloud,
 } from "lucide-react";
 
@@ -20,9 +18,246 @@ import type {
   ProjectMediaPreview,
   ProjectSummary,
 } from "../lib/projectSalesTypes";
-import { formatBytes, mediaActionLabel } from "../lib/projectSalesFormatters";
-import { cardStyle, primaryButtonStyle, secondaryButtonStyle } from "../lib/projectSalesStyles";
-import { InfoBand, Metric, SectionTitle } from "./ProjectSalesPrimitives";
+import { formatBytes } from "../lib/projectSalesFormatters";
+import {
+  cardStyle,
+  primaryButtonStyle,
+  secondaryButtonStyle,
+} from "../lib/projectSalesStyles";
+import {
+  InfoBand,
+  Metric,
+  SectionTitle,
+} from "./ProjectSalesPrimitives";
+
+type MediaFolder = ProjectMediaConfig["folders"][number];
+type SelectedFilesByPackage = Record<string, File[]>;
+
+const MIN_IMAGES_PER_CATEGORY = 4;
+
+type ZipEntry = {
+  path: string;
+  data: Uint8Array;
+  crc: number;
+  modifiedAt: Date;
+};
+
+const CRC_TABLE = (() => {
+  const table = new Uint32Array(256);
+
+  for (let index = 0; index < 256; index += 1) {
+    let value = index;
+
+    for (let bit = 0; bit < 8; bit += 1) {
+      value =
+        value & 1
+          ? 0xedb88320 ^ (value >>> 1)
+          : value >>> 1;
+    }
+
+    table[index] = value >>> 0;
+  }
+
+  return table;
+})();
+
+function crc32(bytes: Uint8Array) {
+  let crc = 0xffffffff;
+
+  for (const byte of bytes) {
+    crc = CRC_TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  }
+
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
+}
+
+function dosDateTime(date: Date) {
+  const year = Math.max(1980, date.getFullYear());
+  const dosTime =
+    (date.getHours() << 11) |
+    (date.getMinutes() << 5) |
+    Math.floor(date.getSeconds() / 2);
+  const dosDate =
+    ((year - 1980) << 9) |
+    ((date.getMonth() + 1) << 5) |
+    date.getDate();
+
+  return { dosTime, dosDate };
+}
+
+function localHeader(entry: ZipEntry, nameBytes: Uint8Array) {
+  const buffer = new ArrayBuffer(30 + nameBytes.length);
+  const view = new DataView(buffer);
+  const { dosTime, dosDate } = dosDateTime(entry.modifiedAt);
+
+  view.setUint32(0, 0x04034b50, true);
+  view.setUint16(4, 20, true);
+  view.setUint16(6, 0x0800, true);
+  view.setUint16(8, 0, true);
+  view.setUint16(10, dosTime, true);
+  view.setUint16(12, dosDate, true);
+  view.setUint32(14, entry.crc, true);
+  view.setUint32(18, entry.data.byteLength, true);
+  view.setUint32(22, entry.data.byteLength, true);
+  view.setUint16(26, nameBytes.length, true);
+  view.setUint16(28, 0, true);
+  new Uint8Array(buffer, 30).set(nameBytes);
+
+  return new Uint8Array(buffer);
+}
+
+function centralHeader(
+  entry: ZipEntry,
+  nameBytes: Uint8Array,
+  localOffset: number,
+) {
+  const buffer = new ArrayBuffer(46 + nameBytes.length);
+  const view = new DataView(buffer);
+  const { dosTime, dosDate } = dosDateTime(entry.modifiedAt);
+
+  view.setUint32(0, 0x02014b50, true);
+  view.setUint16(4, 20, true);
+  view.setUint16(6, 20, true);
+  view.setUint16(8, 0x0800, true);
+  view.setUint16(10, 0, true);
+  view.setUint16(12, dosTime, true);
+  view.setUint16(14, dosDate, true);
+  view.setUint32(16, entry.crc, true);
+  view.setUint32(20, entry.data.byteLength, true);
+  view.setUint32(24, entry.data.byteLength, true);
+  view.setUint16(28, nameBytes.length, true);
+  view.setUint16(30, 0, true);
+  view.setUint16(32, 0, true);
+  view.setUint16(34, 0, true);
+  view.setUint16(36, 0, true);
+  view.setUint32(38, 0, true);
+  view.setUint32(42, localOffset, true);
+  new Uint8Array(buffer, 46).set(nameBytes);
+
+  return new Uint8Array(buffer);
+}
+
+function endOfCentralDirectory(
+  entryCount: number,
+  centralSize: number,
+  centralOffset: number,
+) {
+  const buffer = new ArrayBuffer(22);
+  const view = new DataView(buffer);
+
+  view.setUint32(0, 0x06054b50, true);
+  view.setUint16(4, 0, true);
+  view.setUint16(6, 0, true);
+  view.setUint16(8, entryCount, true);
+  view.setUint16(10, entryCount, true);
+  view.setUint32(12, centralSize, true);
+  view.setUint32(16, centralOffset, true);
+  view.setUint16(20, 0, true);
+
+  return new Uint8Array(buffer);
+}
+
+function safeFolderName(value: string) {
+  return value
+    .replace(/\\/g, "/")
+    .split("/")
+    .filter(Boolean)
+    .join("/");
+}
+
+function fileExtension(fileName: string) {
+  const match = fileName.toLowerCase().match(/\.(jpe?g|png|webp)$/);
+  return match?.[0] || ".jpg";
+}
+
+function roomLabel(folder: MediaFolder) {
+  if (folder.type === "PROJECT_GENERAL") {
+    return "Proje Genel";
+  }
+
+  return folder.roomCount?.trim() || folder.name;
+}
+
+function generatedFileBase(folder: MediaFolder) {
+  if (folder.type === "PROJECT_GENERAL") {
+    return "proje-genel";
+  }
+
+  return roomLabel(folder)
+    .trim()
+    .replace(/\s+/g, "")
+    .replace(/[^0-9A-Za-zÇĞİÖŞÜçğıöşü+_-]/g, "-");
+}
+
+async function createZipFile(
+  project: ProjectSummary,
+  folders: MediaFolder[],
+  filesByPackage: SelectedFilesByPackage,
+) {
+  const entries: ZipEntry[] = [];
+
+  for (const folder of folders) {
+    const selectedFiles = filesByPackage[folder.packageId] || [];
+    const folderPath = safeFolderName(folder.folder);
+    const baseName = generatedFileBase(folder);
+
+    for (let index = 0; index < selectedFiles.length; index += 1) {
+      const file = selectedFiles[index];
+      const extension = fileExtension(file.name);
+      const generatedName = `${baseName}-${String(index + 1).padStart(2, "0")}${extension}`;
+      const data = new Uint8Array(await file.arrayBuffer());
+
+      entries.push({
+        path: `${folderPath}/${generatedName}`,
+        data,
+        crc: crc32(data),
+        modifiedAt: new Date(file.lastModified || Date.now()),
+      });
+    }
+  }
+
+  if (entries.length === 0) {
+    return null;
+  }
+
+  const encoder = new TextEncoder();
+  const localParts: BlobPart[] = [];
+  const centralParts: BlobPart[] = [];
+  let localOffset = 0;
+  let centralSize = 0;
+
+  for (const entry of entries) {
+    const nameBytes = encoder.encode(entry.path);
+    const local = localHeader(entry, nameBytes);
+    const central = centralHeader(entry, nameBytes, localOffset);
+
+    localParts.push(toArrayBuffer(local), toArrayBuffer(entry.data));
+    centralParts.push(toArrayBuffer(central));
+    localOffset += local.byteLength + entry.data.byteLength;
+    centralSize += central.byteLength;
+  }
+
+  const end = endOfCentralDirectory(
+    entries.length,
+    centralSize,
+    localOffset,
+  );
+  const projectCode =
+    project.code?.trim().replace(/[^0-9A-Za-z_-]/g, "-") ||
+    "proje";
+
+  return new File(
+    [...localParts, ...centralParts, toArrayBuffer(end)],
+    `${projectCode}-gorseller.zip`,
+    { type: "application/zip" },
+  );
+}
 
 export function ProjectMediaCenterView({
   project,
@@ -49,39 +284,138 @@ export function ProjectMediaCenterView({
   onPreview: () => void;
   onUpload: () => void;
 }) {
-  const [copied, setCopied] = useState(false);
+  const [filesByPackage, setFilesByPackage] =
+    useState<SelectedFilesByPackage>({});
+  const [buildingZip, setBuildingZip] = useState(false);
+  const [selectionError, setSelectionError] = useState<string | null>(
+    null,
+  );
+  const buildVersionRef = useRef(0);
+
   const previewing = busyAction === "media-preview";
   const uploading = busyAction === "media-upload";
+  const locked = buildingZip || previewing || uploading;
 
-  const folderPlan = config.folders
-    .map((folder) => {
-      const countText =
-        folder.type === "PROJECT_GENERAL"
-          ? `${config.limits.generalImageCount.min}-${config.limits.generalImageCount.max} görsel`
-          : `önerilen ${config.limits.recommendedStandardImageCount}, en fazla ${config.limits.maxStandardImageCount} görsel`;
+  const orderedFolders = useMemo(
+    () =>
+      [...config.folders].sort((first, second) => {
+        if (first.type === "PROJECT_GENERAL") return -1;
+        if (second.type === "PROJECT_GENERAL") return 1;
 
-      return `${folder.folder}/  (${folder.name} • ${countText})`;
-    })
-    .join("\n");
+        return roomLabel(first).localeCompare(
+          roomLabel(second),
+          "tr-TR",
+          { numeric: true },
+        );
+      }),
+    [config.folders],
+  );
 
-  const copyFolderPlan = async () => {
-    try {
-      await navigator.clipboard.writeText(folderPlan);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1800);
-    } catch {
-      setCopied(false);
-    }
-  };
-
+  const totalSelected = Object.values(filesByPackage).reduce(
+    (total, files) => total + files.length,
+    0,
+  );
   const totalExistingAssets = config.folders.reduce(
     (total, folder) => total + folder.existingAssetCount,
     0,
   );
-  const totalAssignedUnits = config.folders.reduce(
-    (total, folder) => total + folder.assignedUnitCount,
-    0,
+  const uploadedPackages = packages.packages.filter(
+    (mediaPackage) => mediaPackage._count.assets > 0,
   );
+  const missingMinimumFolders = orderedFolders.filter(
+    (folder) =>
+      (filesByPackage[folder.packageId] || []).length <
+      MIN_IMAGES_PER_CATEGORY,
+  );
+  const selectionsReady =
+    orderedFolders.length > 0 && missingMinimumFolders.length === 0;
+
+  const rebuildZip = async (
+    nextFilesByPackage: SelectedFilesByPackage,
+  ) => {
+    const version = buildVersionRef.current + 1;
+    buildVersionRef.current = version;
+
+    const selectedCount = Object.values(nextFilesByPackage).reduce(
+      (total, files) => total + files.length,
+      0,
+    );
+
+    if (selectedCount === 0) {
+      onFileChange(null);
+      setBuildingZip(false);
+      return;
+    }
+
+    setBuildingZip(true);
+
+    try {
+      const generatedZip = await createZipFile(
+        project,
+        orderedFolders,
+        nextFilesByPackage,
+      );
+
+      if (buildVersionRef.current !== version) {
+        return;
+      }
+
+      onFileChange(generatedZip);
+    } catch {
+      if (buildVersionRef.current === version) {
+        onFileChange(null);
+        setSelectionError(
+          "Görseller hazırlanamadı. Dosyaları yeniden seçin.",
+        );
+      }
+    } finally {
+      if (buildVersionRef.current === version) {
+        setBuildingZip(false);
+      }
+    }
+  };
+
+  const updateFolderFiles = (
+    folder: MediaFolder,
+    selectedFiles: File[],
+  ) => {
+    const maxCount =
+      folder.type === "PROJECT_GENERAL"
+        ? config.limits.generalImageCount.max
+        : config.limits.maxStandardImageCount;
+
+    if (selectedFiles.length > maxCount) {
+      setSelectionError(
+        `${roomLabel(folder)} için en fazla ${maxCount} görsel seçilebilir.`,
+      );
+      return;
+    }
+
+    const invalidFile = selectedFiles.find(
+      (file) => !/\.(jpe?g|png|webp)$/i.test(file.name),
+    );
+
+    if (invalidFile) {
+      setSelectionError(
+        "Yalnız JPG, PNG ve WEBP görseller yüklenebilir.",
+      );
+      return;
+    }
+
+    setSelectionError(null);
+
+    const nextFilesByPackage = {
+      ...filesByPackage,
+      [folder.packageId]: selectedFiles,
+    };
+
+    if (selectedFiles.length === 0) {
+      delete nextFilesByPackage[folder.packageId];
+    }
+
+    setFilesByPackage(nextFilesByPackage);
+    void rebuildZip(nextFilesByPackage);
+  };
 
   return (
     <div
@@ -89,291 +423,239 @@ export function ProjectMediaCenterView({
         display: "grid",
         gap: 12,
         marginTop: 12,
-        paddingBottom: "calc(80px + env(safe-area-inset-bottom))",
+        paddingBottom: "calc(84px + env(safe-area-inset-bottom))",
       }}
     >
       <section
         style={{
           ...cardStyle,
-          borderColor: "#C4B5FD",
+          borderColor: "#BFDBFE",
           background:
-            "linear-gradient(135deg, #F5F3FF 0%, #FFFFFF 52%, #FFF7ED 100%)",
+            "linear-gradient(135deg, #EFF6FF 0%, #FFFFFF 58%, #F8FAFC 100%)",
           padding: 13,
         }}
       >
         <SectionTitle
-          icon={<Images size={22} />}
-          title="Toplu Proje Görselleri"
-          subtitle={`${project.name} • Daire tiplerine göre tek ZIP ile toplu yükleme`}
+          icon={<Images size={21} />}
+          title="Proje Görselleri"
+          subtitle={`${project.name} • Oda planına göre ayrı görsel yükleme`}
         />
 
         <div
           style={{
             display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(min(100%, 140px), 1fr))",
+            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
             gap: 7,
-            marginTop: 12,
+            marginTop: 11,
           }}
         >
-          <Metric label="Fotoğraf Paketi" value={config.folders.length} />
-          <Metric label="Bağlı Bağımsız" value={totalAssignedUnits} />
-          <Metric label="Mevcut Görsel" value={totalExistingAssets} />
-          <Metric
-            label="ZIP Limiti"
-            value={`${config.limits.maxZipSizeMb} MB`}
-          />
+          <Metric label="Kategori" value={orderedFolders.length} />
+          <Metric label="Seçilen" value={totalSelected} />
+          <Metric label="Yüklü" value={totalExistingAssets} />
         </div>
 
-        <div
-          style={{
-            marginTop: 10,
-            border: "1.5px solid #C4B5FD",
-            borderRadius: 16,
-            background: "#FFFFFF",
-            padding: 11,
-            color: "#475569",
-            fontSize: 10,
-            lineHeight: 1.6,
-            fontWeight: 750,
-          }}
-        >
-          Proje genel fotoğraflarını ayrı klasöre; 2+1, 3+1, 4+1,
-          dükkan ve diğer bağımsız bölüm gruplarını kendi klasörlerine
-          koyun. Aynı pakete bağlı bütün bağımsız bölümlerde aynı
-          görseller ortak kullanılır.
-        </div>
+        <InfoBand tone="info">
+          Proje Genel, 2+1, 3+1, 4+1 ve projedeki diğer oda
+          planlarına ayrı ayrı en az 4 görsel seçin. Dosya adları sistem
+          tarafından otomatik olarak 2+1-01, 3+1-01 şeklinde oluşturulur.
+        </InfoBand>
       </section>
+
+      {selectionError && (
+        <InfoBand tone="error">{selectionError}</InfoBand>
+      )}
 
       <section style={{ ...cardStyle, padding: 13 }}>
         <SectionTitle
-          icon={<FolderOpen size={21} />}
-          title="ZIP Klasör Planı"
-          subtitle="Aşağıdaki klasör adlarını değiştirmeden ZIP dosyasının köküne yerleştirin."
+          icon={<FileImage size={21} />}
+          title="Görsel Kategorileri"
+          subtitle="Her kategori için en az 4 görsel seçin."
         />
 
         <div
           style={{
             display: "grid",
             gridTemplateColumns:
-              "repeat(auto-fit, minmax(min(100%, 230px), 1fr))",
+              "repeat(auto-fit, minmax(min(100%, 210px), 1fr))",
             gap: 9,
-            marginTop: 12,
+            marginTop: 11,
           }}
         >
-          {config.folders.map((folder, index) => {
-            const palette =
+          {orderedFolders.map((folder) => {
+            const selectedFiles =
+              filesByPackage[folder.packageId] || [];
+            const selectedCount = selectedFiles.length;
+            const maxCount =
               folder.type === "PROJECT_GENERAL"
-                ? {
-                    background: "#EDE9FE",
-                    border: "#A78BFA",
-                    color: "#5B21B6",
-                  }
-                : index % 3 === 0
-                  ? {
-                      background: "#DCFCE7",
-                      border: "#86EFAC",
-                      color: "#166534",
-                    }
-                  : index % 3 === 1
-                    ? {
-                        background: "#DBEAFE",
-                        border: "#93C5FD",
-                        color: "#1D4ED8",
-                      }
-                    : {
-                        background: "#FEF3C7",
-                        border: "#FCD34D",
-                        color: "#92400E",
-                      };
+                ? config.limits.generalImageCount.max
+                : config.limits.maxStandardImageCount;
+            const label = roomLabel(folder);
 
             return (
               <article
                 key={folder.packageId}
                 style={{
                   minWidth: 0,
-                  border: `1.5px solid ${palette.border}`,
-                  borderRadius: 17,
-                  background: palette.background,
-                  padding: 11,
+                  border: selectedCount
+                    ? "2px solid #2563EB"
+                    : "1.5px solid #C7D6E8",
+                  borderRadius: 16,
+                  background: selectedCount ? "#EFF6FF" : "#FFFFFF",
+                  padding: 10,
                   display: "grid",
                   gap: 8,
                 }}
               >
                 <div
                   style={{
-                    display: "flex",
+                    display: "grid",
+                    gridTemplateColumns: "40px minmax(0, 1fr)",
                     alignItems: "center",
                     gap: 9,
-                    minWidth: 0,
                   }}
                 >
-                  <div
+                  <span
                     style={{
-                      width: 38,
-                      height: 38,
-                      flex: "0 0 38px",
+                      width: 40,
+                      height: 40,
                       display: "grid",
                       placeItems: "center",
                       borderRadius: 12,
-                      background: "#FFFFFF",
-                      color: palette.color,
+                      background: selectedCount ? "#DBEAFE" : "#F1F5F9",
+                      color: selectedCount ? "#1D4ED8" : "#64748B",
                     }}
                   >
-                    <Archive size={20} />
-                  </div>
+                    {selectedCount ? (
+                      <CheckCircle2 size={21} />
+                    ) : (
+                      <Images size={21} />
+                    )}
+                  </span>
 
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div
+                  <div style={{ minWidth: 0 }}>
+                    <strong
                       style={{
-                        color: palette.color,
-                        fontSize: 12,
+                        display: "block",
+                        color: "#1F2937",
+                        fontSize: 13,
                         lineHeight: 1.35,
                         fontWeight: 950,
-                        overflowWrap: "anywhere",
                       }}
                     >
-                      {folder.folder}/
-                    </div>
-                    <div
+                      {label}
+                    </strong>
+                    <span
                       style={{
+                        display: "block",
                         marginTop: 2,
-                        color: "#475569",
+                        color: "#64748B",
                         fontSize: 9,
                         lineHeight: 1.4,
                         fontWeight: 750,
                       }}
                     >
-                      {folder.name}
-                    </div>
+                      {selectedCount > 0
+                        ? `${selectedCount} görsel seçildi • en az ${MIN_IMAGES_PER_CATEGORY}`
+                        : `En az ${MIN_IMAGES_PER_CATEGORY} • en fazla ${maxCount} görsel`}
+                    </span>
                   </div>
                 </div>
+
+                {selectedCount > 0 && (
+                  <div
+                    style={{
+                      border: "1px solid #BFDBFE",
+                      borderRadius: 11,
+                      background: "#FFFFFF",
+                      padding: 7,
+                      color: "#475569",
+                      fontSize: 9,
+                      lineHeight: 1.45,
+                      fontWeight: 750,
+                    }}
+                  >
+                    {selectedFiles
+                      .slice(0, 3)
+                      .map((file) => file.name)
+                      .join(" • ")}
+                    {selectedCount > 3
+                      ? ` • +${selectedCount - 3} görsel`
+                      : ""}
+                  </div>
+                )}
 
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-                    gap: 6,
+                    gridTemplateColumns: selectedCount
+                      ? "minmax(0, 1fr) 42px"
+                      : "1fr",
+                    gap: 7,
                   }}
                 >
-                  <Metric
-                    label="Bağlı Bölüm"
-                    value={folder.assignedUnitCount}
-                  />
-                  <Metric
-                    label="Mevcut Görsel"
-                    value={folder.existingAssetCount}
-                  />
-                </div>
+                  <label
+                    style={{
+                      ...secondaryButtonStyle,
+                      width: "100%",
+                      minHeight: 42,
+                      borderColor: "#93C5FD",
+                      background: "#EFF6FF",
+                      color: "#1D4ED8",
+                      cursor: locked ? "not-allowed" : "pointer",
+                      opacity: locked ? 0.6 : 1,
+                    }}
+                  >
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                      disabled={locked}
+                      onChange={(event) => {
+                        updateFolderFiles(
+                          folder,
+                          Array.from(event.target.files || []),
+                        );
+                        event.currentTarget.value = "";
+                      }}
+                      style={{ display: "none" }}
+                    />
+                    <UploadCloud size={17} />
+                    {selectedCount ? "Değiştir" : "Görsel Seç"}
+                  </label>
 
-                <p
-                  style={{
-                    margin: 0,
-                    color: "#475569",
-                    fontSize: 9,
-                    lineHeight: 1.5,
-                    fontWeight: 700,
-                  }}
-                >
-                  {folder.type === "PROJECT_GENERAL"
-                    ? `Zorunlu ilk paket: ${config.limits.generalImageCount.min}-${config.limits.generalImageCount.max} proje görseli.`
-                    : `Önerilen ${config.limits.recommendedStandardImageCount}, en fazla ${config.limits.maxStandardImageCount} görsel.`}
-                </p>
+                  {selectedCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => updateFolderFiles(folder, [])}
+                      disabled={locked}
+                      aria-label={`${label} görsellerini temizle`}
+                      style={{
+                        width: 42,
+                        minHeight: 42,
+                        border: "1.5px solid #FCA5A5",
+                        borderRadius: 12,
+                        background: "#FFF7F7",
+                        color: "#DC2626",
+                        display: "grid",
+                        placeItems: "center",
+                        cursor: locked ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      <Trash2 size={17} />
+                    </button>
+                  )}
+                </div>
               </article>
             );
           })}
         </div>
-
-        <button
-          type="button"
-          onClick={() => void copyFolderPlan()}
-          style={{
-            ...secondaryButtonStyle,
-            width: "100%",
-            marginTop: 10,
-            borderColor: "#C4B5FD",
-            background: "#F5F3FF",
-            color: "#6D28D9",
-          }}
-        >
-          {copied ? <Check size={18} /> : <Copy size={18} />}
-          {copied ? "Klasör Listesi Kopyalandı" : "Klasör Listesini Kopyala"}
-        </button>
       </section>
 
-      <section
-        style={{
-          ...cardStyle,
-          borderColor: "#93C5FD",
-          background: "#F8FBFF",
-          padding: 13,
-        }}
-      >
-        <SectionTitle
-          icon={<UploadCloud size={22} />}
-          title="ZIP Dosyasını Yükle"
-          subtitle={`En fazla ${config.limits.maxZipSizeMb} MB • JPG, PNG ve WEBP`}
-        />
-
+      {totalExistingAssets > 0 && (
         <label
           style={{
-            marginTop: 12,
-            minHeight: 110,
-            border: selectedFile
-              ? "2px solid #2563EB"
-              : "2px dashed #93C5FD",
-            borderRadius: 18,
-            background: selectedFile ? "#EAF2FF" : "#FFFFFF",
-            display: "grid",
-            placeItems: "center",
-            gap: 5,
-            padding: 14,
-            textAlign: "center",
-            cursor: uploading || previewing ? "not-allowed" : "pointer",
-          }}
-        >
-          <input
-            type="file"
-            accept=".zip,application/zip,application/x-zip-compressed"
-            disabled={uploading || previewing}
-            onChange={(event) =>
-              onFileChange(event.target.files?.[0] || null)
-            }
-            style={{ display: "none" }}
-          />
-
-          <Archive size={30} color="#2563EB" />
-
-          <strong
-            style={{
-              color: "#1D4ED8",
-              fontSize: 12,
-              fontWeight: 950,
-            }}
-          >
-            {selectedFile
-              ? selectedFile.name
-              : "ZIP dosyasını seçmek için dokunun"}
-          </strong>
-
-          <span
-            style={{
-              color: "#64748B",
-              fontSize: 10,
-              fontWeight: 700,
-            }}
-          >
-            {selectedFile
-              ? formatBytes(selectedFile.size)
-              : "Klasörleri tek ZIP içinde yükleyin"}
-          </span>
-        </label>
-
-        <label
-          style={{
-            marginTop: 10,
-            border: "1.5px solid #F3C97B",
-            borderRadius: 14,
+            ...cardStyle,
+            borderColor: "#F3C97B",
             background: "#FFF8E7",
             padding: 10,
             display: "flex",
@@ -382,33 +664,54 @@ export function ProjectMediaCenterView({
             color: "#7A4307",
             fontSize: 10,
             lineHeight: 1.45,
-            fontWeight: 800,
-            cursor: "pointer",
+            fontWeight: 850,
+            cursor: locked ? "not-allowed" : "pointer",
           }}
         >
           <input
             type="checkbox"
             checked={replaceExisting}
+            disabled={locked}
             onChange={(event) =>
               onReplaceExistingChange(event.target.checked)
             }
           />
-          Mevcut paket görsellerini bu ZIP içeriğiyle değiştir
+          Daha önce yüklenen görselleri yeni seçimlerle değiştir
         </label>
+      )}
+
+      {totalSelected > 0 && !selectionsReady && (
+        <InfoBand tone="warning">
+          En az 4 görsel bekleyen kategoriler:{" "}
+          {missingMinimumFolders.map(roomLabel).join(", ")}.
+        </InfoBand>
+      )}
+
+      <section
+        style={{
+          ...cardStyle,
+          borderColor: "#93C5FD",
+          background: "#F8FBFF",
+          padding: 11,
+        }}
+      >
+        {buildingZip && (
+          <InfoBand tone="info">
+            Görseller oda planlarına göre hazırlanıyor...
+          </InfoBand>
+        )}
 
         <div
           style={{
             display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(min(100%, 190px), 1fr))",
+            gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
             gap: 8,
-            marginTop: 10,
           }}
         >
           <button
             type="button"
             onClick={onPreview}
-            disabled={!selectedFile || previewing || uploading}
+            disabled={!selectedFile || !selectionsReady || locked}
             style={{
               ...secondaryButtonStyle,
               width: "100%",
@@ -416,28 +719,35 @@ export function ProjectMediaCenterView({
               borderColor: "#93C5FD",
               background: "#EFF6FF",
               color: "#1D4ED8",
+              opacity: !selectedFile || !selectionsReady || locked ? 0.55 : 1,
+              cursor:
+                !selectedFile || !selectionsReady || locked ? "not-allowed" : "pointer",
             }}
           >
-            {previewing ? (
+            {previewing || buildingZip ? (
               <Loader2 size={18} className="eph-spin" />
             ) : (
-              <ClipboardList size={18} />
+              <RefreshCw size={18} />
             )}
-            ZIP Dosyasını Önizle
+            Kontrol Et
           </button>
 
           <button
             type="button"
             onClick={onUpload}
-            disabled={!preview?.valid || uploading || previewing}
+            disabled={!preview?.valid || locked}
             style={{
               ...primaryButtonStyle,
               width: "100%",
               minHeight: 48,
               background: preview?.valid
-                ? "linear-gradient(135deg, #6D28D9, #8B5CF6)"
+                ? "linear-gradient(135deg, #047857, #10B981)"
                 : "#94A3B8",
-              cursor: preview?.valid ? "pointer" : "not-allowed",
+              opacity: !preview?.valid || locked ? 0.6 : 1,
+              cursor:
+                !preview?.valid || locked
+                  ? "not-allowed"
+                  : "pointer",
             }}
           >
             {uploading ? (
@@ -445,7 +755,7 @@ export function ProjectMediaCenterView({
             ) : (
               <UploadCloud size={18} />
             )}
-            Görselleri Toplu Yükle
+            Görselleri Yükle
           </button>
         </div>
       </section>
@@ -469,90 +779,38 @@ export function ProjectMediaCenterView({
             }
             title={
               preview.valid
-                ? "ZIP Önizlemesi Onaylandı"
-                : "ZIP Dosyasında Düzeltilecekler Var"
+                ? "Görseller yüklemeye hazır"
+                : "Görsel seçimlerinde düzeltilecekler var"
             }
-            subtitle={preview.archive.fileName}
+            subtitle={`${preview.summary.packageCount} kategori • ${preview.summary.imageCount} görsel`}
           />
 
           <div
             style={{
               display: "grid",
-              gridTemplateColumns:
-                "repeat(auto-fit, minmax(min(100%, 130px), 1fr))",
+              gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
               gap: 7,
-              marginTop: 11,
+              marginTop: 10,
             }}
           >
-            <Metric label="Paket" value={preview.summary.packageCount} />
+            <Metric label="Kategori" value={preview.summary.packageCount} />
             <Metric label="Görsel" value={preview.summary.imageCount} />
             <Metric
-              label="Toplam Boyut"
+              label="Boyut"
               value={formatBytes(preview.summary.totalImageSize)}
             />
-            <Metric label="Hata" value={preview.summary.errorCount} />
-            <Metric label="Uyarı" value={preview.summary.warningCount} />
-          </div>
-
-          <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
-            {preview.packages.map((mediaPackage) => (
-              <div
-                key={mediaPackage.packageId}
-                style={{
-                  border: "1.5px solid #C7D6E8",
-                  borderRadius: 14,
-                  background: "#FFFFFF",
-                  padding: 10,
-                  display: "grid",
-                  gridTemplateColumns:
-                    "minmax(0, 1fr) repeat(2, minmax(78px, auto))",
-                  gap: 8,
-                  alignItems: "center",
-                }}
-              >
-                <div style={{ minWidth: 0 }}>
-                  <strong
-                    style={{
-                      color: "#1F2937",
-                      fontSize: 11,
-                      fontWeight: 950,
-                    }}
-                  >
-                    {mediaPackage.sourceFolder}/
-                  </strong>
-                  <div
-                    style={{
-                      marginTop: 2,
-                      color: "#64748B",
-                      fontSize: 9,
-                      fontWeight: 700,
-                    }}
-                  >
-                    {mediaPackage.name}
-                  </div>
-                </div>
-
-                <Metric
-                  label="Görsel"
-                  value={mediaPackage.fileCount}
-                />
-                <Metric
-                  label="İşlem"
-                  value={mediaActionLabel(mediaPackage.action)}
-                />
-              </div>
-            ))}
           </div>
 
           {preview.issues.length > 0 && (
-            <div style={{ display: "grid", gap: 7, marginTop: 10 }}>
+            <div style={{ display: "grid", gap: 7, marginTop: 9 }}>
               {preview.issues.map((issue, index) => (
                 <InfoBand
                   key={`${issue.code}-${index}`}
-                  tone={issue.level === "ERROR" ? "error" : "warning"}
+                  tone={
+                    issue.level === "ERROR" ? "error" : "warning"
+                  }
                 >
                   {issue.message}
-                  {issue.path ? ` • ${issue.path}` : ""}
                 </InfoBand>
               ))}
             </div>
@@ -560,166 +818,160 @@ export function ProjectMediaCenterView({
         </section>
       )}
 
-      <section style={{ ...cardStyle, padding: 13 }}>
-        <SectionTitle
-          icon={<Images size={21} />}
-          title="Yüklü Görsel Paketleri"
-          subtitle={`${packages.packages.reduce(
-            (total, item) => total + item._count.assets,
-            0,
-          )} görsel kayıtlı`}
-        />
+      {uploadedPackages.length > 0 && (
+        <section style={{ ...cardStyle, padding: 13 }}>
+          <SectionTitle
+            icon={<Images size={20} />}
+            title="Yüklü Görseller"
+            subtitle={`${uploadedPackages.reduce(
+              (total, item) => total + item._count.assets,
+              0,
+            )} görsel kayıtlı`}
+          />
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(min(100%, 240px), 1fr))",
-            gap: 9,
-            marginTop: 11,
-          }}
-        >
-          {packages.packages.map((mediaPackage) => {
-            const cover =
-              mediaPackage.assets.find((asset) => asset.isCover) ||
-              mediaPackage.assets[0];
-            const coverUrl =
-              cover?.supabaseUrl || cover?.url || "";
-            const fallbackCoverUrl =
-              cover?.supabaseUrl && cover?.url !== cover.supabaseUrl
-                ? cover.url
-                : "";
+          <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+            {uploadedPackages.map((mediaPackage) => {
+              const cover =
+                mediaPackage.assets.find((asset) => asset.isCover) ||
+                mediaPackage.assets[0];
+              const coverUrl = cover?.supabaseUrl || cover?.url || "";
+              const fallbackCoverUrl =
+                cover?.supabaseUrl && cover?.url !== cover.supabaseUrl
+                  ? cover.url
+                  : "";
+              const visibleName =
+                mediaPackage.type === "PROJECT_GENERAL"
+                  ? "Proje Genel"
+                  : mediaPackage.roomCount || mediaPackage.name;
 
-            return (
-              <article
-                key={mediaPackage.id}
-                style={{
-                  minWidth: 0,
-                  border: "1.5px solid #C7D6E8",
-                  borderRadius: 17,
-                  background: "#F8FAFC",
-                  overflow: "hidden",
-                }}
-              >
-                <div
+              return (
+                <article
+                  key={mediaPackage.id}
                   style={{
-                    position: "relative",
-                    width: "100%",
-                    aspectRatio: "16 / 10",
-                    overflow: "hidden",
-                    background: "#E2E8F0",
+                    minWidth: 0,
+                    border: "1.5px solid #C7D6E8",
+                    borderRadius: 15,
+                    background: "#F8FAFC",
+                    padding: 8,
+                    display: "grid",
+                    gridTemplateColumns: "72px minmax(0, 1fr)",
+                    alignItems: "center",
+                    gap: 10,
                   }}
                 >
-                  {cover && coverUrl ? (
-                    <>
-                      <img
-                        src={coverUrl}
-                        data-fallback={fallbackCoverUrl}
-                        alt=""
-                        aria-hidden="true"
-                        onError={(event) => {
-                          const image = event.currentTarget;
-                          const fallback =
-                            image.dataset.fallback || "";
+                  <div
+                    style={{
+                      position: "relative",
+                      width: 72,
+                      height: 58,
+                      overflow: "hidden",
+                      borderRadius: 11,
+                      background: "#E2E8F0",
+                    }}
+                  >
+                    {cover && coverUrl ? (
+                      <>
+                        <img
+                          src={coverUrl}
+                          data-fallback={fallbackCoverUrl}
+                          alt=""
+                          aria-hidden="true"
+                          onError={(event) => {
+                            const image = event.currentTarget;
+                            const fallback = image.dataset.fallback || "";
 
-                          if (fallback) {
-                            image.dataset.fallback = "";
-                            image.src = fallback;
-                            return;
-                          }
+                            if (fallback) {
+                              image.dataset.fallback = "";
+                              image.src = fallback;
+                              return;
+                            }
 
-                          image.style.display = "none";
-                        }}
-                        style={{
-                          position: "absolute",
-                          inset: "-12%",
-                          width: "124%",
-                          height: "124%",
-                          objectFit: "cover",
-                          filter: "blur(18px)",
-                          opacity: 0.55,
-                        }}
-                      />
-                      <img
-                        src={coverUrl}
-                        data-fallback={fallbackCoverUrl}
-                        alt={mediaPackage.name}
-                        onError={(event) => {
-                          const image = event.currentTarget;
-                          const fallback =
-                            image.dataset.fallback || "";
+                            image.style.display = "none";
+                          }}
+                          style={{
+                            position: "absolute",
+                            inset: "-12%",
+                            width: "124%",
+                            height: "124%",
+                            objectFit: "cover",
+                            filter: "blur(12px)",
+                            opacity: 0.5,
+                          }}
+                        />
 
-                          if (fallback) {
-                            image.dataset.fallback = "";
-                            image.src = fallback;
-                            return;
-                          }
+                        <img
+                          src={coverUrl}
+                          data-fallback={fallbackCoverUrl}
+                          alt={visibleName}
+                          onError={(event) => {
+                            const image = event.currentTarget;
+                            const fallback = image.dataset.fallback || "";
 
-                          image.style.display = "none";
-                        }}
+                            if (fallback) {
+                              image.dataset.fallback = "";
+                              image.src = fallback;
+                              return;
+                            }
+
+                            image.style.display = "none";
+                          }}
+                          style={{
+                            position: "absolute",
+                            inset: 0,
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "contain",
+                          }}
+                        />
+                      </>
+                    ) : (
+                      <div
                         style={{
                           position: "absolute",
                           inset: 0,
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "contain",
+                          display: "grid",
+                          placeItems: "center",
+                          color: "#94A3B8",
                         }}
-                      />
-                    </>
-                  ) : (
-                    <div
+                      >
+                        <Images size={23} />
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ minWidth: 0 }}>
+                    <strong
                       style={{
-                        position: "absolute",
-                        inset: 0,
-                        display: "grid",
-                        placeItems: "center",
-                        color: "#94A3B8",
+                        display: "block",
+                        color: "#1F2937",
+                        fontSize: 12,
+                        lineHeight: 1.4,
+                        fontWeight: 950,
                       }}
                     >
-                      <Images size={34} />
-                    </div>
-                  )}
-                </div>
+                      {visibleName}
+                    </strong>
 
-                <div style={{ padding: 10 }}>
-                  <strong
-                    style={{
-                      display: "block",
-                      color: "#1F2937",
-                      fontSize: 11,
-                      lineHeight: 1.4,
-                      fontWeight: 950,
-                      overflowWrap: "anywhere",
-                    }}
-                  >
-                    {mediaPackage.name}
-                  </strong>
-
-                  <div
-                    style={{
-                      marginTop: 5,
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: 8,
-                      color: "#64748B",
-                      fontSize: 9,
-                      lineHeight: 1.4,
-                      fontWeight: 750,
-                    }}
-                  >
-                    <span>{mediaPackage.zipFolder}/</span>
-                    <span>
+                    <span
+                      style={{
+                        display: "block",
+                        marginTop: 3,
+                        color: "#64748B",
+                        fontSize: 9,
+                        lineHeight: 1.45,
+                        fontWeight: 750,
+                      }}
+                    >
                       {mediaPackage._count.assets} görsel •{" "}
-                      {mediaPackage._count.units} bölüm
+                      {mediaPackage._count.units} bağımsız bölüm
                     </span>
                   </div>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      </section>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
-

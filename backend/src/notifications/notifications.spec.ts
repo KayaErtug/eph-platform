@@ -328,7 +328,7 @@ describe('EPH-38 durable event collection and scoped cron', () => {
   it('drains more than 100 expiration recipients for the Istanbul calendar day, including office trials', async () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-10-30T06:00:00Z'));
     try {
-      const db: any = { $queryRaw: jest.fn().mockResolvedValue([]) };
+      const db: any = { $queryRaw: jest.fn().mockResolvedValue([]), systemSetting: { findUnique: jest.fn().mockResolvedValue({ valueJson: { gun: 14, seviyePaketi: 'GUMUS', pk: 500, kartIstenir: false, hatirlatmaGunleri: [3], kardesOfis: false, ofisBoy: false } }) } };
       db.$queryRaw.mockResolvedValueOnce(
         Array.from({ length: 100 }, (_, i) => ({
           ...input,

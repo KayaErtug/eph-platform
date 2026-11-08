@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "Conversation" ADD COLUMN IF NOT EXISTS "subjectType" TEXT;
+ALTER TABLE "Conversation" ADD COLUMN IF NOT EXISTS "subjectId" TEXT;
+ALTER TABLE "Conversation" ADD COLUMN IF NOT EXISTS "subjectTitle" TEXT;
+ALTER TABLE "Conversation" ADD COLUMN IF NOT EXISTS "dealStatus" TEXT DEFAULT 'ACTIVE';

@@ -54,7 +54,7 @@ describe('Mobile office dashboard contract', () => {
     expect((await f.service.dashboard('owner')).offices[0].maxTeams).toBe(maxTeams);
   });
 
-  it('uses the existing EPH-24A capacity fallback when maxTeams is absent', async () => {
+  it('PROVA-2: maxTeams ayarda yoksa ESKİ kural — danışman kapasitesinden türetilir (agents 7 → 2)', async () => {
     const f = fixture();
     f.db.systemSetting.findUnique.mockImplementation(async ({ where }) => {
       if (where.key === 'OFFICE_SUBSCRIPTION_office') return { valueJson: { agents: 7 } };

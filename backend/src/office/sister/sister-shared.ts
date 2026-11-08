@@ -2,6 +2,8 @@ import { ForbiddenException, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma, Role, UnitStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsService } from '../../notifications/notifications.service';
+import { EntitlementDb, entitlementSource, resolveOfficeEntitlements } from '../office-entitlement.service';
+import { legacySnapshotLive } from '../office-legacy';
 
 export const SISTER_PACKAGES_KEY = 'KARDES_OFIS_PAKETLER';
 const logger = new Logger('SisterNetwork');
@@ -37,17 +39,26 @@ export async function resolveOfficeAccess(prisma: PrismaService, userId: string,
 
 export const sortedPair = (a: string, b: string): [string, string] => (a < b ? [a, b] : [b, a]);
 
-export async function allowedPackageCodes(prisma: PrismaService): Promise<string[]> {
+export async function allowedPackageCodes(prisma: Pick<PrismaService, 'systemSetting'>): Promise<string[]> {
   const row = await prisma.systemSetting.findUnique({ where: { key: SISTER_PACKAGES_KEY }, select: { valueJson: true } });
   const raw = row?.valueJson;
   return Array.isArray(raw) ? raw.filter((c): c is string => typeof c === 'string' && !!c.trim()).map(c => c.trim().toUpperCase()) : [];
 }
 
 // "Uygun" = aktif ofis + abonelik paketi izinli listede (süresi dolmamış). Her istekte hesaplanır, saklanmaz.
-export async function eligibilityMap(prisma: PrismaService, officeIds: string[]): Promise<Map<string, boolean>> {
+export async function eligibilityMap(prisma: Pick<PrismaService, 'systemSetting' | 'office'> & Partial<Pick<PrismaService, 'ofisAbonelik' | 'ofisEklenti' | 'ofisDenemeKaydi'>>, officeIds: string[]): Promise<Map<string, boolean>> {
   const ids = [...new Set(officeIds)];
   const result = new Map<string, boolean>(ids.map(id => [id, false]));
   if (!ids.length) return result;
+  // F12: relational modda uygunluk ortak etkin hak çözümleyicisinden (iki taraf da); izinli liste ve Kardeş Ofis hakkı ayardan
+  if (prisma.ofisAbonelik && prisma.ofisEklenti && prisma.ofisDenemeKaydi && await entitlementSource(prisma) === 'relational') {
+    const [allowedCodes, offs] = await Promise.all([allowedPackageCodes(prisma), prisma.office.findMany({ where: { id: { in: ids } }, select: { id: true, isActive: true } })]);
+    for (const o of offs) {
+      const eff = await resolveOfficeEntitlements(prisma as EntitlementDb, o.id);
+      result.set(o.id, o.isActive && eff.state === 'UCRETLI' && eff.kardesOfis && !!eff.packageCode && allowedCodes.includes(eff.packageCode));
+    }
+    return result;
+  }
   const [allowed, offices, subs] = await Promise.all([
     allowedPackageCodes(prisma),
     prisma.office.findMany({ where: { id: { in: ids } }, select: { id: true, isActive: true } }),
@@ -58,8 +69,10 @@ export async function eligibilityMap(prisma: PrismaService, officeIds: string[])
     const sub = subById.get(o.id);
     const code = typeof sub?.packageCode === 'string' ? sub.packageCode.trim().toUpperCase() : '';
     const expires = sub?.expiresAt ? Date.parse(sub.expiresAt) : NaN;
-    const expired = Number.isFinite(expires) && expires <= Date.now();
-    result.set(o.id, o.isActive && !!code && allowed.includes(code) && !expired);
+    // F12: NULL/eksik/bozuk bitiş süresiz hak SAYILMAZ (fail-closed). Süresiz yalnız açık işaretli kayıt: sureTuru === 'SURESIZ_OZEL'. Kapanmış (ended/active:false) kayıt uygun değil.
+    const notClosed = sub?.active !== false && sub?.ended !== true;
+    const live = notClosed && (sub?.sureTuru === 'SURESIZ_OZEL' || (Number.isFinite(expires) && expires > Date.now()));
+    result.set(o.id, o.isActive && !!code && allowed.includes(code) && live);
   }
   return result;
 }

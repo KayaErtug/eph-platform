@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
 
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -20,6 +20,11 @@ export class MessagesController {
     return this.messagesService.getConversations(user.id, user.role);
   }
 
+  @Get('quick-templates')
+  getQuickTemplates(@Query('subjectType') subjectType?: string) {
+    return this.messagesService.getQuickTemplates(subjectType);
+  }
+
   @Post('start')
   startConversation(
     @CurrentUser() user: AuthUser,
@@ -29,9 +34,21 @@ export class MessagesController {
       title?: string;
       creatorId?: string;
       participantId?: string;
+      subjectType?: string;
+      subjectId?: string;
+      subjectTitle?: string;
     },
   ) {
     return this.messagesService.startConversation(body, user.id, user.role);
+  }
+
+  @Patch(':id/deal-status')
+  updateDealStatus(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+    @Body('status') status: string,
+  ) {
+    return this.messagesService.updateDealStatus(id, status, user.id, user.role);
   }
 
   @Get(':id')

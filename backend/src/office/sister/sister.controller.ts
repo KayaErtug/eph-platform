@@ -1,17 +1,31 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { OfficeRealtorGuard } from '../office-realtor.guard';
+import { SisterViewingService } from './sister-viewing.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { SisterLinksService } from './sister-links.service';
 import { SisterPoolService } from './sister-pool.service';
 import { SisterRequestsService } from './sister-requests.service';
+import { SisterDemandsService } from './sister-demands.service';
 
 @Controller('office')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, OfficeRealtorGuard)
 export class SisterController {
   constructor(
     private readonly links: SisterLinksService,
     private readonly pool: SisterPoolService,
     private readonly requests: SisterRequestsService,
+    private readonly viewing: SisterViewingService,
+    private readonly demands: SisterDemandsService,
   ) {}
+
+  @Get(':id/sister-demands/quota') demandQuota(@Req() req: any, @Param('id') id: string) { return this.demands.getQuota(req.user.id, id); }
+  @Get(':id/sister-demands') sisterDemands(@Req() req: any, @Param('id') id: string, @Query() query: any) { return this.demands.list(req.user.id, id, query); }
+  @Post(':id/sister-demands') createSisterDemand(@Req() req: any, @Param('id') id: string, @Body() body: any) { return this.demands.create(req.user.id, id, body); }
+
+  @Post(':id/sister-pool/:unitId/viewing-requests') createViewing(@Req() req: any, @Param('id') id: string, @Param('unitId') unitId: string, @Body() body: unknown) { return this.viewing.create(req.user.id, id, unitId, body); }
+  @Get(':id/viewing-requests') viewingList(@Req() req: any, @Param('id') id: string, @Query('box') box: unknown, @Query('unitId') unitId?: string) { return this.viewing.list(req.user.id, id, box, unitId); }
+  @Post(':id/viewing-requests/:requestId/approve') approveViewing(@Req() req: any, @Param('id') id: string, @Param('requestId') requestId: string) { return this.viewing.decide(req.user.id, id, requestId, true); }
+  @Post(':id/viewing-requests/:requestId/reject') rejectViewing(@Req() req: any, @Param('id') id: string, @Param('requestId') requestId: string) { return this.viewing.decide(req.user.id, id, requestId, false); }
 
   @Get(':id/sisters') list(@Req() req: any, @Param('id') id: string) { return this.links.list(req.user.id, id); }
   @Post(':id/sisters/invite') invite(@Req() req: any, @Param('id') id: string, @Body() body: any) { return this.links.invite(req.user.id, id, body ?? {}); }

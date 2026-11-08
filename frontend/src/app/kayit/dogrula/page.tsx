@@ -3,12 +3,15 @@
 import {
   FormEvent,
   Suspense,
+  useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
 import {
   CheckCircle2,
   Clock3,
@@ -19,8 +22,15 @@ import {
 } from "lucide-react";
 
 import api from "@/lib/api";
+import { getFirebasePhoneAuth } from "@/lib/firebase-phone-auth";
 
 type Step = "phone" | "email" | "complete";
+
+type StoredPhoneSession = {
+  sessionInfo: string;
+  sessionExpiresAt: string;
+  nextSmsAllowedAt?: string;
+};
 
 function maskPhone(phone: string) {
   const digits = phone.replace(/\D/g, "");
@@ -40,15 +50,93 @@ function maskEmail(email: string) {
   }
 
   const visible = localPart.slice(0, 2);
+
   return `${visible}${"*".repeat(Math.max(3, localPart.length - 2))}@${domain}`;
 }
 
 function getErrorMessage(error: any, fallback: string) {
   const message = error?.response?.data?.message;
 
-  return Array.isArray(message)
-    ? message.join(" • ")
-    : message || fallback;
+  return Array.isArray(message) ? message.join(" • ") : message || fallback;
+}
+
+function getFirebaseErrorMessage(error: any, fallback: string) {
+  const backendMessage = getErrorMessage(error, "");
+
+  if (backendMessage) {
+    return backendMessage;
+  }
+
+  const firebaseErrorCode = String(error?.code || "");
+
+  const firebaseMessages: Record<string, string> = {
+    "auth/invalid-phone-number":
+      "Telefon numarası Firebase tarafından geçersiz bulundu.",
+    "auth/missing-phone-number":
+      "Telefon numarası doğrulama işlemine gönderilemedi.",
+    "auth/too-many-requests":
+      "Bu telefon numarası veya cihaz için çok fazla SMS isteği yapıldı. Lütfen daha sonra tekrar deneyiniz.",
+    "auth/quota-exceeded":
+      "Firebase SMS gönderim kotasına ulaşıldı. Lütfen daha sonra tekrar deneyiniz.",
+    "auth/captcha-check-failed":
+      "Güvenlik doğrulaması tamamlanamadı. Sayfayı yenileyip tekrar deneyiniz.",
+    "auth/network-request-failed":
+      "İnternet bağlantısı nedeniyle Firebase SMS isteği tamamlanamadı.",
+    "auth/app-not-authorized":
+      "Bu alan adı Firebase telefon doğrulaması için yetkilendirilmemiş.",
+    "auth/operation-not-allowed":
+      "Firebase telefon doğrulama hizmeti şu anda aktif değil.",
+  };
+
+  return firebaseMessages[firebaseErrorCode] || error?.message || fallback;
+}
+
+function getSecondsUntil(value: string | null | undefined, fallback: number) {
+  const timestamp = Date.parse(String(value || ""));
+
+  if (!Number.isFinite(timestamp)) {
+    return fallback;
+  }
+
+  return Math.max(0, Math.ceil((timestamp - Date.now()) / 1000));
+}
+
+function readStoredPhoneSession(storageKey: string): StoredPhoneSession | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const rawValue = window.sessionStorage.getItem(storageKey);
+
+    if (!rawValue) {
+      return null;
+    }
+
+    const stored = JSON.parse(rawValue) as StoredPhoneSession;
+
+    const sessionInfo = String(stored.sessionInfo || "").trim();
+
+    const expiresAt = Date.parse(String(stored.sessionExpiresAt || ""));
+
+    if (
+      !sessionInfo ||
+      !Number.isFinite(expiresAt) ||
+      expiresAt <= Date.now()
+    ) {
+      window.sessionStorage.removeItem(storageKey);
+      return null;
+    }
+
+    return {
+      sessionInfo,
+      sessionExpiresAt: stored.sessionExpiresAt,
+      nextSmsAllowedAt: stored.nextSmsAllowedAt,
+    };
+  } catch {
+    window.sessionStorage.removeItem(storageKey);
+    return null;
+  }
 }
 
 function VerificationContent() {
@@ -58,25 +146,229 @@ function VerificationContent() {
     () => String(searchParams.get("pending") || "").trim(),
     [searchParams],
   );
+
   const phone = useMemo(
     () => String(searchParams.get("phone") || "").trim(),
     [searchParams],
   );
+
   const email = useMemo(
-    () => String(searchParams.get("email") || "").trim().toLowerCase(),
+    () =>
+      String(searchParams.get("email") || "")
+        .trim()
+        .toLowerCase(),
     [searchParams],
   );
 
+  const phoneSessionStorageKey = useMemo(
+    () => `eph:firebase-phone-session:${pendingRegistrationId}`,
+    [pendingRegistrationId],
+  );
+
+  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
+
+  const automaticSmsRequestRef = useRef("");
+
   const [step, setStep] = useState<Step>("phone");
   const [code, setCode] = useState("");
-  const [cooldown, setCooldown] = useState(60);
+  const [cooldown, setCooldown] = useState(0);
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
+  const [initializingPhone, setInitializingPhone] = useState(true);
+  const [phoneSessionReady, setPhoneSessionReady] = useState(false);
+  const [phoneSessionInfo, setPhoneSessionInfo] = useState("");
   const [error, setError] = useState("");
   const [info, setInfo] = useState(
-    "Telefonunuza gönderilen 6 haneli doğrulama kodunu girin.",
+    "Güvenli telefon doğrulama işlemi hazırlanıyor.",
   );
   const [completedMessage, setCompletedMessage] = useState("");
+
+  const clearRecaptchaVerifier = useCallback(() => {
+    const verifier = recaptchaVerifierRef.current;
+    recaptchaVerifierRef.current = null;
+
+    if (verifier) {
+      try {
+        verifier.clear();
+      } catch {
+        // Daha önce temizlenmiş Firebase doğrulayıcısı.
+      }
+    }
+
+    const recaptchaHost = document.getElementById("firebase-phone-recaptcha");
+
+    if (recaptchaHost) {
+      recaptchaHost.innerHTML = "";
+    }
+  }, []);
+
+  const sendPhoneCode = useCallback(
+    async (isResend: boolean) => {
+      if (!pendingRegistrationId) {
+        setError("Kayıt doğrulama oturumu bulunamadı.");
+        return false;
+      }
+
+      if (!phone) {
+        setError("Doğrulanacak telefon numarası bulunamadı.");
+        return false;
+      }
+
+      setError("");
+      setPhoneSessionReady(false);
+      setPhoneSessionInfo("");
+
+      window.sessionStorage.removeItem(phoneSessionStorageKey);
+
+      try {
+        const prepareResponse = await api.post(
+          "/auth/prepare-firebase-phone-verification",
+          {
+            pendingRegistrationId,
+          },
+        );
+
+        const verificationPhone = String(
+          prepareResponse.data?.phone || phone,
+        ).trim();
+
+        if (!verificationPhone) {
+          throw new Error(
+            "Firebase doğrulaması için telefon numarası hazırlanamadı.",
+          );
+        }
+
+        clearRecaptchaVerifier();
+
+        const auth = getFirebasePhoneAuth();
+
+        const verifier = new RecaptchaVerifier(
+          auth,
+          "firebase-phone-recaptcha",
+          {
+            size: "invisible",
+          },
+        );
+
+        recaptchaVerifierRef.current = verifier;
+
+        await verifier.render();
+
+        const confirmationResult = await signInWithPhoneNumber(
+          auth,
+          verificationPhone,
+          verifier,
+        );
+
+        const verificationId = String(
+          confirmationResult.verificationId || "",
+        ).trim();
+
+        if (!verificationId) {
+          throw new Error("Firebase doğrulama oturumu oluşturulamadı.");
+        }
+
+        const bindResponse = await api.post(
+          "/auth/bind-firebase-phone-session",
+          {
+            pendingRegistrationId,
+            sessionInfo: verificationId,
+          },
+        );
+
+        const sessionExpiresAt = String(
+          bindResponse.data?.sessionExpiresAt || "",
+        );
+
+        const nextSmsAllowedAt = String(
+          bindResponse.data?.nextSmsAllowedAt || "",
+        );
+
+        setPhoneSessionInfo(verificationId);
+        setPhoneSessionReady(true);
+
+        window.sessionStorage.setItem(
+          phoneSessionStorageKey,
+          JSON.stringify({
+            sessionInfo: verificationId,
+            sessionExpiresAt,
+            nextSmsAllowedAt,
+          } satisfies StoredPhoneSession),
+        );
+
+        setCooldown(getSecondsUntil(nextSmsAllowedAt, 120));
+
+        setInfo(
+          isResend
+            ? "Yeni Firebase doğrulama kodu telefonunuza gönderildi."
+            : "Telefonunuza gönderilen 6 haneli Firebase doğrulama kodunu girin.",
+        );
+
+        return true;
+      } catch (requestError: any) {
+        setInfo("Telefon doğrulama kodu gönderilemedi.");
+
+        setError(
+          getFirebaseErrorMessage(
+            requestError,
+            "Firebase doğrulama kodu gönderilemedi.",
+          ),
+        );
+
+        return false;
+      } finally {
+        clearRecaptchaVerifier();
+      }
+    },
+    [
+      clearRecaptchaVerifier,
+      pendingRegistrationId,
+      phone,
+      phoneSessionStorageKey,
+    ],
+  );
+
+  useEffect(() => {
+    if (!pendingRegistrationId || !phone) {
+      setInitializingPhone(false);
+
+      setError(
+        "Telefon doğrulama bilgileri eksik. Üyelik formuna dönerek yeniden başlayınız.",
+      );
+
+      return;
+    }
+
+    const storedSession = readStoredPhoneSession(phoneSessionStorageKey);
+
+    if (storedSession) {
+      setPhoneSessionInfo(storedSession.sessionInfo);
+      setPhoneSessionReady(true);
+
+      setCooldown(getSecondsUntil(storedSession.nextSmsAllowedAt, 0));
+
+      setInfo(
+        "Telefonunuza gönderilen 6 haneli Firebase doğrulama kodunu girin.",
+      );
+
+      setInitializingPhone(false);
+      return;
+    }
+
+    const automaticRequestKey = `${pendingRegistrationId}:${phone}`;
+
+    if (automaticSmsRequestRef.current === automaticRequestKey) {
+      return;
+    }
+
+    automaticSmsRequestRef.current = automaticRequestKey;
+
+    setInitializingPhone(true);
+
+    void sendPhoneCode(false).finally(() => {
+      setInitializingPhone(false);
+    });
+  }, [pendingRegistrationId, phone, phoneSessionStorageKey, sendPhoneCode]);
 
   useEffect(() => {
     if (cooldown <= 0) {
@@ -110,9 +402,8 @@ function VerificationContent() {
     setStep("email");
     setCode("");
     setCooldown(60);
-    setInfo(
-      "E-posta adresinize gönderilen 6 haneli doğrulama kodunu girin.",
-    );
+
+    setInfo("E-posta adresinize gönderilen 6 haneli doğrulama kodunu girin.");
   };
 
   const completeRegistration = async () => {
@@ -124,6 +415,7 @@ function VerificationContent() {
       response.data?.message ||
         "Üyelik kaydınız tamamlandı. Mesleki belge onay sürecine geçebilirsiniz.",
     );
+
     setStep("complete");
   };
 
@@ -140,15 +432,28 @@ function VerificationContent() {
       return;
     }
 
+    if (step === "phone" && (!phoneSessionReady || !phoneSessionInfo)) {
+      setError(
+        "Firebase telefon doğrulama oturumu hazır değil. Yeni kod gönderiniz.",
+      );
+      return;
+    }
+
     setLoading(true);
     setError("");
 
     try {
       if (step === "phone") {
-        await api.post("/auth/verify-phone-otp", {
+        await api.post("/auth/verify-firebase-phone-otp", {
           pendingRegistrationId,
+          sessionInfo: phoneSessionInfo,
           code,
         });
+
+        window.sessionStorage.removeItem(phoneSessionStorageKey);
+
+        setPhoneSessionInfo("");
+        setPhoneSessionReady(false);
 
         await sendEmailCode();
         return;
@@ -162,10 +467,7 @@ function VerificationContent() {
       await completeRegistration();
     } catch (requestError: any) {
       setError(
-        getErrorMessage(
-          requestError,
-          "Doğrulama işlemi tamamlanamadı.",
-        ),
+        getErrorMessage(requestError, "Doğrulama işlemi tamamlanamadı."),
       );
     } finally {
       setLoading(false);
@@ -177,6 +479,7 @@ function VerificationContent() {
       !pendingRegistrationId ||
       cooldown > 0 ||
       resending ||
+      initializingPhone ||
       step === "complete"
     ) {
       return;
@@ -187,27 +490,24 @@ function VerificationContent() {
 
     try {
       if (step === "phone") {
-        await api.post("/auth/resend-phone-otp", {
-          pendingRegistrationId,
-        });
+        const sent = await sendPhoneCode(true);
 
-        setInfo("Yeni telefon doğrulama kodu gönderildi.");
+        if (sent) {
+          setCode("");
+        }
       } else {
         await api.post("/auth/send-email-code", {
           pendingRegistrationId,
         });
 
         setInfo("Yeni e-posta doğrulama kodu gönderildi.");
-      }
 
-      setCode("");
-      setCooldown(60);
+        setCode("");
+        setCooldown(60);
+      }
     } catch (requestError: any) {
       setError(
-        getErrorMessage(
-          requestError,
-          "Yeni doğrulama kodu gönderilemedi.",
-        ),
+        getErrorMessage(requestError, "Yeni doğrulama kodu gönderilemedi."),
       );
     } finally {
       setResending(false);
@@ -253,6 +553,7 @@ function VerificationContent() {
         .success-text{margin-top:8px;font-size:13px;line-height:1.7;font-weight:800}
         .action{display:flex;align-items:center;justify-content:center;width:100%;height:52px;margin-top:16px;border-radius:17px;background:#2563EB;color:#FFFFFF;text-decoration:none;font-size:14px;font-weight:950}
         .security{display:flex;align-items:flex-start;gap:10px;margin-top:18px;padding-top:16px;border-top:1px solid #E2E8F0;color:#64748B;font-size:12px;line-height:1.6;font-weight:700}
+        .recaptcha-host{position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none}
         @media(max-width:640px){
           .page{align-items:flex-start;padding:0;background:#FFFFFF}
           .shell{min-height:100dvh;border:0;border-radius:0;box-shadow:none}
@@ -284,13 +585,10 @@ function VerificationContent() {
             </p>
 
             <div className="steps">
-              <div
-                className={`step ${
-                  step === "phone" ? "active" : "done"
-                }`}
-              >
+              <div className={`step ${step === "phone" ? "active" : "done"}`}>
                 1 · Telefon
               </div>
+
               <div
                 className={`step ${
                   step === "email"
@@ -302,17 +600,22 @@ function VerificationContent() {
               >
                 2 · E-posta
               </div>
-              <div
-                className={`step ${
-                  step === "complete" ? "active" : ""
-                }`}
-              >
+
+              <div className={`step ${step === "complete" ? "active" : ""}`}>
                 3 · Belge onayı
               </div>
             </div>
           </header>
 
           <div className="body">
+            <button
+              id="firebase-phone-recaptcha"
+              type="button"
+              className="recaptcha-host"
+              aria-hidden="true"
+              tabIndex={-1}
+            />
+
             {step !== "complete" ? (
               <>
                 <div className="status">
@@ -324,16 +627,16 @@ function VerificationContent() {
                   <div className="target-icon">
                     {isPhoneStep ? <Phone size={19} /> : <Mail size={19} />}
                   </div>
+
                   <div>
                     <div className="target-label">
                       {isPhoneStep
                         ? "Doğrulama telefonu"
                         : "Doğrulama e-postası"}
                     </div>
+
                     <div className="target-value">
-                      {isPhoneStep
-                        ? maskPhone(phone)
-                        : maskEmail(email)}
+                      {isPhoneStep ? maskPhone(phone) : maskEmail(email)}
                     </div>
                   </div>
                 </div>
@@ -349,9 +652,7 @@ function VerificationContent() {
                     inputMode="numeric"
                     autoComplete="one-time-code"
                     value={code}
-                    onChange={(event) =>
-                      handleCodeChange(event.target.value)
-                    }
+                    onChange={(event) => handleCodeChange(event.target.value)}
                     placeholder="000000"
                     className="code"
                     maxLength={6}
@@ -363,19 +664,27 @@ function VerificationContent() {
                     disabled={
                       loading ||
                       code.length !== 6 ||
-                      !pendingRegistrationId
+                      !pendingRegistrationId ||
+                      (isPhoneStep && (!phoneSessionReady || initializingPhone))
                     }
                   >
-                    {loading
-                      ? "Doğrulanıyor..."
-                      : isPhoneStep
-                        ? "Telefonumu Doğrula"
-                        : "E-postamı Doğrula"}
+                    {initializingPhone && isPhoneStep
+                      ? "SMS Gönderiliyor..."
+                      : loading
+                        ? "Doğrulanıyor..."
+                        : isPhoneStep
+                          ? "Telefonumu Doğrula"
+                          : "E-postamı Doğrula"}
                   </button>
                 </form>
 
                 <div className="resend">
-                  {cooldown > 0 ? (
+                  {isPhoneStep && initializingPhone ? (
+                    <span className="cooldown">
+                      <RefreshCw size={16} />
+                      Güvenli SMS gönderiliyor
+                    </span>
+                  ) : cooldown > 0 ? (
                     <span className="cooldown">
                       <Clock3 size={16} />
                       Yeni kod için {cooldown} saniye
@@ -385,7 +694,7 @@ function VerificationContent() {
                       type="button"
                       className="resend-button"
                       onClick={handleResend}
-                      disabled={resending}
+                      disabled={resending || initializingPhone}
                     >
                       <RefreshCw size={16} />
                       {resending ? "Gönderiliyor..." : "Yeni kod gönder"}
@@ -400,12 +709,11 @@ function VerificationContent() {
                 <div className="success-icon">
                   <CheckCircle2 size={28} />
                 </div>
-                <div className="success-title">
-                  Doğrulamalar tamamlandı
-                </div>
-                <div className="success-text">
-                  {completedMessage}
-                </div>
+
+                <div className="success-title">Doğrulamalar tamamlandı</div>
+
+                <div className="success-text">{completedMessage}</div>
+
                 <Link href="/giris" className="action">
                   Giriş ekranına git
                 </Link>

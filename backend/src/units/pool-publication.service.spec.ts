@@ -29,7 +29,7 @@ function harness() {
         return structuredClone(state.units[where.id]);
       },
     },
-    kontorCuzdani: {
+    portfolioCreditLot: { findMany: async () => [], update: async () => ({}), create: async () => ({ id: 'lot' }) }, portfolioCreditLotTuketim: { create: async () => ({}), findMany: async () => [], update: async () => ({}) }, kontorCuzdani: {
       findUnique: async ({ where }: { where: { kullaniciId: string } }) => structuredClone(state.wallets[where.kullaniciId] || null),
       updateMany: async ({ where, data }: { where: { kullaniciId: string; bakiye: { gte: number } }; data: { bakiye: { decrement: number }; toplamHarcama: { increment: number } } }) => {
         const wallet = state.wallets[where.kullaniciId];

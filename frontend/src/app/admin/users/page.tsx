@@ -51,6 +51,16 @@ type ActiveMembership = {
   testPaketiMi?: boolean;
 };
 
+type MembershipPackageOption = {
+  id: string;
+  paketKodu: "DENEME" | "BRONZ" | "GUMUS" | "ALTIN";
+  paketAdi: string;
+  fiyat?: number | null;
+  paraBirimi?: string;
+  aylikPaketPk?: number;
+  denemeGunSayisi?: number | null;
+};
+
 type GiftPoolData = {
   havuz: {
     id: string;
@@ -257,6 +267,18 @@ export default function AdminUsersPage() {
     useState("");
   const [trialDays, setTrialDays] = useState("7");
   const [trialReason, setTrialReason] = useState("");
+
+  const [membershipPackages, setMembershipPackages] =
+    useState<MembershipPackageOption[]>([]);
+  const [membershipPackageCode, setMembershipPackageCode] =
+    useState("");
+  const [membershipDuration, setMembershipDuration] =
+    useState("1");
+  const [membershipReason, setMembershipReason] =
+    useState("");
+  const [membershipLoading, setMembershipLoading] =
+    useState(false);
+
   const [actionMessage, setActionMessage] = useState("");
   const [actionError, setActionError] = useState("");
 
@@ -413,6 +435,151 @@ export default function AdminUsersPage() {
     }
   }
 
+  async function loadMembershipPackages(target: AdminUser) {
+    if (!isSuperAdmin || target.role === "SUPER_ADMIN") {
+      setMembershipPackages([]);
+      setMembershipPackageCode("");
+      return;
+    }
+
+    setMembershipLoading(true);
+    setActionError("");
+
+    try {
+      const response = await api.get(
+        `/admin/users/${target.id}/membership-packages?t=${Date.now()}`,
+      );
+
+      const items: MembershipPackageOption[] =
+        Array.isArray(response.data?.paketler)
+          ? response.data.paketler
+          : [];
+
+      setMembershipPackages(items);
+
+      const currentCode =
+        String(target.aktifUyelik?.paketKodu || "");
+
+      const selected =
+        items.find((item) => item.paketKodu === currentCode) ||
+        items[0];
+
+      if (selected) {
+        setMembershipPackageCode(selected.paketKodu);
+        setMembershipDuration(
+          selected.paketKodu === "DENEME"
+            ? String(selected.denemeGunSayisi || 14)
+            : "1",
+        );
+      } else {
+        setMembershipPackageCode("");
+        setMembershipDuration("1");
+      }
+    } catch (err: any) {
+      setMembershipPackages([]);
+      setMembershipPackageCode("");
+      setActionError(
+        err?.response?.data?.message ||
+          "Üyelik paketleri yüklenemedi.",
+      );
+    } finally {
+      setMembershipLoading(false);
+    }
+  }
+
+  async function updateMembership() {
+    if (!selectedUser || !isSuperAdmin) return;
+
+    if (!membershipPackageCode) {
+      setActionError("Yeni üyelik paketi seçilmelidir.");
+      return;
+    }
+
+    const duration = Number(membershipDuration);
+
+    if (!Number.isInteger(duration) || duration <= 0) {
+      setActionError("Üyelik süresi pozitif tam sayı olmalıdır.");
+      return;
+    }
+
+    if (membershipReason.trim().length > 120) {
+      setActionError(
+        "Üyelik değişiklik gerekçesi en fazla 120 karakter olabilir.",
+      );
+      return;
+    }
+
+    const isTrial = membershipPackageCode === "DENEME";
+
+    setBusyKey(`${selectedUser.id}-membership-update`);
+    setActionError("");
+    setActionMessage("");
+
+    try {
+      const response = await api.patch(
+        `/admin/users/${selectedUser.id}/membership`,
+        {
+          paketKodu: membershipPackageCode,
+          ...(isTrial
+            ? { gunSayisi: duration }
+            : { aySayisi: duration }),
+          gerekce:
+            membershipReason.trim() ||
+            "Yazılım Ekibi tarafından üyelik paketi güncellendi.",
+        },
+      );
+
+      const nextMembership: ActiveMembership = {
+        id: response.data?.uyelik?.id || "",
+        paketId: response.data?.uyelik?.paketId || "",
+        paketKodu:
+          response.data?.uyelik?.paketKodu ||
+          membershipPackageCode,
+        paketAdi:
+          response.data?.uyelik?.paketAdi ||
+          membershipPackageCode,
+        durum:
+          response.data?.uyelik?.durum || "AKTIF",
+        baslangicTarihi:
+          response.data?.uyelik?.baslangicTarihi || null,
+        bitisTarihi:
+          response.data?.uyelik?.bitisTarihi || null,
+        pilotPaketMi:
+          response.data?.uyelik?.pilotPaketMi || false,
+        testPaketiMi:
+          response.data?.uyelik?.testPaketiMi || false,
+      };
+
+      setSelectedUser((current) =>
+        current
+          ? { ...current, aktifUyelik: nextMembership }
+          : current,
+      );
+
+      setUsers((current) =>
+        current.map((item) =>
+          item.id === selectedUser.id
+            ? { ...item, aktifUyelik: nextMembership }
+            : item,
+        ),
+      );
+
+      setMembershipReason("");
+
+      setActionMessage(
+        response.data?.mesaj ||
+          "Üyelik paketi başarıyla güncellendi.",
+      );
+    } catch (err: any) {
+      setActionError(
+        err?.response?.data?.message ||
+          "Üyelik paketi güncellenemedi.",
+      );
+    } finally {
+      setBusyKey("");
+    }
+  }
+
   async function extendTrial() {
     if (!selectedUser || !isSuperAdmin) return;
 
@@ -514,8 +681,18 @@ export default function AdminUsersPage() {
     setGiftReason("");
     setTrialDays("7");
     setTrialReason("");
+
+    setMembershipPackages([]);
+    setMembershipPackageCode("");
+    setMembershipDuration("1");
+    setMembershipReason("");
+
     setActionMessage("");
     setActionError("");
+
+    if (isSuperAdmin && target.role !== "SUPER_ADMIN") {
+      void loadMembershipPackages(target);
+    }
   }
 
   function changeFilter(value: "all" | "approved" | "pending") {
@@ -1181,6 +1358,113 @@ export default function AdminUsersPage() {
                 }
               />
             </div>
+
+            {isSuperAdmin &&
+            selectedUser.role !== "SUPER_ADMIN" ? (
+              <div className="mt-3 rounded-2xl border border-blue-200 bg-white p-3">
+                <p className="text-center text-[11px] font-black uppercase tracking-[0.1em] text-[#2563EB]">
+                  Üyelik Yönetimi
+                </p>
+
+                {membershipLoading ? (
+                  <div className="mt-3 flex items-center justify-center gap-2 text-[12px] font-bold text-slate-500">
+                    <Loader2 size={16} className="animate-spin" />
+                    Paketler yükleniyor...
+                  </div>
+                ) : (
+                  <>
+                    <select
+                      value={membershipPackageCode}
+                      onChange={(event) => {
+                        const code = event.target.value;
+                        setMembershipPackageCode(code);
+
+                        const item = membershipPackages.find(
+                          (packageItem) =>
+                            packageItem.paketKodu === code,
+                        );
+
+                        setMembershipDuration(
+                          code === "DENEME"
+                            ? String(item?.denemeGunSayisi || 14)
+                            : "1",
+                        );
+                      }}
+                      className="mt-3 h-11 w-full rounded-xl border border-slate-200 px-3 text-[12px] font-black outline-none focus:border-[#2563EB]"
+                    >
+                      <option value="">Paket seçin</option>
+                      {membershipPackages.map((item) => (
+                        <option
+                          key={item.id}
+                          value={item.paketKodu}
+                        >
+                          {item.paketAdi} — {item.aylikPaketPk || 0} PK
+                        </option>
+                      ))}
+                    </select>
+
+                    <div className="mt-2 grid grid-cols-[120px_1fr] gap-2">
+                      <input
+                        type="number"
+                        min="1"
+                        max={
+                          membershipPackageCode === "DENEME"
+                            ? "365"
+                            : "36"
+                        }
+                        value={membershipDuration}
+                        onChange={(event) =>
+                          setMembershipDuration(event.target.value)
+                        }
+                        placeholder={
+                          membershipPackageCode === "DENEME"
+                            ? "Gün"
+                            : "Ay"
+                        }
+                        className="h-11 rounded-xl border border-slate-200 px-3 text-center text-[13px] font-black outline-none focus:border-[#2563EB]"
+                      />
+
+                      <input
+                        value={membershipReason}
+                        maxLength={120}
+                        onChange={(event) =>
+                          setMembershipReason(event.target.value)
+                        }
+                        placeholder="Değişiklik gerekçesi"
+                        className="h-11 rounded-xl border border-slate-200 px-3 text-center text-[12px] font-bold outline-none focus:border-[#2563EB]"
+                      />
+                    </div>
+
+                    <p className="mt-2 text-center text-[10px] font-bold text-slate-500">
+                      {membershipPackageCode === "DENEME"
+                        ? "Süre gün olarak uygulanır."
+                        : "Süre ay olarak uygulanır."}
+                    </p>
+
+                    <button
+                      type="button"
+                      onClick={updateMembership}
+                      disabled={
+                        membershipLoading ||
+                        !membershipPackageCode ||
+                        busyKey ===
+                          `${selectedUser.id}-membership-update`
+                      }
+                      className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 text-[12px] font-black text-white disabled:opacity-60"
+                    >
+                      {busyKey ===
+                      `${selectedUser.id}-membership-update` ? (
+                        <Loader2
+                          size={16}
+                          className="animate-spin"
+                        />
+                      ) : null}
+                      Üyeliği Güncelle
+                    </button>
+                  </>
+                )}
+              </div>
+            ) : null}
 
             {isSuperAdmin &&
             selectedUser.role !== "SUPER_ADMIN" ? (

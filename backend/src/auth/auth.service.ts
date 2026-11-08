@@ -1,3 +1,4 @@
+import { isAccountDeleted } from './account-deletion';
 import {
   BadRequestException,
   Injectable,
@@ -334,7 +335,7 @@ export class AuthService {
 
     const user = await this.usersService.findByPhoneOrEmail(rawIdentifier);
 
-    if (!user || !user.passwordHash) {
+    if (!user || !user.passwordHash || await isAccountDeleted(this.prisma, user.id)) {
       throw new UnauthorizedException('Kullanıcı bilgisi veya şifre hatalı.');
     }
 
@@ -393,7 +394,7 @@ export class AuthService {
 
     const user = await this.usersService.findByPhoneOrEmail(email);
 
-    if (!user || !user.email) {
+    if (!user || !user.email || await isAccountDeleted(this.prisma, user.id)) {
       return {
         success: true,
         resendAfterSeconds,

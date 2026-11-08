@@ -1,0 +1,155 @@
+-- ODM-2R: Mağaza ürün eşleme veri betiği — TASLAK, ÇALIŞTIRILMAZ.
+-- Paket modeli: EPH_ODEME_SISTEMI.md r4 §12 (kilitli) ve §13 (20 ürün). Değerler (fiyat, hak, kullanıcı sayısı) burada YOK (§0-B).
+-- Ön koşul: prisma/migrations/20261108120000_odm2_store_payments uygulanmış olmalı (ODM-10 runbook).
+-- 20 ürün x 2 platform (APPLE, GOOGLE) = 40 satır. Idempotent: aynı (platform, magazaUrunKimligi) varsa dokunmaz;
+-- kimlikler asla UPDATE edilmez (kimlik değişmez kuralı).
+-- Eşleme: OFFICE -> OFFICE_MEMBERSHIP_PACKAGES ayarındaki kod (SOLO dahil); MUTEAHHIT -> UyelikPaketi (paketKodu + segment);
+-- PK -> EPH_PAYMENT_SETTINGS_V1.pkProducts içinde miktar (credits) eşleşen ürünün kodu.
+-- Bulunamayan eşleme: NOTICE + aktifMi=false (satır yine eklenir; kaynak tanımlanınca aktifleştirilir).
+-- Gerektirir: PostgreSQL 13+ (gen_random_uuid).
+BEGIN;
+
+-- 0) ÖN KONTROL (yalnız uyarı)
+DO $$
+DECLARE r text;
+BEGIN
+  FOR r IN
+    SELECT k.kod FROM (VALUES ('SOLO'),('BRONZ'),('GUMUS'),('ALTIN'),('PLATINUM')) k(kod)
+    WHERE NOT EXISTS (
+      SELECT 1 FROM "SystemSetting" ss,
+           LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(ss."valueJson"::jsonb) = 'array' THEN ss."valueJson"::jsonb ELSE '[]'::jsonb END) e
+      WHERE ss."key" = 'OFFICE_MEMBERSHIP_PACKAGES' AND e->>'code' = k.kod
+    )
+  LOOP
+    RAISE NOTICE 'UYARI: OFFICE_MEMBERSHIP_PACKAGES içinde % kodlu ofis paketi yok; ürün aktifMi=false eklenecek.', r;
+  END LOOP;
+
+  FOR r IN
+    SELECT k.kod FROM (VALUES ('BRONZ'),('GUMUS'),('ALTIN'),('PLATINUM')) k(kod)
+    WHERE NOT EXISTS (
+      SELECT 1 FROM "UyelikPaketi" p WHERE p."segment"::text = 'MUTEAHHIT' AND p."paketKodu"::text = k.kod
+    )
+  LOOP
+    RAISE NOTICE 'UYARI: UyelikPaketi içinde MUTEAHHIT/% yok; ürün aktifMi=false eklenecek.', r;
+  END LOOP;
+END $$;
+
+-- 1) ÜYELİK ÜRÜNLERİ: ofis 5 + müteahhit 4 = 9 ürün
+INSERT INTO "StoreProduct"
+  ("id","platform","urunTuru","segment","paketKodu","uyelikPaketiId","kisiSayisi","pkUrunKodu","urunAnahtari","surum",
+   "magazaUrunKimligi","googleBasePlanKimligi","aktifMi","olusturulmaTarihi","guncellenmeTarihi")
+SELECT
+  gen_random_uuid()::text,
+  pf.platform::"StorePlatform",
+  'UYELIK'::"StoreProductKind",
+  u.segment::"StoreProductSegment",
+  u.kod,
+  p."id",
+  NULL, NULL,
+  'UYELIK:' || u.segment || ':' || u.kod,
+  1,
+  u.kimlik,
+  CASE WHEN pf.platform = 'GOOGLE' THEN 'monthly' ELSE NULL END,
+  CASE
+    WHEN u.segment = 'OFFICE' THEN EXISTS (
+      SELECT 1 FROM "SystemSetting" ss,
+           LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(ss."valueJson"::jsonb) = 'array' THEN ss."valueJson"::jsonb ELSE '[]'::jsonb END) e
+      WHERE ss."key" = 'OFFICE_MEMBERSHIP_PACKAGES' AND e->>'code' = u.kod)
+    ELSE p."id" IS NOT NULL
+  END,
+  now(), now()
+FROM (VALUES
+  ('OFFICE','SOLO','eph_sub_office_solo_v1'),
+  ('OFFICE','BRONZ','eph_sub_office_bronz_v1'),
+  ('OFFICE','GUMUS','eph_sub_office_gumus_v1'),
+  ('OFFICE','ALTIN','eph_sub_office_altin_v1'),
+  ('OFFICE','PLATINUM','eph_sub_office_platinum_v1'),
+  ('MUTEAHHIT','BRONZ','eph_sub_muteahhit_bronz_v1'),
+  ('MUTEAHHIT','GUMUS','eph_sub_muteahhit_gumus_v1'),
+  ('MUTEAHHIT','ALTIN','eph_sub_muteahhit_altin_v1'),
+  ('MUTEAHHIT','PLATINUM','eph_sub_muteahhit_platinum_v1')
+) u(segment, kod, kimlik)
+CROSS JOIN (VALUES ('APPLE'),('GOOGLE')) pf(platform)
+LEFT JOIN "UyelikPaketi" p
+  ON u.segment = 'MUTEAHHIT' AND p."segment"::text = u.segment AND p."paketKodu"::text = u.kod
+ON CONFLICT ("platform","magazaUrunKimligi") DO NOTHING;
+
+-- 2) EK KULLANICI (5) ve OFİS BOY (1) — ayrı abonelik grupları; ofis paketi satın alınmış olmalı kuralı sunucu servisindedir.
+INSERT INTO "StoreProduct"
+  ("id","platform","urunTuru","segment","paketKodu","uyelikPaketiId","kisiSayisi","pkUrunKodu","urunAnahtari","surum",
+   "magazaUrunKimligi","googleBasePlanKimligi","aktifMi","olusturulmaTarihi","guncellenmeTarihi")
+SELECT
+  gen_random_uuid()::text,
+  pf.platform::"StorePlatform",
+  a.tur::"StoreProductKind",
+  NULL, NULL, NULL,
+  a.kisi,
+  NULL,
+  CASE WHEN a.tur = 'EK_KULLANICI' THEN 'EK_KULLANICI:' || a.kisi ELSE 'OFIS_BOY' END,
+  1,
+  a.kimlik,
+  CASE WHEN pf.platform = 'GOOGLE' THEN 'monthly' ELSE NULL END,
+  true, now(), now()
+FROM (VALUES
+  ('EK_KULLANICI', 1,  'eph_addon_user_1_v1'),
+  ('EK_KULLANICI', 2,  'eph_addon_user_2_v1'),
+  ('EK_KULLANICI', 3,  'eph_addon_user_3_v1'),
+  ('EK_KULLANICI', 5,  'eph_addon_user_5_v1'),
+  ('EK_KULLANICI', 10, 'eph_addon_user_10_v1'),
+  ('OFIS_BOY', NULL::int, 'eph_addon_ofisboy_v1')
+) a(tur, kisi, kimlik)
+CROSS JOIN (VALUES ('APPLE'),('GOOGLE')) pf(platform)
+ON CONFLICT ("platform","magazaUrunKimligi") DO NOTHING;
+
+-- 3) EK PK (5) — tüketilebilir
+WITH pk AS (
+  SELECT * FROM (VALUES
+    (250,  'eph_pk_250_v1'),
+    (500,  'eph_pk_500_v1'),
+    (1000, 'eph_pk_1000_v1'),
+    (2500, 'eph_pk_2500_v1'),
+    (5000, 'eph_pk_5000_v1')
+  ) v(miktar, kimlik)
+), cfg AS (
+  SELECT e->>'code' AS code, (e->>'credits')::int AS credits
+  FROM "SystemSetting" ss,
+       LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(ss."valueJson"::jsonb->'pkProducts') = 'array' THEN ss."valueJson"::jsonb->'pkProducts' ELSE '[]'::jsonb END) e
+  WHERE ss."key" = 'EPH_PAYMENT_SETTINGS_V1'
+), res AS (
+  SELECT pk.miktar, pk.kimlik,
+         COALESCE((SELECT min(cfg.code) FROM cfg WHERE cfg.credits = pk.miktar), 'PK_' || pk.miktar) AS kod,
+         EXISTS (SELECT 1 FROM cfg WHERE cfg.credits = pk.miktar) AS bulundu
+  FROM pk
+)
+INSERT INTO "StoreProduct"
+  ("id","platform","urunTuru","segment","paketKodu","uyelikPaketiId","kisiSayisi","pkUrunKodu","urunAnahtari","surum",
+   "magazaUrunKimligi","googleBasePlanKimligi","aktifMi","olusturulmaTarihi","guncellenmeTarihi")
+SELECT
+  gen_random_uuid()::text,
+  pf.platform::"StorePlatform",
+  'PK'::"StoreProductKind",
+  NULL, NULL, NULL, NULL,
+  res.kod,
+  'PK:' || res.kod,
+  1,
+  res.kimlik,
+  NULL,
+  res.bulundu,
+  now(), now()
+FROM res
+CROSS JOIN (VALUES ('APPLE'),('GOOGLE')) pf(platform)
+ON CONFLICT ("platform","magazaUrunKimligi") DO NOTHING;
+
+-- 4) SON KONTROL: 40 satır (20 x 2) olmalı; değilse işlem geri alınır.
+DO $$
+DECLARE n integer;
+BEGIN
+  SELECT count(*) INTO n FROM "StoreProduct" WHERE "surum" = 1;
+  IF n <> 40 THEN RAISE EXCEPTION 'Beklenen 40 StoreProduct satırı, bulunan %', n; END IF;
+END $$;
+
+-- 5) İNCELEME ÇIKTISI (aktifMi=false olanlar = kaynağı henüz tanımsız ürünler)
+SELECT "platform", "urunTuru", "segment", "paketKodu", "kisiSayisi", "pkUrunKodu", "magazaUrunKimligi", "googleBasePlanKimligi", "aktifMi"
+FROM "StoreProduct" ORDER BY "platform", "urunTuru", "segment", "paketKodu", "kisiSayisi", "pkUrunKodu";
+
+COMMIT;
