@@ -618,6 +618,7 @@ function AnalyticsSection() {
 function StatsBand() {
   return (
     <section id="fiyatlandirma" data-reveal className="bg-[#0E1E38] px-5 py-8 md:px-10">
+      <h2 className="mb-6 text-center text-[24px] font-semibold text-white">2027 Hedeflerimiz</h2>
       <div className="mx-auto grid max-w-[1380px] overflow-hidden rounded-[14px] border border-white/12 bg-white/[0.055] md:grid-cols-4">
         {stats.map((item) => (
           <div key={item.label} className="flex items-center justify-center gap-5 border-b border-white/10 px-7 py-6 last:border-b-0 md:border-b-0 md:border-r md:last:border-r-0">
@@ -887,7 +888,7 @@ export default function LandingPage() {
           <div className="mt-2 text-[12px] font-semibold text-[#51657F]">Sayfa Başına Dön</div>
 
           <div className="mx-auto mt-6 max-w-[720px] border-t border-[#E6EEF8] pt-5 text-center text-[12px] font-medium text-[#6A7E96]">
-            © 2024 EPH — Emlak Portföy Havuzu. Tüm hakları saklıdır.
+            © {new Date().getFullYear()} EPH — Emlak Portföy Havuzu. Tüm hakları saklıdır.
           </div>
         </div>
       </section>
