@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 
 import api from "@/lib/api";
+import { paymentReturnPath } from "@/lib/payment-return";
 import { useAuthStore } from "@/store/auth.store";
 import { loginSchema, LoginFormData } from "@/schemas/auth.schema";
 
@@ -58,7 +59,7 @@ export default function GirisPage() {
       }
 
       setAuth(result.user, result.token);
-      router.push("/dashboard");
+      router.push(paymentReturnPath(new URLSearchParams(window.location.search).get("next")));
     } catch (err: any) {
       const message =
         err?.response?.data?.message ||

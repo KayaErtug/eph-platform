@@ -1,3 +1,7 @@
+import { formatPageTitle } from '../visits/visits.service';
+import { consumeLots, grantLot, lockPaymentUser, lockWallet } from '../kontor/wallet-lots';
+import { deletedAccounts } from '../auth/account-deletion';
+import { deleteUserAccount } from './delete-user-account';
 import { COST_PREFIX, LIMIT_DEFAULTS, LIMIT_DESCRIPTIONS, LIMIT_LIST_DEFAULTS, LIMIT_PREFIX, isManagedCommercialKey, parseLimitList } from "../pricing/commercial-costs";
 import { NEW_USER_NOTIFY_KEYS } from "../auth/registration/new-user-notifier.service";
 import { readTrialPolicy, resolveInitialTrialDays } from "../pricing/trial-policy";
@@ -146,6 +150,7 @@ export class AdminService {
 
   private readonly rolKodlari: Record<Role, string> = {
     EMLAKCI: "EML",
+    OFIS_BOY: "OFB",
     MUTEAHHIT: "MUT",
     INSAAT_FIRMASI: "INS",
     MODERATOR: "MOD",
@@ -1014,8 +1019,133 @@ export class AdminService {
     };
   }
 
-  async getUsers(filter?: "pending" | "approved" | "all", actor?: AdminActor) {
+  async getLiveActivity(actor?: AdminActor) {
+    const isSuper = actor?.role === 'SUPER_ADMIN';
+    if (!isSuper && actor?.role !== 'ADMIN') {
+      throw new ForbiddenException('Bu bilgi yalnız Yazılım Ekibi / Süper Admin yetkisine açıktır.');
+    }
+
+    const now = Date.now();
+    const onlineThreshold = new Date(now - 5 * 60 * 1000);
+    const awayThreshold = new Date(now - 20 * 60 * 1000);
+
+    const users = await this.prisma.user.findMany({
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        role: true,
+        memberCode: true,
+        city: true,
+        district: true,
+        profileImageUrl: true,
+        visits: {
+          orderBy: { createdAt: 'desc' },
+          take: 30,
+          select: {
+            id: true,
+            page: true,
+            durationSeconds: true,
+            createdAt: true,
+            ip: true,
+          },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    let onlineCount = 0;
+    let awayCount = 0;
+    let offlineCount = 0;
+
+    const list = users.map((u) => {
+      const visits = u.visits || [];
+      const lastVisit = visits[0] || null;
+      const lastSeenAt = lastVisit?.createdAt || null;
+
+      let presenceStatus: 'online' | 'away' | 'offline' = 'offline';
+      let minutesAgo: number | null = null;
+
+      if (lastSeenAt) {
+        minutesAgo = Math.floor((now - new Date(lastSeenAt).getTime()) / 60000);
+        if (new Date(lastSeenAt) >= onlineThreshold) {
+          presenceStatus = 'online';
+          onlineCount++;
+        } else if (new Date(lastSeenAt) >= awayThreshold) {
+          presenceStatus = 'away';
+          awayCount++;
+        } else {
+          presenceStatus = 'offline';
+          offlineCount++;
+        }
+      } else {
+        offlineCount++;
+      }
+
+      const pageHistory = visits.map((v) => ({
+        id: v.id,
+        rawPage: v.page,
+        pageTitle: formatPageTitle(v.page),
+        durationSeconds: v.durationSeconds || 0,
+        createdAt: v.createdAt,
+        ip: v.ip,
+      }));
+
+      const totalRecordedSeconds = visits.reduce(
+        (sum, v) => sum + (v.durationSeconds || 0),
+        0,
+      );
+
+      return {
+        userId: u.id,
+        fullName: `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email || 'İsimsiz Kullanıcı',
+        email: u.email,
+        phone: u.phone,
+        role: u.role,
+        memberCode: u.memberCode,
+        location: [u.city, u.district].filter(Boolean).join(' / ') || 'Konum belirtilmedi',
+        profileImageUrl: u.profileImageUrl,
+        presenceStatus,
+        minutesAgo,
+        lastSeenAt,
+        currentPage: lastVisit?.page ? formatPageTitle(lastVisit.page) : 'Henüz giriş kaydı yok',
+        currentRawPage: lastVisit?.page || null,
+        currentDurationSeconds: lastVisit?.durationSeconds || 0,
+        totalRecordedSeconds,
+        historyCount: visits.length,
+        pageHistory,
+      };
+    });
+
+    const statusPriority = { online: 0, away: 1, offline: 2 };
+    list.sort((a, b) => {
+      const pA = statusPriority[a.presenceStatus] ?? 3;
+      const pB = statusPriority[b.presenceStatus] ?? 3;
+      if (pA !== pB) return pA - pB;
+      const timeA = a.lastSeenAt ? new Date(a.lastSeenAt).getTime() : 0;
+      const timeB = b.lastSeenAt ? new Date(b.lastSeenAt).getTime() : 0;
+      return timeB - timeA;
+    });
+
+    return {
+      generatedAt: new Date().toISOString(),
+      summary: {
+        totalUsers: users.length,
+        onlineCount,
+        awayCount,
+        offlineCount,
+      },
+      users: list,
+    };
+  }
+
+  async getUsers(filter?: "pending" | "approved" | "all" | "deleted", actor?: AdminActor) {
     const now = new Date();
+    if (filter === 'deleted') this.requireSoftwareTeam(actor);
+    const deletionRecords = await deletedAccounts(this.prisma);
+    const deletedIds = [...deletionRecords.keys()];
 
     const where =
       filter === "pending"
@@ -1028,7 +1158,7 @@ export class AdminService {
           : {};
 
     const users = await this.prisma.user.findMany({
-      where,
+      where: { AND: [where, filter === "deleted" ? { id: { in: deletedIds } } : { id: { notIn: deletedIds } }] },
       select: {
         id: true,
         firstName: true,
@@ -1041,6 +1171,7 @@ export class AdminService {
         memberSince: true,
         city: true,
         district: true,
+        neighborhood: true,
         cityPlateCode: true,
         isApproved: true,
         isVerified: true,
@@ -1082,6 +1213,7 @@ export class AdminService {
           select: {
             id: true,
             name: true,
+            code: true,
             slug: true,
             city: true,
             district: true,
@@ -1226,6 +1358,7 @@ export class AdminService {
 
       return {
         ...maskedUser,
+        deletedAt: deletionRecords.get(user.id)?.deletedAt || null,
         phoneVerifiedAt:
           phoneVerificationMap.get(user.phone)?.verifiedAt || null,
         aktifUyelik: aktifUyelik
@@ -1499,38 +1632,160 @@ export class AdminService {
     return updated;
   }
 
-  async rejectUser(id: string, actor?: AdminActor) {
-    const permission = await this.resolveOperationalPermission(actor, "USER_DELETE");
-    if (!permission.enabled) {
-      throw new ForbiddenException("Kullanıcı silme yetkiniz bulunmuyor.");
-    }
-    this.requireSoftwareTeam(actor);
+  async updateUser(
+    id: string,
+    data: {
+      firstName?: string;
+      lastName?: string;
+      phone?: string;
+      email?: string;
+      city?: string;
+      district?: string;
+      neighborhood?: string;
+      role?: Role | string;
+      officeId?: string | null;
+      isApproved?: boolean;
+      isVerified?: boolean;
+      isSuspended?: boolean;
+      memberCode?: string | null;
+      password?: string;
+      bakiye?: number;
+    },
+    actor?: AdminActor,
+  ) {
+    this.requireAdminOrSoftwareTeam(actor);
+    const isSuper = this.isSoftwareTeam(actor);
 
-    const user = await this.prisma.user.findUnique({ where: { id } });
-
-    if (!user) {
-      throw new NotFoundException("Kullanıcı bulunamadı.");
-    }
-
-    if (user.id === this.getActorId(actor)) {
-      throw new BadRequestException("Kendi hesabınızı silemezsiniz.");
-    }
-
-    const deleted = await this.prisma.user.delete({ where: { id } });
-
-    await this.logAdminAction({
-      actor,
-      targetUserId: id,
-      action: "USER_DELETED",
-      entityType: "User",
-      entityId: id,
-      description: `${user.email} kullanıcısı Yazılım Ekibi tarafından silindi.`,
-      metadata: {
-        deletedUserRole: user.role,
+    const targetUser = await this.prisma.user.findUnique({
+      where: { id },
+      include: {
+        office: true,
       },
     });
 
-    return deleted;
+    if (!targetUser) {
+      throw new NotFoundException('Kullanıcı bulunamadı.');
+    }
+
+    if (!isSuper && (targetUser.role === Role.SUPER_ADMIN || targetUser.role === Role.ADMIN)) {
+      throw new ForbiddenException('Yalnızca Yazılım Ekibi (Süper Admin) admin hesaplarını güncelleyebilir.');
+    }
+
+    const updateData: Prisma.UserUpdateInput = {};
+
+    if (data.firstName !== undefined) updateData.firstName = data.firstName.trim();
+    if (data.lastName !== undefined) updateData.lastName = data.lastName.trim();
+    if (data.phone !== undefined) updateData.phone = data.phone.trim();
+    if (data.city !== undefined) updateData.city = data.city.trim() || null;
+    if (data.district !== undefined) updateData.district = data.district.trim() || null;
+    if (data.neighborhood !== undefined) updateData.neighborhood = data.neighborhood ? data.neighborhood.trim() : null;
+    if (data.isApproved !== undefined) updateData.isApproved = Boolean(data.isApproved);
+    if (data.isVerified !== undefined) updateData.isVerified = Boolean(data.isVerified);
+    if (data.memberCode !== undefined) updateData.memberCode = data.memberCode ? data.memberCode.trim() : null;
+
+    if (data.email !== undefined && data.email.trim() && data.email.trim() !== targetUser.email) {
+      const existingEmail = await this.prisma.user.findUnique({ where: { email: data.email.trim() } });
+      if (existingEmail && existingEmail.id !== id) {
+        throw new BadRequestException('Bu e-posta adresi başka bir kullanıcı tarafından kullanılmaktadır.');
+      }
+      updateData.email = data.email.trim();
+    }
+
+    if (data.role !== undefined && Object.values(Role).includes(data.role as Role)) {
+      updateData.role = data.role as Role;
+    }
+
+    if (data.officeId !== undefined) {
+      if (!data.officeId) {
+        updateData.office = { disconnect: true };
+      } else {
+        const effectiveRole = data.role ? String(data.role).trim().toUpperCase() : targetUser.role;
+        if (effectiveRole === Role.MUTEAHHIT || effectiveRole === Role.INSAAT_FIRMASI) {
+          throw new BadRequestException('Müteahhit veya inşaat firmaları emlak ofisine dahil edilemez.');
+        }
+        const officeExists = await this.prisma.office.findUnique({ where: { id: data.officeId } });
+        if (officeExists) {
+          updateData.office = { connect: { id: data.officeId } };
+        } else {
+          throw new BadRequestException('Seçilen ofis bulunamadı.');
+        }
+      }
+    }
+
+    if (data.password && data.password.trim().length >= 6) {
+      updateData.passwordHash = await bcrypt.hash(data.password.trim(), 10);
+    }
+
+    if (data.isSuspended !== undefined) {
+      if (data.isSuspended) {
+        await this.prisma.userRestriction.create({
+          data: {
+            userId: id,
+            type: 'GECICI_ASKI' as any,
+            reason: 'Yönetici tarafından askıya alındı.',
+            startsAt: new Date(),
+            endsAt: null,
+            isActive: true,
+            createdById: this.getActorId(actor) || null,
+          },
+        });
+      } else {
+        await this.prisma.userRestriction.updateMany({
+          where: { userId: id, isActive: true },
+          data: { isActive: false },
+        });
+      }
+    }
+
+    if (data.bakiye !== undefined && Number.isFinite(Number(data.bakiye))) {
+      const newBalance = Math.max(0, Math.floor(Number(data.bakiye)));
+      // EPH-70B1G/F4: mutlak bakiye düzeltmesi ortak cüzdan kilidi + lot modeliyle atomik (artış → DUZELTME lotu, azalış → lot tüketimi).
+      await this.prisma.$transaction(async (tx) => {
+        await lockPaymentUser(tx, id);
+        await tx.kontorCuzdani.upsert({ where: { kullaniciId: id }, create: { kullaniciId: id, bakiye: 0, aktifMi: true }, update: {} });
+        const currentWallet = await lockWallet(tx, id);
+        const before = currentWallet?.bakiye ?? 0;
+        const diff = newBalance - before;
+        await tx.kontorCuzdani.update({ where: { kullaniciId: id }, data: { bakiye: newBalance, aktifMi: true } });
+        if (diff === 0) return;
+        const movement = await tx.kontorHareketi.create({
+          data: {
+            kullaniciId: id,
+            miktar: Math.abs(diff),
+            hareketTuru: KontorHareketTuru.DUZELTME,
+            islemTuru: KontorIslemTuru.DIGER,
+            oncekiBakiye: before,
+            sonrakiBakiye: newBalance,
+            aciklama: `Yönetici panelinden bakiye güncellendi (Aktör: ${actor?.email || actor?.id})`,
+            ilgiliKayitTuru: 'ADMIN_BAKIYE_DUZELTME',
+            olusturanId: this.getActorId(actor),
+          },
+        });
+        if (diff > 0) await grantLot(tx, { userId: id, lotTuru: 'DUZELTME', amount: diff, kaynakKayitTuru: 'ADMIN_BAKIYE_DUZELTME', kaynakKayitId: movement.id, dedupeKey: `admin-balance:${movement.id}`, aciklama: 'Yönetici bakiye düzeltmesi' });
+        else await consumeLots(tx, id, -diff, { hareketId: movement.id });
+      });
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id },
+      data: updateData,
+      include: {
+        office: { select: { id: true, name: true, city: true, district: true } },
+        capabilities: true,
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Kullanıcı bilgileri başarıyla güncellendi.',
+      user: updatedUser,
+    };
+  }
+
+  async rejectUser(id: string, actor?: AdminActor, reason?: unknown) {
+    return deleteUserAccount(this.prisma, this.getActorId(actor), id, {
+      reason, ipAddress: actor?.ipAddress, userAgent: actor?.userAgent,
+    });
   }
 
   async suspendUser(
@@ -1795,6 +2050,9 @@ export class AdminService {
       phone: string;
       password: string;
       role: Role | string;
+      city?: string;
+      district?: string;
+      officeId?: string | null;
     },
     actor?: AdminActor,
   ) {
@@ -1804,6 +2062,15 @@ export class AdminService {
 
     if (!Object.values(Role).includes(normalizedRole)) {
       throw new BadRequestException("Geçersiz rol.");
+    }
+
+    if (
+      normalizedRole === Role.MUTEAHHIT ||
+      normalizedRole === Role.INSAAT_FIRMASI
+    ) {
+      if (data.officeId) {
+        throw new BadRequestException("Müteahhit veya inşaat firmaları emlak ofisine dahil edilemez.");
+      }
     }
 
     if (
@@ -1829,15 +2096,26 @@ export class AdminService {
       throw new BadRequestException("Bu e-posta zaten kayıtlı.");
     }
 
+    const existingPhone = await this.prisma.user.findUnique({
+      where: { phone: data.phone },
+    });
+
+    if (existingPhone) {
+      throw new BadRequestException("Bu telefon numarası zaten kayıtlı.");
+    }
+
     const passwordHash = await bcrypt.hash(data.password, 10);
     const referralCode = await this.generateUniqueReferralCode();
 
     const created = await this.prisma.user.create({
       data: {
-        firstName: data.firstName,
-        lastName: data.lastName,
-        email: data.email,
-        phone: data.phone,
+        firstName: data.firstName.trim(),
+        lastName: data.lastName.trim(),
+        email: data.email.trim(),
+        phone: data.phone.trim(),
+        city: data.city?.trim() || null,
+        district: data.district?.trim() || null,
+        officeId: data.officeId || null,
         passwordHash,
         role: normalizedRole,
         isApproved: true,
@@ -1925,6 +2203,7 @@ export class AdminService {
         memberSince: true,
         city: true,
         district: true,
+        neighborhood: true,
         cityPlateCode: true,
         isApproved: true,
         isVerified: true,
@@ -1967,6 +2246,7 @@ export class AdminService {
         memberSince: true,
         city: true,
         district: true,
+        neighborhood: true,
         cityPlateCode: true,
         isApproved: true,
         isVerified: true,
@@ -2281,9 +2561,11 @@ export class AdminService {
     capabilities: Capability[],
   ): DocumentType[] {
     if (role === Role.EMLAKCI) {
-      return capabilities.includes(Capability.OFFICE_OWNER)
-        ? [DocumentType.YETKI_BELGESI]
-        : [DocumentType.MYK_BELGESI];
+      return [
+        DocumentType.YETKI_BELGESI,
+        DocumentType.MYK_BELGESI,
+        DocumentType.VERGI_LEVHASI,
+      ];
     }
 
     if (
@@ -2368,11 +2650,18 @@ export class AdminService {
       ProfessionalVerificationStatus.PENDING;
 
     const hasEmployer = !requiresCompanyName(user.role) || (typeof user.companyName === 'string' && user.companyName.trim().length >= 2);
-    if (hasEmployer && states.every((state) => state.approved)) {
+    const isEmlakci = user.role === Role.EMLAKCI;
+    const hasAnyApprovedEmlakciDoc = isEmlakci && states.some((state) => state.approved);
+    const allApproved = states.every((state) => state.approved);
+
+    if (hasEmployer && (allApproved || hasAnyApprovedEmlakciDoc)) {
       nextStatus =
         ProfessionalVerificationStatus.VERIFIED;
     } else if (
-      states.some((state) => state.rejected)
+      isEmlakci
+        ? states.filter((s) => user.documents.some((d) => d.type === s.requiredType)).length > 0 &&
+          states.filter((s) => user.documents.some((d) => d.type === s.requiredType)).every((s) => s.rejected)
+        : states.some((state) => state.rejected)
     ) {
       nextStatus =
         ProfessionalVerificationStatus.REJECTED;
@@ -3181,6 +3470,8 @@ export class AdminService {
         );
       }
 
+      // EPH-70B1F/D7: ortak kilit sırası payment-user -> üyelik satırı -> wallet (Apple iadesi/ödeme settlement'ı ile aynı)
+      await lockPaymentUser(tx, normalizedUserId);
       await tx.kullaniciUyelikPaketi.updateMany({
         where: {
           kullaniciId: normalizedUserId,
@@ -3254,20 +3545,8 @@ export class AdminService {
           },
         });
 
-        await tx.$queryRaw`
-          SELECT "id"
-          FROM "KontorCuzdani"
-          WHERE "kullaniciId" = ${normalizedUserId}
-          FOR UPDATE
-        `;
-
-        const wallet =
-          await tx.kontorCuzdani.findUnique({
-            where: {
-              kullaniciId:
-                normalizedUserId,
-            },
-          });
+        // EPH-70B1F/D7: wallet advisory + satır kilidi (+ atomik dönem sonu kapanışı); bakiye kilitten sonra
+        const wallet = await lockWallet(tx, normalizedUserId);
 
         if (!wallet) {
           throw new BadRequestException(

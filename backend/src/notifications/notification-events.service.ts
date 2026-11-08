@@ -157,6 +157,17 @@ export class NotificationEventsService {
           OR s."targetType" = 'SEHIRLER' AND (u.city = ANY(s."targetCities") OR u."cityPlateCode" = ANY(s."targetCityPlateCodes"))
           OR s."targetType" = 'SEHIRLER_VE_ROLLER' AND u.role::text = ANY(s."targetRoles")
             AND (u.city = ANY(s."targetCities") OR u."cityPlateCode" = ANY(s."targetCityPlateCodes")))`,
+      Prisma.sql`
+        SELECT t."userId", 'CRM_TASK_DUE' AS type, 'ONEMLI' AS priority,
+          'CRM hatırlatıcınızın zamanı geldi' AS title, t.title AS body,
+          '/crm?customerId=' || t."customerId" AS "actionUrl",
+          'crm-task-due:' || t.id || ':' || t."dueDate"::text AS "eventKey"
+        FROM "Task" t
+        JOIN "Customer" c ON c.id = t."customerId"
+        JOIN "User" u ON u.id = t."userId"
+        WHERE t.status = 'BEKLIYOR' AND t."dueDate" >= ${since}
+          AND t."dueDate" <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+          AND btrim(t.title) <> ''`,
     ];
   }
 

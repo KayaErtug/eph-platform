@@ -1,5 +1,6 @@
 import {
   Body,
+  Query,
   Controller,
   Delete,
   Get,
@@ -10,7 +11,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { Request } from "express";
-import { Role } from "@prisma/client";
+import { Role, SisterLinkStatus } from "@prisma/client";
 
 import { OrganizationService } from "./organization.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
@@ -67,6 +68,55 @@ export class OrganizationController {
     return this.organizationService.getOffices();
   }
 
+  @Get("sister-links")
+  @RequirePermission("ORGANIZATION_VIEW")
+  getSisterLinks(@Query("status") status?: SisterLinkStatus) {
+    return this.organizationService.getSisterLinks(status);
+  }
+
+  @Post("sister-links/invite")
+  @RequirePermission("ORGANIZATION_MANAGE")
+  createSisterLink(
+    @Body()
+    body: {
+      inviterOfficeId: string;
+      targetOfficeId?: string;
+      targetOfficeCode?: string;
+      commissionSplitPct?: number;
+      autoApprove?: boolean;
+    },
+    @Req() request: OrganizationRequest,
+  ) {
+    return this.organizationService.createSisterLink(
+      body,
+      this.extractActor(request),
+    );
+  }
+
+  @Post("sister-links/:id/accept")
+  @RequirePermission("ORGANIZATION_MANAGE")
+  acceptSisterLink(@Param("id") id: string, @Req() request: OrganizationRequest) {
+    return this.organizationService.acceptSisterLink(id, this.extractActor(request));
+  }
+
+  @Post("sister-links/:id/reject")
+  @RequirePermission("ORGANIZATION_MANAGE")
+  rejectSisterLink(@Param("id") id: string, @Req() request: OrganizationRequest) {
+    return this.organizationService.rejectSisterLink(id, this.extractActor(request));
+  }
+
+  @Post("sister-links/:id/end")
+  @RequirePermission("ORGANIZATION_MANAGE")
+  endSisterLink(@Param("id") id: string, @Req() request: OrganizationRequest) {
+    return this.organizationService.endSisterLink(id, this.extractActor(request));
+  }
+
+  @Get("offices/packages")
+  @RequirePermission("ORGANIZATION_VIEW")
+  getOfficePackages() {
+    return this.organizationService.getOfficePackages();
+  }
+
   @Get("offices/:id/kpi")
   @RequirePermission("ORGANIZATION_VIEW")
   getOfficeKpi(@Param("id") id: string) {
@@ -114,6 +164,32 @@ export class OrganizationController {
     );
   }
 
+  @Patch("offices/:id/package")
+  @RequirePermission("ORGANIZATION_MANAGE")
+  updateOfficePackage(
+    @Param("id") id: string,
+    @Body()
+    body: {
+      packageCode: string;
+      durationDays?: number;
+      durationMonths?: number;
+      reason?: string;
+    },
+    @Req() request: OrganizationRequest,
+  ) {
+    return this.organizationService.updateOfficePackage(
+      id,
+      body,
+      this.extractActor(request),
+    );
+  }
+
+  @Delete("offices/:id")
+  @RequirePermission("ORGANIZATION_MANAGE")
+  deactivateOffice(@Param("id") id: string, @Req() request: OrganizationRequest) {
+    return this.organizationService.deactivateOffice(id, this.extractActor(request));
+  }
+
   @Get("teams")
   @RequirePermission("ORGANIZATION_VIEW")
   getTeams() {
@@ -159,6 +235,12 @@ export class OrganizationController {
       body,
       this.extractActor(request),
     );
+  }
+
+  @Delete("teams/:id")
+  @RequirePermission("ORGANIZATION_MANAGE")
+  deactivateTeam(@Param("id") id: string, @Req() request: OrganizationRequest) {
+    return this.organizationService.deactivateTeam(id, this.extractActor(request));
   }
 
   @Patch("teams/:id/leader")

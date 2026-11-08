@@ -1,3 +1,9 @@
+import { OfficeContractsController } from './contracts/office-contracts.controller';
+import { OfficeContractsService } from './contracts/office-contracts.service';
+import { PotentialUnitsController } from './potential-units/potential-units.controller';
+import { PotentialUnitsService } from './potential-units/potential-units.service';
+import { OfficeRealtorGuard } from './office-realtor.guard';
+import { SisterViewingService } from './sister/sister-viewing.service';
 import { Module } from "@nestjs/common";
 import { PrismaModule } from "../prisma/prisma.module";
 import { PushModule } from "../push/push.module";
@@ -13,11 +19,31 @@ import { SisterController } from './sister/sister.controller';
 import { SisterLinksService } from './sister/sister-links.service';
 import { SisterPoolService } from './sister/sister-pool.service';
 import { SisterRequestsService } from './sister/sister-requests.service';
+import { SisterDemandsService } from './sister/sister-demands.service';
 
 @Module({
   imports: [PrismaModule, PushModule, NotificationsModule],
-  controllers: [OfficeController, OfficeManagementController, OfficePoolController, SisterController],
-  providers: [OfficeService, OfficeManagementService, OfficePoolService, SisterLinksService, SisterPoolService, SisterRequestsService],
-  exports: [OfficeService],
+  controllers: [
+    OfficeController,
+    OfficeManagementController,
+    OfficePoolController,
+    SisterController,
+    OfficeContractsController,
+    PotentialUnitsController,
+  ],
+  providers: [
+    OfficeRealtorGuard,
+    SisterViewingService,
+    OfficeService,
+    OfficeManagementService,
+    OfficePoolService,
+    SisterLinksService,
+    SisterPoolService,
+    SisterRequestsService,
+    SisterDemandsService,
+    OfficeContractsService,
+    PotentialUnitsService,
+  ],
+  exports: [OfficeService, OfficeContractsService, SisterDemandsService, PotentialUnitsService],
 })
 export class OfficeModule {}

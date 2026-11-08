@@ -16,7 +16,7 @@ export class SupabaseService {
   readonly local: LocalStorageDriver | null = null;
 
   constructor() {
-    const driverName = String(process.env.STORAGE_DRIVER || 'supabase')
+    const driverName = String(process.env.STORAGE_DRIVER || 'local')
       .trim()
       .toLowerCase();
 
@@ -26,8 +26,9 @@ export class SupabaseService {
       );
     }
 
+    this.local = new LocalStorageDriver(readLocalStorageConfig());
+
     if (driverName === 'local') {
-      this.local = new LocalStorageDriver(readLocalStorageConfig());
       this.logger.log('Dosya depolama sürücüsü: local');
       return;
     }
@@ -108,6 +109,12 @@ export class SupabaseService {
         return data;
       } catch (error) {
         lastError = error;
+        if (this.isQuotaOrRestrictedError(error) && this.local) {
+          this.logger.warn(
+            `Supabase kotası aşıldı/kısıtlandı (402), dosya otomatik olarak yerel depolamaya (local driver) kaydediliyor: ${bucket}/${path}`,
+          );
+          return this.local.write(bucket, path, file);
+        }
         const message = this.storageErrorMessage(
           error,
           bucket,
@@ -270,17 +277,10 @@ export class SupabaseService {
       ),
     );
 
-    if (this.local) {
+    if (this.local && (!this.supabase || (await this.local.exists(bucket, path)))) {
       if (!this.local.isPrivateBucket(bucket)) {
         return this.local.publicUrl(bucket, path);
       }
-
-      if (!(await this.local.exists(bucket, path))) {
-        throw new Error(
-          `Dosya bulunamadı (bucket: ${bucket}; path: ${path}).`,
-        );
-      }
-
       return this.local.signedUrl(bucket, path, safeExpiresIn);
     }
 
@@ -369,6 +369,19 @@ export class SupabaseService {
       `${statusCode ? ` [${statusCode}]` : ''}: ${rawMessage}. ` +
       `Kimlik doğrulama: ${this.writeAuthMode}; ` +
       `bucket: ${bucket}; path: ${path}.${hint}`
+    );
+  }
+
+  private isQuotaOrRestrictedError(error: unknown): boolean {
+    const msg = String((error as any)?.message || error || '').toLowerCase();
+    const status = (error as any)?.status || (error as any)?.statusCode;
+    return (
+      status === 402 ||
+      msg.includes('402') ||
+      msg.includes('quota') ||
+      msg.includes('restricted') ||
+      msg.includes('exceed') ||
+      msg.includes('violation')
     );
   }
 

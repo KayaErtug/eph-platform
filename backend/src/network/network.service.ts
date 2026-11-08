@@ -1,4 +1,5 @@
 import { consumeMembershipQuota } from '../membership/membership-quota.rules';
+import { consumeLots, lockWallet } from '../kontor/wallet-lots';
 import { resolveOfficeWallet } from '../office/office-wallet.rules';
 import { TextSafetyField } from '../text-safety/text-safety.types';
 import {
@@ -2508,13 +2509,7 @@ export class NetworkService {
     const selected = await resolveOfficeWallet(tx, actorId, { walletSource: input.walletSource, walletOfficeId: input.walletOfficeId }, true);
     if (input.actorId && selected.chargeUserId !== input.userId) throw new BadRequestException('Ofis harcama hesabı değişti; ücreti yeniden kontrol edin.');
     input = { ...input, userId: selected.chargeUserId, actorId };
-    await tx.$executeRaw`
-      SELECT pg_advisory_xact_lock(
-        hashtext(${`wallet:${input.userId}`})
-      )
-    `;
-
-    await tx.$queryRaw`SELECT "id" FROM "KontorCuzdani" WHERE "kullaniciId" = ${input.userId} FOR UPDATE`;
+    await lockWallet(tx, input.userId); // EPH-70B1F: ortak kilit sırası + atomik dönem sonu kapanışı
 
     let wallet = await tx.kontorCuzdani.findUnique({
       where: {
@@ -2577,6 +2572,7 @@ export class NetworkService {
         olusturanId: input.actorId || input.userId,
       },
     });
+    await consumeLots(tx, input.userId, input.amount, { hareketId: movement.id }); // EPH-70B1F/D1
 
     return {
       wallet: updatedWallet,

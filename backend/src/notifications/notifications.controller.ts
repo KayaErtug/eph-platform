@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -39,6 +40,21 @@ export class NotificationsController {
   @Post('read-all')
   readAll(@CurrentUser() user: { id: string }) {
     return this.service.readAll(user.id);
+  }
+  @Delete(':id')
+  delete(@CurrentUser() user: { id: string }, @Param('id') id: string) {
+    return this.service.delete(user.id, id);
+  }
+  @Delete()
+  deleteAll(@CurrentUser() user: { id: string }) {
+    return this.service.deleteAll(user.id);
+  }
+  @Post('dismiss')
+  dismiss(
+    @CurrentUser() user: { id: string },
+    @Body() body: { type?: string; actionUrl?: string },
+  ) {
+    return this.service.dismiss(user.id, body || {});
   }
 }
 

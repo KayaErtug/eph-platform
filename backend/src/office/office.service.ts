@@ -1,4 +1,5 @@
 import { resolveOfficeWallet } from '../office/office-wallet.rules';
+import { grantLot, lockWallet } from '../kontor/wallet-lots';
 import {
   BadRequestException,
   ForbiddenException,
@@ -78,6 +79,9 @@ export class OfficeService {
       const subscription = await tx.systemSetting.findUnique({ where: { key: `OFFICE_SUBSCRIPTION_${officeId}` } });
       const current: any = subscription?.valueJson;
       if (current?.packageCode && current.packageCode !== 'DENEME' && new Date(current.expiresAt).getTime() > Date.now()) throw new BadRequestException('Aktif ücretli ofis paketi denemeyle değiştirilemez.');
+      // EPH-70B1F/D7: ortak cüzdan kilidi (upsert -> wallet advisory + FOR UPDATE); bakiye kilitten sonra okunur.
+      await tx.kontorCuzdani.upsert({ where: { kullaniciId: beneficiaryId }, create: { kullaniciId: beneficiaryId }, update: {} });
+      await lockWallet(tx, beneficiaryId);
       let wallet = await tx.kontorCuzdani.findUnique({
         where: { kullaniciId: beneficiaryId },
       });
@@ -119,7 +123,12 @@ export class OfficeService {
         },
       });
 
-      const valueJson = { ...trial, officeId, packageCode: trial.code, packageName: trial.name, purchasedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + trialDays * 86400000).toISOString() };
+      // EPH-70B1G/F2: deneme PK'sı SÜRELİ lot (PAKET türü + OFFICE_TRIAL kaynağı; deneme bitişiyle aynı vade). Karar 18b: cutoff'tan ÖNCE açılan
+      // eski denemeler isLegacyTrialLot ile korunur; cutoff sonrası denemenin kalan PK'sı dönem sonunda silinir. Süresiz HEDIYE KULLANILMAZ.
+      const trialExpiresAt = new Date(Date.now() + trialDays * 86400000);
+      await grantLot(tx, { userId: beneficiaryId, lotTuru: 'PAKET', amount: TRIAL_PK, kaynakKayitTuru: 'OFFICE_TRIAL', kaynakKayitId: movement.id, dedupeKey: `office-trial:${movement.id}`, aciklama: 'Ofis Deneme PK', sonKullanmaTarihi: trialExpiresAt });
+
+      const valueJson = { ...trial, officeId, packageCode: trial.code, packageName: trial.name, purchasedAt: new Date().toISOString(), expiresAt: trialExpiresAt.toISOString() };
       await tx.systemSetting.upsert({ where: { key: `OFFICE_SUBSCRIPTION_${officeId}` }, create: { key: `OFFICE_SUBSCRIPTION_${officeId}`, valueJson }, update: { valueJson } });
       return {
         ok: true,
@@ -165,6 +174,9 @@ export class OfficeService {
     const monthlyPk = Number(pkg.monthlyPk || 0);
 
     return this.prisma.$transaction(async (tx) => {
+      // EPH-70B1F/D7: ortak cüzdan kilidi
+      await tx.kontorCuzdani.upsert({ where: { kullaniciId: userId }, create: { kullaniciId: userId }, update: {} });
+      await lockWallet(tx, userId);
       let wallet = await tx.kontorCuzdani.findUnique({
         where: { kullaniciId: userId },
       });
@@ -205,6 +217,10 @@ export class OfficeService {
         },
       });
 
+      // EPH-70B1G/F2: ofis paketi PK'sı abonelik süresiyle (30 gün) eşleşen SÜRELİ PAKET lotu
+      const packageExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      await grantLot(tx, { userId, lotTuru: 'PAKET', amount: monthlyPk, kaynakKayitTuru: 'OFFICE_PACKAGE', kaynakKayitId: movement.id, dedupeKey: `office-package:${movement.id}`, aciklama: `${pkg.name} ofis paketi PK`, sonKullanmaTarihi: packageExpiresAt });
+
       const subRecord = {
         officeId: office.id,
         packageCode: pkg.code,
@@ -215,7 +231,7 @@ export class OfficeService {
         crmCapacity: pkg.crmCapacity,
         agents: pkg.agents,
         purchasedAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        expiresAt: packageExpiresAt.toISOString(),
       };
 
       await tx.systemSetting.upsert({

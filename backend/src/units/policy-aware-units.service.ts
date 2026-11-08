@@ -44,6 +44,7 @@ type ProjectAccessSnapshot = {
 };
 
 const policyUnitInclude = {
+  salesRepresentative: { select: { id: true, firstName: true, lastName: true, phone: true, role: true } },
   project: {
     select: {
       id: true,
@@ -253,6 +254,26 @@ export class PolicyAwareUnitsService extends UnitsService {
       });
 
     if (!activeMembership) {
+      const userWithOffice = await this.policyPrisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          officeId: true,
+          office: {
+            select: {
+              isActive: true,
+              ownerUserId: true,
+            },
+          },
+        },
+      });
+      if (
+        userWithOffice?.officeId &&
+        userWithOffice.office?.isActive &&
+        userWithOffice.office.ownerUserId &&
+        userWithOffice.office.ownerUserId !== userId
+      ) {
+        return this.getPolicyActiveMembershipPackage(userWithOffice.office.ownerUserId);
+      }
       throw new ForbiddenException(
         'Portföy işlemleri için aktif üyelik paketi gereklidir.',
       );

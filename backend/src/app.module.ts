@@ -51,6 +51,7 @@ import { CoordinationModule } from './coordination/coordination.module';
 import { PoolExperienceModule } from './pool-experience/pool-experience.module';
 import { PoolAudienceModule } from './pool-audience/pool-audience.module';
 import { PoolProjectsModule } from './pool-projects/pool-projects.module';
+import { AppVersionModule } from './app-version/app-version.module';
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { PoolProjectsModule } from './pool-projects/pool-projects.module';
     PoolExperienceModule,
     PoolAudienceModule,
     PoolProjectsModule,
+    AppVersionModule,
 
     NominationsModule,
     ApplicationsModule,

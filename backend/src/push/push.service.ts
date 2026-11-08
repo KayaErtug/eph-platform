@@ -1,3 +1,4 @@
+import { isAccountDeleted } from '../auth/account-deletion';
 import { NativePushService } from './native-push.service';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -87,6 +88,7 @@ export class PushService {
   }
 
   async sendToUser(userId: string, payload: PushPayload) {
+    if (await isAccountDeleted(this.prisma, userId)) return { ok: false, successCount: 0, failCount: 0, skippedCount: 1 };
     const row = await this.prisma.systemSetting.findUnique({ where: { key: SETTINGS_PREFIX + userId } });
     const settings = row?.valueJson as Record<string, unknown> | undefined;
     if (settings?.enabled === false || settings?.[payload.category || notificationCategory('', payload.url || '')] === false) {

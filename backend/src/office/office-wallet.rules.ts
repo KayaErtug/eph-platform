@@ -30,7 +30,7 @@ export async function resolveOfficeWallet(db: OfficeDb, actorId: string, input: 
   if (input.walletSource === 'OFFICE' && !input.walletOfficeId) throw new BadRequestException('PK kaynağı için ofis seçin.');
   if (lock) {
     await officeLock(db, `office-user:${actorId}`);
-    await db.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${actorId} FOR UPDATE`;
+    await db.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${actorId} FOR NO KEY UPDATE`;
   }
   const actor = await db.user.findUnique({ where: { id: actorId }, select: { id: true, role: true, officeId: true } });
   if (!actor) throw new ForbiddenException('Kullanıcı bulunamadı.');

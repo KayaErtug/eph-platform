@@ -1,0 +1,296 @@
+"use client";
+
+import { Suspense, useEffect, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import {
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  ArrowRight,
+  RotateCw,
+  ShieldCheck,
+  Receipt,
+  Smartphone,
+  Home,
+  CreditCard,
+} from "lucide-react";
+import api from "@/lib/api";
+
+type OrderDetail = {
+  id: string;
+  number: string;
+  purpose: string;
+  status: "PAID" | "PENDING" | "FAILED" | "EXPIRED" | "CREATED";
+  amount: string;
+  currency: string;
+  credits?: number;
+  product?: {
+    code?: string;
+    paketAdi?: string;
+    credits?: number;
+  };
+  paidAt?: string | null;
+  settled?: boolean;
+};
+
+function OdemeContent() {
+  const searchParams = useSearchParams();
+  const orderId = searchParams.get("order") || "";
+
+  const [order, setOrder] = useState<OrderDetail | null>(null);
+  const [loading, setLoading] = useState(Boolean(orderId));
+  const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchOrder = async (isManualRefresh = false) => {
+    if (!orderId) {
+      setLoading(false);
+      return;
+    }
+    if (isManualRefresh) setRefreshing(true);
+    else setLoading(true);
+    setError(null);
+
+    try {
+      const res = await api.get<OrderDetail>(`/payments/orders/${encodeURIComponent(orderId)}`);
+      setOrder(res.data);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Sipariş detayları yüklenemedi.");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    void fetchOrder();
+  }, [orderId]);
+
+  if (!orderId) {
+    return (
+      <div className="mx-auto max-w-xl text-center py-16 px-4">
+        <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-[#EFF6FF] text-[#1D4ED8]">
+          <CreditCard className="h-8 w-8" />
+        </div>
+        <h1 className="text-2xl font-black text-[#0F2747]">Ödeme İşlemleri</h1>
+        <p className="mt-3 text-sm text-[#64748B] leading-relaxed">
+          Görüntülenecek bir sipariş numarası bulunamadı. Paket ve kredi seçeneklerini incelemek için paketler sayfasına gidebilirsiniz.
+        </p>
+        <Link
+          href="/ucretlendirme"
+          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#1D4ED8] px-6 py-3 text-sm font-bold text-white shadow-lg shadow-[#1D4ED8]/20 transition-all hover:bg-[#1E40AF]"
+        >
+          Paketleri İncele <ArrowRight className="h-4 w-4" />
+        </Link>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-xl text-center py-24 px-4">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#EFF6FF]">
+          <RotateCw className="h-7 w-7 animate-spin text-[#1D4ED8]" />
+        </div>
+        <h2 className="text-lg font-black text-[#0F2747]">Ödeme Durumu Doğrulanıyor</h2>
+        <p className="mt-2 text-sm text-[#64748B]">iyzico ve banka onayı kontrol ediliyor, lütfen bekleyiniz...</p>
+      </div>
+    );
+  }
+
+  const isPaid = order?.status === "PAID";
+  const isGranted = order?.settled === true;
+  const isFailed = order?.status === "FAILED" || order?.status === "EXPIRED";
+  const isPending = order?.status === "PENDING" || order?.status === "CREATED";
+
+  return (
+    <div className="mx-auto max-w-2xl px-4 py-12">
+      {isPaid && (
+        <div className="overflow-hidden rounded-3xl border border-[#D1FAE5] bg-white shadow-xl shadow-emerald-950/5">
+          <div className="bg-gradient-to-br from-[#059669] to-[#047857] p-8 text-center text-white">
+            <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
+              <CheckCircle2 className="h-12 w-12 text-white" />
+            </div>
+            <h1 className="text-2xl font-black tracking-tight md:text-3xl">
+              Ödemeniz Başarıyla Alındı!
+            </h1>
+            <p className="mt-2 text-sm font-medium text-emerald-100">
+              {isGranted
+                ? "Hak tanımlandı: Satın aldığınız paket veya krediler hesabınıza işlendi."
+                : "Ödeme alındı. Hak tanımlaması henüz doğrulanmadı; durumu tekrar kontrol ediniz."}
+            </p>
+          </div>
+
+          <div className="p-6 md:p-8 space-y-6">
+            <div className="rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] p-5 space-y-3">
+              <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-3 text-sm">
+                <span className="font-semibold text-[#64748B]">Sipariş No</span>
+                <span className="font-mono font-bold text-[#0F2747]">{order?.number}</span>
+              </div>
+              <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-3 text-sm">
+                <span className="font-semibold text-[#64748B]">Ürün / Paket</span>
+                <span className="font-bold text-[#0F2747]">
+                  {order?.product?.paketAdi || (order?.purpose === "PK_PURCHASE" ? `${order.credits} PK Paketi` : "Üyelik Paketi")}
+                </span>
+              </div>
+              <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-3 text-sm">
+                <span className="font-semibold text-[#64748B]">Ödenen Tutar</span>
+                <span className="text-base font-black text-[#059669]">
+                  {Number(order?.amount).toLocaleString("tr-TR", { minimumFractionDigits: 2 })} {order?.currency || "₺"}
+                </span>
+              </div>
+              {order?.paidAt && (
+                <div className="flex items-center justify-between text-xs text-[#94A3B8]">
+                  <span>İşlem Zamanı</span>
+                  <span>{new Date(order.paidAt).toLocaleString("tr-TR")}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-2xl bg-[#EFF6FF] border border-[#BFDBFE] p-4 flex items-start gap-3">
+              <Smartphone className="h-5 w-5 text-[#1D4ED8] shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <p className="font-bold text-[#1E3A8A]">{isGranted ? "Haklarınız Kullanıma Hazır" : "Hak Tanımlaması Bekleniyor"}</p>
+                <p className="mt-1 text-[#3B82F6] text-xs leading-relaxed">
+                  {isGranted
+                    ? "Güncel haklarınızı aynı hesapla EPH mobil uygulamasında kullanabilirsiniz."
+                    : "Yeniden ödeme yapmayınız. Durumu güncelleyiniz; hak tanımlaması tamamlanmazsa destek ile iletişime geçiniz."}
+                </p>
+              </div>
+            </div>
+
+            {!isGranted && (
+              <button
+                onClick={() => void fetchOrder(true)}
+                disabled={refreshing}
+                className="inline-flex items-center gap-2 rounded-xl bg-[#1D4ED8] px-6 py-3 text-sm font-bold text-white disabled:opacity-50"
+              >
+                <RotateCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+                Durumu Güncelle
+              </button>
+            )}
+
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <Link
+                href="/ucretlendirme"
+                className="flex-1 text-center rounded-xl bg-[#1D4ED8] py-3.5 px-4 text-sm font-bold text-white transition-all hover:bg-[#1E40AF]"
+              >
+                Paketlere Dön
+              </Link>
+              <Link
+                href="/"
+                className="flex-1 text-center rounded-xl border border-[#CBD5E1] bg-white py-3.5 px-4 text-sm font-bold text-[#334155] transition-all hover:bg-[#F8FAFC]"
+              >
+                Ana Sayfaya Dön
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isFailed && (
+        <div className="overflow-hidden rounded-3xl border border-[#FECDD3] bg-white shadow-xl shadow-rose-950/5">
+          <div className="bg-gradient-to-br from-[#DC2626] to-[#B91C1C] p-8 text-center text-white">
+            <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
+              <XCircle className="h-12 w-12 text-white" />
+            </div>
+            <h1 className="text-2xl font-black tracking-tight md:text-3xl">
+              Ödeme Onaylanamadı
+            </h1>
+            <p className="mt-2 text-sm font-medium text-rose-100">
+              {order?.status === "EXPIRED"
+                ? "Ödeme oturumunun süresi doldu."
+                : "Ödeme işlemi tamamlanamadı."}{" "}
+              Tahsilat veya provizyon durumu bu sipariş durumundan kesinleştirilemiyor. Banka hareketlerinizi kontrol ediniz; tutar görünüyorsa yeniden ödeme yapmadan destek ile iletişime geçiniz.
+            </p>
+          </div>
+
+          <div className="p-6 md:p-8 space-y-6">
+            <div className="rounded-2xl bg-[#FFF1F2] border border-[#FECDD3] p-4 text-sm text-[#9F1239]">
+              <p className="font-bold">Olası Sebepler:</p>
+              <ul className="mt-2 list-disc list-inside space-y-1 text-xs text-[#BE123C]">
+                <li>Kart limitiniz veya internet alışverişi yetkisi yetersiz olabilir.</li>
+                <li>3D Secure SMS şifresi hatalı girilmiş veya zaman aşımına uğramış olabilir.</li>
+                <li>Bankanız güvenlik gerekçesiyle işleme izin vermemiş olabilir.</li>
+              </ul>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <Link
+                href="/ucretlendirme"
+                className="flex-1 text-center rounded-xl bg-[#DC2626] py-3.5 px-4 text-sm font-bold text-white transition-all hover:bg-[#B91C1C]"
+              >
+                Tekrar Dene
+              </Link>
+              <Link
+                href="/"
+                className="flex-1 text-center rounded-xl border border-[#CBD5E1] bg-white py-3.5 px-4 text-sm font-bold text-[#334155] transition-all hover:bg-[#F8FAFC]"
+              >
+                Vazgeç
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isPending && (
+        <div className="overflow-hidden rounded-3xl border border-[#FDE68A] bg-white shadow-xl shadow-amber-950/5">
+          <div className="bg-gradient-to-br from-[#D97706] to-[#B45309] p-8 text-center text-white">
+            <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
+              <AlertCircle className="h-12 w-12 text-white" />
+            </div>
+            <h1 className="text-2xl font-black tracking-tight md:text-3xl">
+              İşlem Doğrulanıyor
+            </h1>
+            <p className="mt-2 text-sm font-medium text-amber-100">
+              iyzico banka onayı bekleniyor. Lütfen birkaç saniye sonra durumu kontrol ediniz.
+            </p>
+          </div>
+
+          <div className="p-6 md:p-8 space-y-6 text-center">
+            <p className="text-sm text-[#64748B]">
+              Sipariş No: <span className="font-mono font-bold text-[#0F2747]">{order?.number}</span>
+            </p>
+            <button
+              onClick={() => void fetchOrder(true)}
+              disabled={refreshing}
+              className="inline-flex items-center gap-2 rounded-xl bg-[#D97706] px-6 py-3 text-sm font-bold text-white transition-all hover:bg-[#B45309] disabled:opacity-50"
+            >
+              <RotateCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+              Durumu Güncelle
+            </button>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="mt-4 rounded-xl bg-[#FFF1F2] border border-[#FECDD3] p-4 text-center text-sm font-bold text-[#BE123C]">
+          {error}
+        </div>
+      )}
+
+      <div className="mt-10 flex items-center justify-center gap-3 text-xs text-[#94A3B8]">
+        <ShieldCheck className="h-4 w-4 text-[#059669]" />
+        <span>256-Bit SSL · iyzico Sanal POS Altyapısı ile Güvenli Ödeme</span>
+      </div>
+    </div>
+  );
+}
+
+export default function OdemePage() {
+  return (
+    <main className="min-h-screen bg-[#F8FAFC]">
+      <Suspense
+        fallback={
+          <div className="mx-auto max-w-xl text-center py-24 px-4">
+            <RotateCw className="mx-auto h-8 w-8 animate-spin text-[#1D4ED8]" />
+            <p className="mt-3 text-sm text-[#64748B]">Yükleniyor...</p>
+          </div>
+        }
+      >
+        <OdemeContent />
+      </Suspense>
+    </main>
+  );
+}
