@@ -114,6 +114,7 @@ export type HavuzPoolItemLike = {
       latitude?: number | null;
       longitude?: number | null;
       name?: string | null;
+      ownerRole?: string | null;
       owner?: {
         role?: string | null;
       } | null;
@@ -482,7 +483,9 @@ export function applyHavuzFilters<T extends HavuzPoolItemLike>(
     const neighborhood = String(unit.project?.address || "");
     const room = String(unit.roomCount || "");
     const currency = String(unit.priceCurrency || "TRY");
-    const ownerRole = String(unit.project?.owner?.role || "");
+    const ownerRole = String(
+      unit.project?.ownerRole || unit.project?.owner?.role || "",
+    );
     const publicFeatures = getPublicPortfolioFeatures(unit.features);
     const metadata = decodePortfolioMetadataState(unit.features);
 

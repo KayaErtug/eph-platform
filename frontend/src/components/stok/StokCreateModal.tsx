@@ -30,6 +30,7 @@ import {
 } from "./locationData";
 import type { LocalPortfolioImage, Project, ProjectFormState, UnitFormState } from "./stokTypes";
 import GoogleGeoPicker from "./GoogleGeoPicker";
+import PremiumCardEntrySection from "./PremiumCardEntrySection";
 
 type CrmCustomerOption = {
   id: string;
@@ -1089,6 +1090,10 @@ export default function StokCreateModal({
   const parselNo = String((unitForm as any).parselNo || "");
   const availableCreditAmountDisplay = formatPriceInput(String((unitForm as any).availableCreditAmount || ""));
   const doorAccessInfo = String((unitForm as any).doorAccessInfo || "");
+  const allowPhoneCall = Boolean((unitForm as any).allowPhoneCall);
+  const contactPhone = String((unitForm as any).contactPhone || "");
+  const allowWhatsapp = Boolean((unitForm as any).allowWhatsapp);
+  const whatsappPhone = String((unitForm as any).whatsappPhone || "");
   const storedFeatures = Array.isArray((unitForm as any).features)
     ? ((unitForm as any).features as string[])
     : [];
@@ -1570,6 +1575,20 @@ export default function StokCreateModal({
       return "Tapu sahibinin cep telefonu 0 (5XX) XXX XX XX formatında olmalıdır.";
     }
 
+    if (
+      allowPhoneCall &&
+      !/^\d{10,15}$/.test(contactPhone.replace(/\D/g, ""))
+    ) {
+      return "Aranacak telefon numarasını alan koduyla birlikte doğru giriniz.";
+    }
+
+    if (
+      allowWhatsapp &&
+      !/^\d{10,15}$/.test(whatsappPhone.replace(/\D/g, ""))
+    ) {
+      return "WhatsApp numarasını alan koduyla birlikte doğru giriniz.";
+    }
+
     const availableCreditAmount = Number(String((unitForm as any).availableCreditAmount || "").replace(/\D/g, ""));
 
     if (availableCreditAmount && price && availableCreditAmount > price) {
@@ -1686,185 +1705,9 @@ export default function StokCreateModal({
 
           <div className="stock-form-block rounded-[30px] border-2 border-[#D7E1EF] bg-[#F8FAFC] p-3 shadow-[0_22px_54px_rgba(15,23,42,0.14)]">
             <div className="stock-form-grid">
-              <section className="col-span-full rounded-[26px] border-2 border-[#F2C66D] bg-[#FFF7E6] p-3 shadow-[0_14px_30px_rgba(180,83,9,0.08)]">
-                <div className="mb-3 rounded-[16px] bg-[#F59E0B] px-3 py-2 text-center text-[11px] font-black uppercase tracking-[0.12em] text-white">
-                  Proje Bilgileri
-                </div>
-                <div className="grid gap-3">
-              {projects.length > 0 && (
-                <label className="stock-form-field full">
-                  <span>Mevcut Projeye Ekle</span>
-                  <select
-                    value={selectedProjectId}
-                    onChange={(e) => setSelectedProjectId(e.target.value)}
-                  >
-                    <option value="">Yeni Proje Oluştur</option>
-                    {projects.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.city})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-
-              {!selectedProjectId && (
-                <label className="stock-form-field full">
-                  <span>Proje Adı *</span>
-                  <input
-                    value={projectForm.name}
-                    onChange={(e) => setProjectField("name", e.target.value)}
-                    onBlur={(e) => setProjectFieldFormatted("name", e.target.value)}
-                  />
-                </label>
-              )}
-                </div>
-              </section>
-
-              <section className="col-span-full rounded-[26px] border-2 border-[#8CC8F6] bg-[#EDF8FF] p-3 shadow-[0_14px_30px_rgba(2,132,199,0.08)]">
-                <div className="mb-3 rounded-[16px] bg-[#0284C7] px-3 py-2 text-center text-[11px] font-black uppercase tracking-[0.12em] text-white">
-                  Adres Bilgileri
-                </div>
-                <div className="grid gap-3">
-              <label className="stock-form-field">
-                <span>Şehir *</span>
-                <select
-                  value={projectForm.city}
-                  onChange={(e) => {
-                    const nextCity = e.target.value;
-                    setProjectForm((current) => ({
-                      ...current,
-                      city: nextCity,
-                      district: "",
-                      address: "",
-                    }));
-                    setSelectedPlace("");
-                  }}
-                >
-                  <option value="">Şehir seçiniz</option>
-                  {provinceOptions.map((city) => (
-                    <option key={city.id} value={city.name}>
-                      {city.name}
-                    </option>
-                  ))}
-                </select>
-                {locationLoading && (
-                  <p className="mt-2 text-center text-xs font-bold text-[#64748B]">
-                    Konum verisi yükleniyor...
-                  </p>
-                )}
-              </label>
-
-              <label className="stock-form-field">
-                <span>İlçe *</span>
-                {districtOptions.length > 0 ? (
-                  <select
-                    value={projectForm.district}
-                    onChange={(e) => {
-                      setProjectField("district", e.target.value);
-                      setProjectField("address", "");
-                      setSelectedPlace("");
-                    }}
-                  >
-                    <option value="">İlçe seçiniz</option>
-                    {districtOptions.map((district) => (
-                      <option key={district.id} value={district.name}>
-                        {district.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    value={projectForm.district}
-                    onChange={(e) => setProjectField("district", e.target.value)}
-                    onBlur={(e) => setProjectFieldFormatted("district", e.target.value)}
-                    placeholder={
-                      locationLoading ? "İlçeler yükleniyor..." : "İlçe yazınız"
-                    }
-                  />
-                )}
-              </label>
-
-              <label className="stock-form-field full">
-                <span>Mahalle / Köy / Mevki *</span>
-                {placeOptions.length > 0 ? (
-                  <select
-                    value={selectedPlace || projectForm.address}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setSelectedPlace(value);
-                      setProjectField("address", value);
-                    }}
-                  >
-                    <option value="">Mahalle / köy seçiniz</option>
-                    {projectForm.address && !placeOptions.some((place) => place.name === projectForm.address) && (
-                      <option value={projectForm.address}>{projectForm.address}</option>
-                    )}
-                    {placeOptions.map((place) => (
-                      <option key={place.id} value={place.name}>
-                        {place.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    value={projectForm.address}
-                    onChange={(e) => setProjectField("address", e.target.value)}
-                    onBlur={(e) => setProjectFieldFormatted("address", e.target.value)}
-                    placeholder={
-                      locationLoading
-                        ? "Mahalle / köy verisi yükleniyor..."
-                        : "Mahalle / köy / mevki yazınız"
-                    }
-                  />
-                )}
-              </label>
-                </div>
-              </section>
-
-              <section className="col-span-full rounded-[26px] border-2 border-[#F3A7A7] bg-[#FFF1F2] p-3 shadow-[0_14px_30px_rgba(225,29,72,0.08)]">
-                <div className="mb-3 rounded-[16px] bg-[#E11D48] px-3 py-2 text-center text-[11px] font-black uppercase tracking-[0.12em] text-white">
-                  Harita ve Konum Doğrulama
-                </div>
-              <div className="stock-form-field full">
-                <GoogleGeoPicker
-                  city={projectForm.city}
-                  district={projectForm.district}
-                  address={projectForm.address}
-                  latitude={Number((projectForm as any).latitude || 0) || null}
-                  longitude={Number((projectForm as any).longitude || 0) || null}
-                  mapAddress={String((projectForm as any).mapAddress || "")}
-                  placeId={String((projectForm as any).placeId || "")}
-                  onOpenChange={setGeoPickerOpen}
-                  onChange={(location) => {
-                    const nextAddress = String((location as any).address || "").trim();
-
-                    if (nextAddress) {
-                      setSelectedPlace(nextAddress);
-                    }
-
-                    setProjectForm((current) => ({
-                      ...(current as any),
-                      city: String((location as any).city || current.city || "").trim(),
-                      district: String((location as any).district || current.district || "").trim(),
-                      address: nextAddress || current.address || location.mapAddress,
-                      latitude: location.latitude,
-                      longitude: location.longitude,
-                      mapAddress: location.mapAddress,
-                      placeId: location.placeId || "",
-                    }));
-                  }}
-                />
-              </div>
-              </section>
-            </div>
-          </div>
-
-          <div className="stock-form-block rounded-[30px] border-2 border-[#D7E1EF] bg-[#F8FAFC] p-3 shadow-[0_22px_54px_rgba(15,23,42,0.14)]">
-            <div className="stock-form-grid">
               <section className="col-span-full rounded-[26px] border-2 border-[#B8AEF4] bg-[#F4F1FF] p-3 shadow-[0_14px_30px_rgba(109,40,217,0.08)]">
                 <div className="mb-3 rounded-[16px] bg-[#6D28D9] px-3 py-2 text-center text-[11px] font-black uppercase tracking-[0.12em] text-white">
-                  Portföy Temel Bilgileri
+                  1. Portföy Tipi ve Temel Kart Bilgileri
                 </div>
                 <div className="grid gap-3">
               <label className="stock-form-field">
@@ -2180,6 +2023,34 @@ export default function StokCreateModal({
                 </>
               )}
 
+              {showAvailableCreditAmountField && (
+                <label className="stock-form-field full">
+                  <span>
+                    {getFieldLabel(
+                      "availableCreditAmount",
+                      unitForm.type,
+                      isRequiredField("availableCreditAmount"),
+                    )} ({getCurrencySymbol(selectedCurrency)})
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={availableCreditAmountDisplay}
+                    onChange={(e) =>
+                      setUnitField(
+                        "availableCreditAmount",
+                        parseFormattedNumber(e.target.value),
+                      )
+                    }
+                    placeholder="Örn: 7.500.000"
+                  />
+                  <p className="mt-2 text-xs font-bold leading-5 text-[#64748B]">
+                    Banka ekspertizi ve kredi değerlendirmesine göre kullanılabilecek
+                    tahmini üst tutarı girin. Satış fiyatını aşamaz.
+                  </p>
+                </label>
+              )}
+
               {showDescriptionField && (
                 <label className="stock-form-field full">
                   <span>{getFieldLabel("description", unitForm.type, isRequiredField("description"))}</span>
@@ -2196,11 +2067,277 @@ export default function StokCreateModal({
               )}
                 </div>
               </section>
+
+              <section className="col-span-full rounded-[26px] border-2 border-[#93C5FD] bg-[#EFF6FF] p-3 shadow-[0_14px_30px_rgba(37,99,235,0.08)]">
+                <div className="mb-3 rounded-[16px] bg-[#2563EB] px-3 py-2 text-center text-[11px] font-black uppercase tracking-[0.12em] text-white">
+                  İletişim İzinleri
+                </div>
+
+                <p className="mb-3 text-center text-xs font-bold leading-5 text-[#475569]">
+                  Kullanıcılar yalnızca izin verdiğiniz kanallardan ve yazdığınız numaralardan size ulaşabilir.
+                </p>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-[20px] border-2 border-[#BFDBFE] bg-white p-3">
+                    <label className="flex min-h-11 cursor-pointer items-center gap-3">
+                      <input
+                        type="checkbox"
+                        checked={allowPhoneCall}
+                        onChange={(event) =>
+                          setUnitForm((current) => ({
+                            ...current,
+                            allowPhoneCall: event.target.checked,
+                          }))
+                        }
+                        className="h-5 w-5 rounded border-[#93C5FD] accent-[#2563EB]"
+                      />
+                      <span className="text-sm font-black text-[#1F2937]">
+                        Telefonla aranabilirim
+                      </span>
+                    </label>
+
+                    <label className="stock-form-field full mt-2">
+                      <span>Aranmasını İstediğiniz Numara</span>
+                      <input
+                        type="tel"
+                        inputMode="tel"
+                        value={contactPhone}
+                        disabled={!allowPhoneCall}
+                        onChange={(event) => setUnitField("contactPhone", event.target.value)}
+                        placeholder="Örn: 0 532 000 00 00"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="rounded-[20px] border-2 border-[#BBF7D0] bg-white p-3">
+                    <label className="flex min-h-11 cursor-pointer items-center gap-3">
+                      <input
+                        type="checkbox"
+                        checked={allowWhatsapp}
+                        onChange={(event) =>
+                          setUnitForm((current) => ({
+                            ...current,
+                            allowWhatsapp: event.target.checked,
+                          }))
+                        }
+                        className="h-5 w-5 rounded border-[#86EFAC] accent-[#16A34A]"
+                      />
+                      <span className="text-sm font-black text-[#1F2937]">
+                        WhatsApp’tan yazılabilir
+                      </span>
+                    </label>
+
+                    <label className="stock-form-field full mt-2">
+                      <span>WhatsApp Numaranız</span>
+                      <input
+                        type="tel"
+                        inputMode="tel"
+                        value={whatsappPhone}
+                        disabled={!allowWhatsapp}
+                        onChange={(event) => setUnitField("whatsappPhone", event.target.value)}
+                        placeholder="Örn: 0 542 000 00 00"
+                      />
+                    </label>
+                  </div>
+                </div>
+              </section>
             </div>
           </div>
 
 
-          <div className="stock-form-block rounded-[30px] border-[3px] border-[#8B5CF6] bg-[#F5F3FF] p-3 shadow-[0_22px_54px_rgba(109,40,217,0.14)] ring-4 ring-[#DDD6FE]/70">
+          <div className="stock-form-grid">
+            <PremiumCardEntrySection
+              unitForm={unitForm}
+              projectForm={projectForm}
+              setUnitForm={setUnitForm}
+            />
+          </div>
+
+<div className="stock-form-block rounded-[30px] border-2 border-[#D7E1EF] bg-[#F8FAFC] p-3 shadow-[0_22px_54px_rgba(15,23,42,0.14)]">
+            <div className="stock-form-grid">
+              <section className="col-span-full rounded-[26px] border-2 border-[#F2C66D] bg-[#FFF7E6] p-3 shadow-[0_14px_30px_rgba(180,83,9,0.08)]">
+                <div className="mb-3 rounded-[16px] bg-[#F59E0B] px-3 py-2 text-center text-[11px] font-black uppercase tracking-[0.12em] text-white">
+                  Proje Bilgileri
+                </div>
+                <div className="grid gap-3">
+              {projects.length > 0 && (
+                <label className="stock-form-field full">
+                  <span>Mevcut Projeye Ekle</span>
+                  <select
+                    value={selectedProjectId}
+                    onChange={(e) => setSelectedProjectId(e.target.value)}
+                  >
+                    <option value="">Yeni Proje Oluştur</option>
+                    {projects.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.city})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              {!selectedProjectId && (
+                <label className="stock-form-field full">
+                  <span>Proje Adı *</span>
+                  <input
+                    value={projectForm.name}
+                    onChange={(e) => setProjectField("name", e.target.value)}
+                    onBlur={(e) => setProjectFieldFormatted("name", e.target.value)}
+                  />
+                </label>
+              )}
+                </div>
+              </section>
+
+              <section className="col-span-full rounded-[26px] border-2 border-[#8CC8F6] bg-[#EDF8FF] p-3 shadow-[0_14px_30px_rgba(2,132,199,0.08)]">
+                <div className="mb-3 rounded-[16px] bg-[#0284C7] px-3 py-2 text-center text-[11px] font-black uppercase tracking-[0.12em] text-white">
+                  Adres Bilgileri
+                </div>
+                <div className="grid gap-3">
+              <label className="stock-form-field">
+                <span>Şehir *</span>
+                <select
+                  value={projectForm.city}
+                  onChange={(e) => {
+                    const nextCity = e.target.value;
+                    setProjectForm((current) => ({
+                      ...current,
+                      city: nextCity,
+                      district: "",
+                      address: "",
+                    }));
+                    setSelectedPlace("");
+                  }}
+                >
+                  <option value="">Şehir seçiniz</option>
+                  {provinceOptions.map((city) => (
+                    <option key={city.id} value={city.name}>
+                      {city.name}
+                    </option>
+                  ))}
+                </select>
+                {locationLoading && (
+                  <p className="mt-2 text-center text-xs font-bold text-[#64748B]">
+                    Konum verisi yükleniyor...
+                  </p>
+                )}
+              </label>
+
+              <label className="stock-form-field">
+                <span>İlçe *</span>
+                {districtOptions.length > 0 ? (
+                  <select
+                    value={projectForm.district}
+                    onChange={(e) => {
+                      setProjectField("district", e.target.value);
+                      setProjectField("address", "");
+                      setSelectedPlace("");
+                    }}
+                  >
+                    <option value="">İlçe seçiniz</option>
+                    {projectForm.district &&
+                      !districtOptions.some(
+                        (district) => district.name === projectForm.district,
+                      ) && (
+                        <option value={projectForm.district}>
+                          {projectForm.district}
+                        </option>
+                      )}
+                    {districtOptions.map((district) => (
+                      <option key={district.id} value={district.name}>
+                        {district.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    value={projectForm.district}
+                    onChange={(e) => setProjectField("district", e.target.value)}
+                    onBlur={(e) => setProjectFieldFormatted("district", e.target.value)}
+                    placeholder={
+                      locationLoading ? "İlçeler yükleniyor..." : "İlçe yazınız"
+                    }
+                  />
+                )}
+              </label>
+
+              <label className="stock-form-field full">
+                <span>Mahalle / Köy / Mevki *</span>
+                {placeOptions.length > 0 ? (
+                  <select
+                    value={selectedPlace || projectForm.address}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setSelectedPlace(value);
+                      setProjectField("address", value);
+                    }}
+                  >
+                    <option value="">Mahalle / köy seçiniz</option>
+                    {projectForm.address && !placeOptions.some((place) => place.name === projectForm.address) && (
+                      <option value={projectForm.address}>{projectForm.address}</option>
+                    )}
+                    {placeOptions.map((place) => (
+                      <option key={place.id} value={place.name}>
+                        {place.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    value={projectForm.address}
+                    onChange={(e) => setProjectField("address", e.target.value)}
+                    onBlur={(e) => setProjectFieldFormatted("address", e.target.value)}
+                    placeholder={
+                      locationLoading
+                        ? "Mahalle / köy verisi yükleniyor..."
+                        : "Mahalle / köy / mevki yazınız"
+                    }
+                  />
+                )}
+              </label>
+                </div>
+              </section>
+
+              <section className="col-span-full rounded-[26px] border-2 border-[#F3A7A7] bg-[#FFF1F2] p-3 shadow-[0_14px_30px_rgba(225,29,72,0.08)]">
+                <div className="mb-3 rounded-[16px] bg-[#E11D48] px-3 py-2 text-center text-[11px] font-black uppercase tracking-[0.12em] text-white">
+                  Harita ve Konum Doğrulama
+                </div>
+              <div className="stock-form-field full">
+                <GoogleGeoPicker
+                  city={projectForm.city}
+                  district={projectForm.district}
+                  address={projectForm.address}
+                  latitude={Number((projectForm as any).latitude || 0) || null}
+                  longitude={Number((projectForm as any).longitude || 0) || null}
+                  mapAddress={String((projectForm as any).mapAddress || "")}
+                  placeId={String((projectForm as any).placeId || "")}
+                  onOpenChange={setGeoPickerOpen}
+                  onChange={(location) => {
+                    const nextAddress = String((location as any).address || "").trim();
+
+                    if (nextAddress) {
+                      setSelectedPlace(nextAddress);
+                    }
+
+                    setProjectForm((current) => ({
+                      ...(current as any),
+                      city: String((location as any).city || current.city || "").trim(),
+                      district: String((location as any).district || current.district || "").trim(),
+                      address: nextAddress || current.address || location.mapAddress,
+                      latitude: location.latitude,
+                      longitude: location.longitude,
+                      mapAddress: location.mapAddress,
+                      placeId: location.placeId || "",
+                    }));
+                  }}
+                />
+              </div>
+              </section>
+            </div>
+          </div>
+
+                    <div className="stock-form-block rounded-[30px] border-[3px] border-[#8B5CF6] bg-[#F5F3FF] p-3 shadow-[0_22px_54px_rgba(109,40,217,0.14)] ring-4 ring-[#DDD6FE]/70">
             <div className="mb-3 rounded-[16px] bg-[#7C3AED] px-3 py-2 text-center text-[11px] font-black uppercase tracking-[0.12em] text-white shadow-[0_10px_24px_rgba(124,58,237,0.24)]">
               Ek Özellikler
             </div>

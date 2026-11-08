@@ -98,6 +98,7 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    if (typeof window !== "undefined" && error?.response?.data?.code === "OFFICE_MEMBERSHIP_REQUIRED" && window.location.pathname !== "/ofisim") window.location.assign("/ofisim");
     const friendlyMessage = getFriendlyErrorMessage(error);
 
     if (error?.response) {

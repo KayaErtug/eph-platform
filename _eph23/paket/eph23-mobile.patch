@@ -1,0 +1,13 @@
+--- a/src/app/project-sales/[id]/launch.tsx
++++ b/src/app/project-sales/[id]/launch.tsx
+@@ -163,7 +163,9 @@
+       setBusy('presentation');
+ 
+       const result = await api.post<any>(
+-        `/project-sales/projects/${id}/launch/presentation-link`
++        `/project-sales/projects/${id}/launch/presentation-link`,
++        undefined,
++        { timeoutMs: 150000 }
+       );
+ 
+       const url = String(result?.url || '');

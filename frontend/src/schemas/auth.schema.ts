@@ -55,7 +55,11 @@ export const registerSchema = z.object({
 
   lastName: z.string().min(2, "Soyad en az 2 karakter olmalıdır"),
 
-  email: z.string().email("Geçerli bir e-posta adresi girin"),
+  email: z
+    .string()
+    .email("Geçerli bir e-posta adresi girin")
+    .optional()
+    .or(z.literal("")),
 
   phone: phoneSchema,
 
@@ -83,7 +87,9 @@ export const registerSchema = z.object({
 });
 
 export const loginSchema = z.object({
-  email: z.string().email("Geçerli bir e-posta adresi girin"),
+  phoneOrEmail: z
+    .string()
+    .min(3, "Lütfen telefon numarası veya e-posta giriniz"),
 
   password: z.string().min(6, "Şifre en az 6 karakter olmalıdır"),
 });

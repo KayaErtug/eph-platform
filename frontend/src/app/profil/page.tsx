@@ -861,7 +861,16 @@ export default function ProfilPage() {
             )}
           </section>
 
-          <section className="h-[46px] shrink-0 overflow-hidden rounded-[18px] bg-red-50/70 px-1.5">
+          <section className="grid h-[92px] shrink-0 grid-rows-2 overflow-hidden rounded-[18px] bg-red-50/70 px-1.5">
+            <MenuButton
+              icon={<X size={18} />}
+              title="Hesabımı Sil"
+              tone="danger"
+              onClick={() => {
+                router.push("/hesap-silme");
+              }}
+            />
+
             <MenuButton
               icon={<LogOut size={18} />}
               title="Çıkış Yap"

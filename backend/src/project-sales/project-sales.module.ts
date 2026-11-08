@@ -1,3 +1,5 @@
+import { ProjectMediaSingleController } from './project-media-single.controller';
+import { ProjectMediaSingleService } from './project-media-single.service';
 import { PoolAudienceModule } from '../pool-audience/pool-audience.module';
 import { Module } from '@nestjs/common';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -40,6 +42,7 @@ import { ProjectSalesService } from './project-sales.service';
   imports: [LinaModule, PoolAudienceModule, NotificationsModule],
   controllers: [
     ProjectSalesController,
+    ProjectMediaSingleController,
     ProjectSalesPresentationShareController,
     ProjectSalesPricingController,
     ProjectSalesCrmOpportunityController,
@@ -59,6 +62,7 @@ import { ProjectSalesService } from './project-sales.service';
     ProjectSalesLaunchService,
     ProjectSalesMediaSetupService,
     ProjectMediaZipService,
+    ProjectMediaSingleService,
     ProjectSalesDashboardService,
     ProjectSalesPricingService,
     ProjectSalesCrmOpportunityService,

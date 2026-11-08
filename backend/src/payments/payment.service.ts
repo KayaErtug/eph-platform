@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, Logger, NotFoundException, OnApplicationBootstrap, OnModuleDestroy, ServiceUnavailableException } from '@nestjs/common';
+import { loadOfficeSettings } from '../office/office-entitlement.service';
 import { AuditAction, PaymentAttemptStatus, PaymentOrderPurpose, PaymentOrderStatus, PaymentTransactionStatus, PaymentTransactionType, Prisma, UyelikPaketKodu } from '@prisma/client';
 import { isIP } from 'node:net';
 import { randomUUID } from 'node:crypto';
@@ -111,6 +112,22 @@ export class PaymentService implements OnApplicationBootstrap, OnModuleDestroy {
     });
   }
 
+  /** EPH-70B2: yeni ofis kataloğu (paketler + eklentiler + deneme + ücretsiz). Tümü DB ayarlarından; ayar bozuksa null (sessiz varsayılan yok). Web fiyatı burada gösterilir (mobil mağazadan okur). */
+  private async officeCatalog() {
+    try {
+      const { catalog, addon, trial, free } = await loadOfficeSettings(this.prisma);
+      const rows = [...catalog.values()];
+      return {
+        packages: rows.filter((p) => p.active && !['DENEME'].includes(p.code)).map((p) => ({ code: p.code, name: p.name, price: p.price, custom: p.custom, users: p.custom ? null : p.totalUsers, portfolio: p.custom ? null : p.portfolio,
+          monthlyPk: p.custom ? null : p.monthlyPk, crm: p.custom ? null : p.crm, kardesOfis: p.kardesOfis, ofisBoyDahil: p.ofisBoyDahil, ofisBoyEklenti: p.ofisBoyEklenti, storeSold: !p.custom && !['UCRETSIZ', 'DENEME'].includes(p.code) })),
+        addons: { ekKullanici: { monthlyPrice: addon.ekKullanici.aylikFiyat, perUserPortfolio: addon.ekKullanici.kisiBasiPortfoy, perUserPk: addon.ekKullanici.kisiBasiPk, minPackage: addon.ekKullanici.enAzPaket, tiers: addon.ekKullanici.kademeler },
+          ofisBoy: { monthlyPrice: addon.ofisBoy.aylikFiyat, seatsPerProduct: addon.ofisBoy.koltukPerUrun, allowedPackages: addon.ofisBoy.izinliPaketler } },
+        trial: { days: trial.gun, levelPackage: trial.seviyePaketi, pk: trial.pk, cardRequired: trial.kartIstenir, reminderDays: trial.hatirlatmaGunleri, kardesOfis: trial.kardesOfis, ofisBoy: trial.ofisBoy },
+        free,
+      };
+    } catch { return null; }
+  }
+
   async publicCatalog() {
     const [settings, packages, officePackages] = await Promise.all([
       this.settings(),
@@ -125,7 +142,9 @@ export class PaymentService implements OnApplicationBootstrap, OnModuleDestroy {
       }),
       this.membership.getOfficePackages(),
     ]);
+    const officeCatalog = await this.officeCatalog();
     return {
+      officeCatalog,
       paymentEnabled: settings.enabled,
       pkProducts: settings.pkProducts.filter((p) => p.active && p.code === 'PK_1000_STANDARD').map((p) => ({ name: p.name, credits: p.credits, price: p.amountMinor / 100 })),
       packages: packages.map((item) => {

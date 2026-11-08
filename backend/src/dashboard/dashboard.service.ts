@@ -7,9 +7,14 @@ export class DashboardService {
   constructor(private prisma: PrismaService) {}
 
   async getSummary(userId: string, userRole: Role) {
-    const ownCustomerWhere = { ownerId: userId };
-    const ownTaskWhere = { userId, status: 'BEKLIYOR' as const };
-    const ownActivityWhere = { userId };
+    const isSuper = userRole === Role.SUPER_ADMIN || (userRole as string) === 'SUPER_ADMIN';
+
+    const ownCustomerWhere = isSuper ? {} : { ownerId: userId };
+    const ownTaskWhere = isSuper ? { status: 'BEKLIYOR' as const } : { userId, status: 'BEKLIYOR' as const };
+    const ownActivityWhere = isSuper ? {} : { userId };
+    const ownUnitWhere = isSuper ? {} : { project: { ownerId: userId } };
+    const ownProjectWhere = isSuper ? {} : { ownerId: userId };
+    const ownVisitWhere = isSuper ? {} : { userId };
 
     const [
       totalUnits,
@@ -23,11 +28,7 @@ export class DashboardService {
       pendingTaskCount,
     ] = await Promise.all([
       this.prisma.unit.count({
-        where: {
-          project: {
-            ownerId: userId,
-          },
-        },
+        where: ownUnitWhere,
       }),
 
       this.prisma.customer.count({
@@ -35,19 +36,15 @@ export class DashboardService {
       }),
 
       this.prisma.userVisit.count({
-        where: { userId },
+        where: ownVisitWhere,
       }),
 
       this.prisma.project.count({
-        where: { ownerId: userId },
+        where: ownProjectWhere,
       }),
 
       this.prisma.unit.findMany({
-        where: {
-          project: {
-            ownerId: userId,
-          },
-        },
+        where: ownUnitWhere,
         orderBy: { createdAt: 'desc' },
         take: 4,
         include: {
@@ -100,7 +97,7 @@ export class DashboardService {
       securityScope: {
         userId,
         role: userRole,
-        mode: 'PRIVATE_USER_DASHBOARD',
+        mode: isSuper ? 'SUPER_ADMIN_PLATFORM_DASHBOARD' : 'PRIVATE_USER_DASHBOARD',
       },
     };
   }

@@ -1,0 +1,144 @@
+import { KontorService } from './kontor.service';
+import { consumeLots, lockWallet, planConsumption, planReconciliation, restoreLots, sortLotsForConsumption } from './wallet-lots';
+
+/* EPH-70B1 — cüzdan kilidi + lot tüketimi testleri.
+ * UYARI: Bellek içi model gerçek PostgreSQL kilidini (advisory + SELECT ... FOR UPDATE) çalıştırmaz; kilit, tx başına
+ * mutex ile MODELLENİR. Gerçek kilit davranışı DB'de doğrulanmalıdır (iki eşzamanlı oturumda iade+harcama). */
+
+const D = (iso: string) => new Date(iso);
+const NOW = D('2026-11-08T12:00:00Z');
+
+type Lot = { id: string; kullaniciId: string; lotTuru: string; ilkMiktar: number; kalanMiktar: number; sonKullanmaTarihi: Date | null; aktifMi: boolean; olusturulmaTarihi: Date };
+
+function makeDb(balance: number, lots: Lot[]) {
+  const state = { wallet: { id: 'w1', kullaniciId: 'u1', bakiye: balance, toplamHarcama: 0, aktifMi: true }, lots, movements: [] as any[] };
+  let tail: Promise<void> = Promise.resolve();
+  const matchLot = (l: Lot, w: any) =>
+    (!w.kullaniciId || l.kullaniciId === w.kullaniciId) && (!w.lotTuru || l.lotTuru === w.lotTuru) && (w.aktifMi === undefined || l.aktifMi === w.aktifMi) &&
+    (!w.kalanMiktar?.gt && w.kalanMiktar?.gt !== 0 ? true : l.kalanMiktar > w.kalanMiktar.gt) &&
+    (!w.sonKullanmaTarihi || (w.sonKullanmaTarihi.lte ? !!l.sonKullanmaTarihi && l.sonKullanmaTarihi <= w.sonKullanmaTarihi.lte : true)) &&
+    (!w.OR || w.OR.some((o: any) => (o.sonKullanmaTarihi === null ? l.sonKullanmaTarihi === null : !!l.sonKullanmaTarihi && l.sonKullanmaTarihi > o.sonKullanmaTarihi.gt)));
+  const make = () => {
+    let release: (() => void) | null = null;
+    const tx: any = {
+      // advisory kilit: ilk çağrıda mutex alınır, tx bitince bırakılır
+      $executeRaw: async () => { if (release) return 0; let rel!: () => void; const got = new Promise<void>((r) => (rel = r)); const prev = tail; tail = prev.then(() => got); await prev; release = rel; return 0; },
+      $queryRaw: async () => [{ id: 'w1' }],
+      kontorCuzdani: {
+        findUnique: async () => ({ ...state.wallet }),
+        update: async ({ data }: any) => { if (data.bakiye?.decrement) state.wallet.bakiye -= data.bakiye.decrement; if (data.bakiye?.increment) state.wallet.bakiye += data.bakiye.increment; return { ...state.wallet }; },
+      },
+      portfolioCreditLot: {
+        findMany: async ({ where, distinct }: any) => { const rows = state.lots.filter((l) => matchLot(l, where)); return distinct ? rows.map((r) => ({ kullaniciId: r.kullaniciId })).filter((r, i, a) => a.findIndex((x) => x.kullaniciId === r.kullaniciId) === i) : rows.map((r) => ({ ...r })); },
+        findUnique: async ({ where }: any) => ({ ...state.lots.find((l) => l.id === where.id)! }),
+        update: async ({ where, data }: any) => { const l = state.lots.find((x) => x.id === where.id)!; for (const [k, v] of Object.entries<any>(data)) { if (v?.decrement) l.kalanMiktar -= v.decrement; else if (v?.increment) l.kalanMiktar += v.increment; else (l as any)[k] = v; } return { ...l }; },
+      },
+      kontorHareketi: { create: async ({ data }: any) => { state.movements.push(data); return data; } },
+    };
+    return { tx, done: () => { release?.(); release = null; } };
+  };
+  const prisma: any = {
+    $transaction: async (fn: any) => { const { tx, done } = make(); try { return await fn(tx); } finally { done(); } },
+    portfolioCreditLot: { findMany: async (args: any) => make().tx.portfolioCreditLot.findMany(args) },
+  };
+  return { state, prisma };
+}
+
+const lot = (id: string, lotTuru: string, kalan: number, exp: string | null, created = '2026-10-01T00:00:00Z', ilk = kalan): Lot =>
+  ({ id, kullaniciId: 'u1', lotTuru, ilkMiktar: ilk, kalanMiktar: kalan, sonKullanmaTarihi: exp ? D(exp) : null, aktifMi: true, olusturulmaTarihi: D(created) });
+
+describe('lot tüketim sırası (K2)', () => {
+  const lots = [
+    lot('ek', 'SATIN_ALMA', 100, null),
+    lot('paket-geç', 'PAKET', 50, '2026-12-20T00:00:00Z'),
+    lot('devir', 'DEVIR', 20, null),
+    lot('paket-yakın', 'PAKET', 30, '2026-11-20T00:00:00Z'),
+  ];
+  it('önce süresi en yakın PAKET/DENEME, sonra süresiz, en son süresiz EK PK', () => {
+    expect(sortLotsForConsumption(lots).map((l) => l.id)).toEqual(['paket-yakın', 'paket-geç', 'devir', 'ek']);
+  });
+  it('düşüm sırayla yapılır; lot karşılığı olmayan kısım untracked döner', () => {
+    const plan = planConsumption(lots, 95);
+    expect(plan.steps.map((s) => [s.lot.id, s.take])).toEqual([['paket-yakın', 30], ['paket-geç', 50], ['devir', 15]]);
+    expect(planConsumption(lots, 500).untracked).toBe(500 - 200);
+  });
+  it('harcama lotları tüketir, EK PK en son azalır; süresi geçmiş lota dokunulmaz', async () => {
+    const db = makeDb(200, [...lots.map((l) => ({ ...l })), lot('eski', 'PAKET', 40, '2026-11-01T00:00:00Z')]);
+    await db.prisma.$transaction(async (tx: any) => { await lockWallet(tx, 'u1'); await consumeLots(tx, 'u1', 110, NOW); });
+    const k = Object.fromEntries(db.state.lots.map((l) => [l.id, l.kalanMiktar]));
+    expect(k).toMatchObject({ 'paket-yakın': 0, 'paket-geç': 0, devir: 0, ek: 90, eski: 40 });
+  });
+});
+
+describe('uzlaştırma planı (K2/madde 5)', () => {
+  it('Σ lot kalanı > bakiye ise fark tanımlı sırayla düşülür', () => {
+    const lots = [lot('ek', 'SATIN_ALMA', 100, null), lot('p', 'PAKET', 60, '2026-12-01T00:00:00Z')];
+    const plan = planReconciliation(lots, 130); // Σ=160, fark=30
+    expect(plan.steps.map((s) => [s.lot.id, s.take])).toEqual([['p', 30]]);
+    expect(planReconciliation(lots, 160).steps).toHaveLength(0);
+    expect(planReconciliation(lots, 500).steps).toHaveLength(0);
+  });
+});
+
+describe('iade (başarısız işlem) lotlara geri yazılır', () => {
+  it('ilkMiktar aşılmaz; tüketim sırasıyla', async () => {
+    const db = makeDb(10, [lot('p', 'PAKET', 5, '2026-12-01T00:00:00Z', undefined, 30), lot('ek', 'SATIN_ALMA', 0, null, undefined, 50)]);
+    await db.prisma.$transaction(async (tx: any) => { await lockWallet(tx, 'u1'); await restoreLots(tx, 'u1', 40, NOW); });
+    expect(db.state.lots.map((l) => l.kalanMiktar)).toEqual([30, 15]);
+  });
+});
+
+describe('eşzamanlı iade + harcama (K1) — MODEL', () => {
+  it('kilit altında seri çalışır: bakiye < 0 olmaz, Σ lot kalanı ≤ bakiye kalır (gerçek FOR UPDATE DB\'de doğrulanmalı)', async () => {
+    const db = makeDb(100, [lot('p', 'PAKET', 100, '2026-12-01T00:00:00Z')]);
+    const spend = (n: number) => db.prisma.$transaction(async (tx: any) => {
+      const w = await lockWallet(tx, 'u1');
+      if (!w || w.bakiye < n) return 'YETERSIZ';
+      await tx.kontorCuzdani.update({ data: { bakiye: { decrement: n } } });
+      await consumeLots(tx, 'u1', n, NOW);
+      return 'OK';
+    });
+    // mağaza iadesi: lotun KALANINI düşer (harcanmış kısım shortfall)
+    const revoke = () => db.prisma.$transaction(async (tx: any) => {
+      const w = await lockWallet(tx, 'u1');
+      const l = await tx.portfolioCreditLot.findUnique({ where: { id: 'p' } });
+      const dec = Math.max(0, Math.min(l.kalanMiktar, w.bakiye));
+      await tx.portfolioCreditLot.update({ where: { id: 'p' }, data: { kalanMiktar: 0, aktifMi: false } });
+      if (dec > 0) await tx.kontorCuzdani.update({ data: { bakiye: { decrement: dec } } });
+      return { dec, shortfall: l.ilkMiktar - dec };
+    });
+    const results = await Promise.all([spend(60), revoke(), spend(60)]);
+    expect(db.state.wallet.bakiye).toBeGreaterThanOrEqual(0);
+    const sum = db.state.lots.reduce((s, l) => s + l.kalanMiktar, 0);
+    expect(sum).toBeLessThanOrEqual(db.state.wallet.bakiye);
+    expect(results.filter((r) => r === 'OK').length + 1).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe('dönem sonu PAKET düşümü (K4)', () => {
+  const mk = () => makeDb(150, [
+    lot('bitmiş', 'PAKET', 40, '2026-11-01T00:00:00Z'),
+    lot('sürüyor', 'PAKET', 30, '2027-01-01T00:00:00Z'),
+    lot('ek', 'SATIN_ALMA', 80, null),
+  ]);
+  it('bitmiş PAKET kalanı cüzdandan düşülür; EK PK ve süren PAKET korunur', async () => {
+    const db = mk();
+    const svc = new KontorService(db.prisma, {} as any);
+    expect(await svc.expirePackageLots(NOW)).toEqual({ users: 1, deducted: 40 });
+    expect(db.state.wallet.bakiye).toBe(110);
+    expect(Object.fromEntries(db.state.lots.map((l) => [l.id, l.kalanMiktar]))).toEqual({ bitmiş: 0, sürüyor: 30, ek: 80 });
+    expect(db.state.movements[0]).toMatchObject({ hareketTuru: 'DUZELTME', miktar: 40, ilgiliKayitTuru: 'PAKET_LOT_DONEM_SONU' });
+  });
+  it('idempotent: ikinci çalıştırma bir şey düşmez', async () => {
+    const db = mk();
+    const svc = new KontorService(db.prisma, {} as any);
+    await svc.expirePackageLots(NOW);
+    expect(await svc.expirePackageLots(NOW)).toEqual({ users: 0, deducted: 0 });
+    expect(db.state.wallet.bakiye).toBe(110);
+  });
+  it('bakiye lot kalanından azsa bakiye sıfırın altına düşmez', async () => {
+    const db = makeDb(15, [lot('bitmiş', 'PAKET', 40, '2026-11-01T00:00:00Z')]);
+    await new KontorService(db.prisma, {} as any).expirePackageLots(NOW);
+    expect(db.state.wallet.bakiye).toBe(0);
+  });
+});
