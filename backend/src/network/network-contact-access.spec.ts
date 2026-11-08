@@ -24,7 +24,7 @@ describe('Talep Merkezi contact privacy and billing', () => {
       networkPost: { findFirst: jest.fn().mockImplementation(async () => post) },
       systemSetting: { findUnique: jest.fn().mockImplementation(async ({ where }) => ({ valueJson: where.key.startsWith('EPH_OFFICE_SPENDING_') ? { mode: 'ALLOCATED' } : 25 })) },
       office: { findFirst: jest.fn().mockResolvedValue(null), findUnique: jest.fn().mockResolvedValue({ id: 'office', isActive: true, ownerUserId: 'office-owner' }) },
-      kontorCuzdani: {
+      portfolioCreditLot: { findMany: async () => [], update: async () => ({}), create: async () => ({ id: 'lot' }) }, portfolioCreditLotTuketim: { create: async () => ({}), findMany: async () => [], update: async () => ({}) }, kontorCuzdani: {
         findUnique: jest.fn().mockImplementation(async () => ({ bakiye: balance, aktifMi: true })),
         update: jest.fn().mockImplementation(async ({ data }) => ({ bakiye: balance -= data.bakiye.decrement })),
         create: jest.fn(),

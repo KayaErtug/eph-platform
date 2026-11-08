@@ -1,3 +1,4 @@
+import { lockWallet } from '../kontor/wallet-lots';
 import {
   BadRequestException,
   ForbiddenException,
@@ -102,6 +103,26 @@ export class MembershipService {
       });
 
     if (!membership) {
+      const userOffice = await db.user.findUnique({
+        where: { id: userId },
+        select: {
+          officeId: true,
+          office: {
+            select: {
+              isActive: true,
+              ownerUserId: true,
+            },
+          },
+        },
+      });
+      if (
+        userOffice?.officeId &&
+        userOffice.office?.isActive &&
+        userOffice.office.ownerUserId &&
+        userOffice.office.ownerUserId !== userId
+      ) {
+        return this.findCurrentMembership(userOffice.office.ownerUserId, db);
+      }
       return null;
     }
 
@@ -314,6 +335,7 @@ export class MembershipService {
         portfolioCreditLotId =
           creditLot.id;
 
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`wallet:${userId}`}))`;
         await tx.kontorCuzdani.upsert({
           where: {
             kullaniciId: userId,
@@ -329,19 +351,8 @@ export class MembershipService {
           },
         });
 
-        await tx.$queryRaw`
-          SELECT "id"
-          FROM "KontorCuzdani"
-          WHERE "kullaniciId" = ${userId}
-          FOR UPDATE
-        `;
-
-        const wallet =
-          await tx.kontorCuzdani.findUnique({
-            where: {
-              kullaniciId: userId,
-            },
-          });
+        // EPH-70B1/K1: tek kilit sırası (advisory + FOR UPDATE)
+        const wallet = await lockWallet(tx, userId);
 
         if (!wallet) {
           throw new BadRequestException(
@@ -613,6 +624,15 @@ export class MembershipService {
         );
       }
 
+      // EPH-70B1F/D8 (§11/19): finans incelemesindeki veya hak verilmemiş işaretli sipariş settle edilemez;
+      // mağaza kanallarında tutarı 0 olan sipariş de hak vermez. (iyzico akışı etkilenmez: kanal/işaret yoksa geçer.)
+      {
+        const meta = jsonObject(order.metadata);
+        if (meta.requiresFinanceReview === true || meta.entitlementGranted === false || ((order.kanal === 'APPLE' || order.kanal === 'GOOGLE') && Number(order.tutar) <= 0)) {
+          throw new BadRequestException('Bu sipariş finans incelemesinde veya tutarı 0; hak tanımlanamaz.');
+        }
+      }
+
       const successfulTransaction =
         await tx.paymentTransaction.findFirst({
           where: {
@@ -657,9 +677,10 @@ export class MembershipService {
       ) {
         const amount = Number(order.pkMiktari);
         if (!Number.isSafeInteger(amount) || amount <= 0) throw new BadRequestException('Geçersiz PK miktarı.');
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`wallet:${order.kullaniciId}`}))`;
         await tx.kontorCuzdani.upsert({ where: { kullaniciId: order.kullaniciId }, update: {}, create: { kullaniciId: order.kullaniciId } });
-        await tx.$queryRaw`SELECT "id" FROM "KontorCuzdani" WHERE "kullaniciId" = ${order.kullaniciId} FOR UPDATE`;
-        const wallet = await tx.kontorCuzdani.findUniqueOrThrow({ where: { kullaniciId: order.kullaniciId } });
+        const wallet = await lockWallet(tx, order.kullaniciId);
+        if (!wallet) throw new BadRequestException('PK cüzdanı bulunamadı.');
         if (!wallet.aktifMi) throw new BadRequestException('PK cüzdanı kapalı; ödeme destek incelemesi gerektiriyor.');
         const updated = await tx.kontorCuzdani.update({ where: { id: wallet.id }, data: { bakiye: { increment: amount }, toplamYukleme: { increment: amount } } });
         const lot = await tx.portfolioCreditLot.create({ data: {
@@ -785,7 +806,9 @@ export class MembershipService {
 
       let creditLot = null;
 
-      if (packagePk > 0) {
+      // EPH-70B1/K4: süresi geçmiş üyelik işlemi hak/PK yüklemez (yalnız tarihsel kayıt).
+      const periodLive = !membership.bitisTarihi || membership.bitisTarihi.getTime() > Date.now();
+      if (packagePk > 0 && periodLive) {
         creditLot =
           await tx.portfolioCreditLot.create({
             data: {
@@ -809,6 +832,7 @@ export class MembershipService {
             },
           });
 
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`wallet:${order.kullaniciId}`}))`;
         await tx.kontorCuzdani.upsert({
           where: {
             kullaniciId: order.kullaniciId,
@@ -824,20 +848,7 @@ export class MembershipService {
           },
         });
 
-        await tx.$queryRaw`
-          SELECT "id"
-          FROM "KontorCuzdani"
-          WHERE "kullaniciId" = ${order.kullaniciId}
-          FOR UPDATE
-        `;
-
-        const wallet =
-          await tx.kontorCuzdani.findUnique({
-            where: {
-              kullaniciId:
-                order.kullaniciId,
-            },
-          });
+        const wallet = await lockWallet(tx, order.kullaniciId);
 
         if (!wallet) {
           throw new BadRequestException(

@@ -9,6 +9,7 @@ import {
   ServiceUnavailableException,
   UseGuards,
 } from "@nestjs/common";
+import { OfficeRealtorGuard } from './office-realtor.guard';
 import { OfficeService } from "./office.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 
@@ -22,14 +23,14 @@ export class OfficeController {
     return { ok: true, data: packages };
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, OfficeRealtorGuard)
   @Get("mine")
   async getMyOffices(@Req() req: any) {
     const userId = req.user?.id || req.user?.sub;
     return this.officeService.getMyOffices(userId, req.user?.role);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, OfficeRealtorGuard)
   @Post("trial/start")
   async startTrial(@Req() req: any, @Body("officeId") officeId: string) {
     const userId = req.user?.id || req.user?.sub;

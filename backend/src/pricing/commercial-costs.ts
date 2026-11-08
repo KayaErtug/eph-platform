@@ -9,6 +9,7 @@ export const COST_DEFAULTS = {
   COST_TALEP_YAYIN: 25,
   COST_TALEP_ACIL_EK: 10,
   COST_YETKI_MEKTUBU_ASIM: 5,
+  COST_SISTER_TALEP_ASIM: 10,
 } as const;
 
 export type CostKey = keyof typeof COST_DEFAULTS;
@@ -32,6 +33,7 @@ export const LIMIT_DEFAULTS = {
   LIMIT_ALICI_ADMIN_HEDIYE_ADET: 2,
   LIMIT_ALICI_ADMIN_HEDIYE_TOPLAM_PK: 1000,
   LIMIT_TAKIM_DANISMAN: 10,
+  LIMIT_OFFICE_SISTER_TALEP_QUOTA: 15,
 } as const;
 
 // Dizi değerli LIMIT_* ayarları ({ value: number[] }); tek sayı olmadıkları için LIMIT_DEFAULTS'a girmez.
@@ -48,6 +50,7 @@ export const LIMIT_DESCRIPTIONS: Record<string, string> = {
   LIMIT_ALICI_ADMIN_HEDIYE_ADET: 'Bir kullanıcının ADMIN hesaplarından alabileceği en fazla hediye PK işlemi sayısı.',
   LIMIT_ALICI_ADMIN_HEDIYE_TOPLAM_PK: 'Bir kullanıcının ADMIN hesaplarından alabileceği toplam hediye PK.',
   LIMIT_TAKIM_DANISMAN: 'Bir takımdaki en fazla aktif danışman sayısı.',
+  LIMIT_OFFICE_SISTER_TALEP_QUOTA: 'Kardeş ofisler ağı için aylık ücretsiz talep yayınlama kotası (varsayılan 15).',
   LIMIT_PK_DUSUK_UYARI: 'PK bakiyesi bu eşiğin altına düştüğünde bildirim gönderilir. Değer veritabanından yönetilir.',
 };
 

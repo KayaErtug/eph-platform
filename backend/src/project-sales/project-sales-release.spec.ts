@@ -131,7 +131,7 @@ describe('Project release access', () => {
   });
 
   it('rejects a changed private-access tariff before charging', async () => {
-    const tx = { $executeRaw: jest.fn(), $queryRaw: jest.fn(), user: { findUnique: jest.fn().mockResolvedValue({ id: 'viewer', role: Role.MUTEAHHIT }) }, office: { findFirst: jest.fn().mockResolvedValue(null) }, systemSetting: { findUnique: jest.fn().mockResolvedValue(null) }, kontorHareketi: { findFirst: jest.fn().mockResolvedValue(null) } };
+    const tx = { $executeRaw: jest.fn(), $queryRaw: jest.fn(), user: { findUnique: jest.fn().mockResolvedValue({ id: 'viewer', role: Role.MUTEAHHIT }) }, office: { findFirst: jest.fn().mockResolvedValue(null) }, systemSetting: { findUnique: jest.fn().mockResolvedValue(null) }, kontorHareketi: { findFirst: jest.fn().mockResolvedValue(null) }, kontorCuzdani: { findUnique: jest.fn().mockResolvedValue(null) }, portfolioCreditLot: { findMany: jest.fn().mockResolvedValue([]) } };
     const service: any = new UnitsService({ $transaction: jest.fn(fn => fn(tx)) } as any);
     service.getPoolUnitWithProjectOrFail = jest.fn().mockResolvedValue({ id: 'u', project: { ownerId: 'owner' } });
     service.poolAudienceService = { assertCanViewUnit: jest.fn() };

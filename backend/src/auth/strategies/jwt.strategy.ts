@@ -1,3 +1,4 @@
+import { isAccountDeleted } from '../account-deletion';
 import { officeMembershipEnforced } from '../../office/office-wallet.rules';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
@@ -29,7 +30,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       },
     });
 
-    if (!user || !user.isApproved || !user.isVerified) {
+    if (!user || !user.isApproved || !user.isVerified || await isAccountDeleted(this.prisma, user.id)) {
       throw new UnauthorizedException('Oturum artık geçerli değil.');
     }
 

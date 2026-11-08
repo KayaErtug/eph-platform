@@ -16,6 +16,8 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminService } from '../admin/admin.service';
 import { readLimit, readLimitList } from '../pricing/commercial-costs';
+import { Cron } from '@nestjs/schedule';
+import { consumeLots, expireDueLots, grantLot, LOT_RECONCILED_KEY, lockWallet, lotsReconciled, restoreLots } from './wallet-lots';
 
 type KontorKategoriKodu =
   | 'HAVUZ_MESAJ'
@@ -237,12 +239,7 @@ export class KontorService {
         }
       }
 
-      await tx.$executeRaw`
-        SELECT pg_advisory_xact_lock(
-          hashtext(${`wallet:${chargeUserId}`})
-        )
-      `;
-
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`wallet:${chargeUserId}`}))`;
       await tx.kontorCuzdani.upsert({
         where: { kullaniciId: chargeUserId },
         update: {},
@@ -256,16 +253,8 @@ export class KontorService {
         },
       });
 
-      await tx.$queryRaw`
-        SELECT "id"
-        FROM "KontorCuzdani"
-        WHERE "kullaniciId" = ${chargeUserId}
-        FOR UPDATE
-      `;
-
-      const wallet = await tx.kontorCuzdani.findUnique({
-        where: { kullaniciId: chargeUserId },
-      });
+      // EPH-70B1/K1: tek kilit sırası (advisory wallet + satır FOR UPDATE); bakiye kilitten SONRA okunur.
+      const wallet = await lockWallet(tx, chargeUserId);
 
       if (!wallet) {
         throw new BadRequestException(
@@ -292,7 +281,10 @@ export class KontorService {
           toplamHarcama: { increment: amount },
         },
       });
-
+      if (updatedWallet.bakiye < 0) {
+        throw new BadRequestException('Kontör bakiyesi sıfırın altına düşemez.');
+      }
+      // EPH-70B1/K2: lotlar tanımlı sırayla tüketilir (süresi yakın PAKET/DENEME → süresiz → EK PK en son).
       const movement = await tx.kontorHareketi.create({
         data: {
           kullaniciId: chargeUserId,
@@ -311,6 +303,8 @@ export class KontorService {
           olusturanId: actorId,
         },
       });
+      // EPH-70B1F/D1+D5: hareket oluştuktan sonra lot tüketimi + lot-bazlı tahsis kaydı (iade buradan geri alınır).
+      await consumeLots(tx, chargeUserId, amount, { hareketId: movement.id });
 
       return {
         spent: amount,
@@ -394,16 +388,8 @@ export class KontorService {
         );
       }
 
-      await tx.$executeRaw`
-        SELECT pg_advisory_xact_lock(
-          hashtext(${`wallet:${userId}`})
-        )
-      `;
-
-      const wallet =
-        await tx.kontorCuzdani.findUnique({
-          where: { kullaniciId: userId },
-        });
+      // EPH-70B1/K1: harcamayla AYNI kilit sırası; bakiye kilitten sonra okunur.
+      const wallet = await lockWallet(tx, userId);
 
       if (!wallet) {
         throw new BadRequestException(
@@ -411,8 +397,10 @@ export class KontorService {
         );
       }
 
-      const nextBalance =
-        wallet.bakiye + originalMovement.miktar;
+      // EPH-70B1F/D5: yalnız bu hareketin tahsis kayıtlarından geri al; geri yazılamayan pay (vadesi geçmiş/pasif lot) bakiyeye eklenmez.
+      const restore = await restoreLots(tx, userId, originalMovement.id, originalMovement.miktar);
+      const credit = restore.credit;
+      const nextBalance = wallet.bakiye + credit;
 
       const updatedWallet =
         await tx.kontorCuzdani.update({
@@ -421,7 +409,7 @@ export class KontorService {
           },
           data: {
             bakiye: {
-              increment: originalMovement.miktar,
+              increment: credit,
             },
             toplamHarcama: Math.max(
               0,
@@ -437,12 +425,12 @@ export class KontorService {
             kullaniciId: userId,
             hareketTuru: KontorHareketTuru.IADE,
             islemTuru: originalMovement.islemTuru,
-            miktar: originalMovement.miktar,
+            miktar: credit,
             oncekiBakiye: wallet.bakiye,
             sonrakiBakiye: nextBalance,
             aciklama:
-              this.cleanDescription(input.aciklama) ||
-              'Başarısız işlem için kontör iadesi.',
+              (this.cleanDescription(input.aciklama) ||
+              'Başarısız işlem için kontör iadesi.') + (restore.lost > 0 ? ` (${restore.lost} PK süresi dolmuş/kapanmış lota ait olduğu için geri yazılmadı.)` : ''),
             ilgiliKayitTuru: 'KONTOR_HARCAMA_IADE',
             ilgiliKayitId: originalMovementId,
             olusturanId: originalMovement.olusturanId || userId,
@@ -450,13 +438,55 @@ export class KontorService {
         });
 
       return {
-        refunded: originalMovement.miktar,
+        refunded: credit,
+        lostPk: restore.lost,
         remainingBalance: updatedWallet.bakiye,
         wallet: updatedWallet,
         movement: refundMovement,
         alreadyProcessed: false,
       };
     });
+  }
+
+  /**
+   * EPH-70B1/K4 (§11 madde 6): dönem sonunda PAKET lotunun kalanı cüzdandan düşülür. Günlük job; idempotent
+   * (düşülen lotun kalanı 0 + aktifMi=false olur, tekrar çalışınca bulunmaz). EK PK (SATIN_ALMA, süresiz) düşülmez.
+   */
+  @Cron('15 3 * * *')
+  async scheduledExpirePackageLots() {
+    try { await this.expirePackageLots(); } catch (error) { console.error('[KontorService] dönem sonu PAKET lot düşümü başarısız:', error); }
+  }
+
+  /**
+   * Bakım/telafi işi (asıl kapanış harcama/iade anında lockWallet içinde atomik yapılır). EPH-70B1F:
+   *  - D3: SystemSetting EPH70_LOT_UZLASTIRMA_TAMAM=true değilse HİÇBİR ŞEY yapmaz (no-op + log).
+   *  - D4: eski denemeler (karar 18b) düşülmez (expireDueLots içinde isLegacyTrialLot).
+   *  - D9: tüm vadesi gelmiş kullanıcılar sayfa sayfa (deterministik sıra, kullaniciId imleci) boşaltılır.
+   */
+  async expirePackageLots(now = new Date()) {
+    if (!(await lotsReconciled(this.prisma as unknown as Prisma.TransactionClient))) {
+      console.warn(`[KontorService] ${LOT_RECONCILED_KEY} true değil; dönem sonu düşümü çalıştırılmadı (no-op).`);
+      return { users: 0, deducted: 0, skipped: true as const };
+    }
+    let users = 0; let deducted = 0; let cursor: string | undefined;
+    const PAGE = 200;
+    for (let guard = 0; guard < 10000; guard++) {
+      const due = await this.prisma.portfolioCreditLot.findMany({
+        where: { lotTuru: 'PAKET', aktifMi: true, kalanMiktar: { gt: 0 }, sonKullanmaTarihi: { lte: now }, ...(cursor ? { kullaniciId: { gt: cursor } } : {}) },
+        select: { kullaniciId: true }, distinct: ['kullaniciId'], orderBy: { kullaniciId: 'asc' }, take: PAGE,
+      });
+      if (due.length === 0) break;
+      for (const { kullaniciId } of due) {
+        deducted += await this.prisma.$transaction(async (tx) => {
+          await lockWallet(tx, kullaniciId, { expire: false, now });
+          return expireDueLots(tx, kullaniciId, now);
+        });
+        users += 1;
+        cursor = kullaniciId;
+      }
+      if (due.length < PAGE) break;
+    }
+    return { users, deducted, skipped: false as const };
   }
 
   async getCuzdan(userId: string) {
@@ -1027,17 +1057,8 @@ export class KontorService {
         },
       });
 
-      await tx.$queryRaw`
-        SELECT "id"
-        FROM "KontorCuzdani"
-        WHERE "kullaniciId" = ${aliciId}
-        FOR UPDATE
-      `;
-
-      const cuzdan =
-        await tx.kontorCuzdani.findUnique({
-          where: { kullaniciId: aliciId },
-        });
+      // EPH-70B1F: ortak kilit sırası (wallet advisory + satır kilidi + atomik dönem sonu kapanışı)
+      const cuzdan = await lockWallet(tx, aliciId);
 
       if (!cuzdan) {
         throw new BadRequestException(
@@ -1076,6 +1097,9 @@ export class KontorService {
             aktifMi: true,
           },
         });
+
+      // EPH-70B1F/D6: hediye PK artık lotlanır (HEDIYE, süresiz) — iade/dönem sonu/uzlaştırma kaynak ayrımı yapabilsin.
+      await grantLot(tx, { userId: aliciId, lotTuru: 'HEDIYE', amount: miktar, kaynakKayitTuru: 'HEDIYE_KONTOR_DAGITIMI', kaynakKayitId: dagitim.id, dedupeKey: `gift:${dagitim.id}`, aciklama: 'Hediye PK' });
 
       await tx.kontorHareketi.create({
         data: {

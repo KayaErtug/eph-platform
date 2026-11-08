@@ -63,6 +63,9 @@ function getTitle(pathname: string) {
 }
 
 function shouldShowShell(pathname: string) {
+  if (["/mobil-uygulama", "/ucretlendirme", "/sifremi-unuttum"].includes(pathname)) return false;
+  if (pathname.startsWith("/verify-authority/")) return false;
+  if (pathname.startsWith("/proje-sunum/")) return false;
   if (pathname === "/") return false;
   if (pathname.startsWith("/giris")) return false;
   if (pathname.startsWith("/kayit")) return false;

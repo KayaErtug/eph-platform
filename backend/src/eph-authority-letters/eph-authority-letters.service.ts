@@ -1,4 +1,5 @@
 import { resolveOfficeWallet } from '../office/office-wallet.rules';
+import { consumeLots, lockWallet } from '../kontor/wallet-lots';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -885,13 +886,7 @@ export class EphAuthorityLettersService {
     ilgiliKayitId: string;
   }) {
     const chargeUserId = (await resolveOfficeWallet(input.tx, input.userId, {}, true)).chargeUserId;
-    await input.tx.$executeRaw`
-        SELECT pg_advisory_xact_lock(
-          hashtext(${`wallet:${chargeUserId}`})
-        )
-      `;
-
-    await input.tx.$queryRaw`SELECT "id" FROM "KontorCuzdani" WHERE "kullaniciId" = ${chargeUserId} FOR UPDATE`;
+    await lockWallet(input.tx, chargeUserId); // EPH-70B1F: ortak kilit sırası + atomik dönem sonu kapanışı
 
       let wallet = await input.tx.kontorCuzdani.findUnique({
       where: {
@@ -952,6 +947,7 @@ export class EphAuthorityLettersService {
         olusturanId: input.userId,
       },
     });
+    await consumeLots(input.tx, chargeUserId, input.amount, { hareketId: movement.id }); // EPH-70B1F/D1
 
     return {
       wallet: updatedWallet,

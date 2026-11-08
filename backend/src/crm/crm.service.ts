@@ -365,11 +365,28 @@ export class CrmService {
     );
   }
 
-  async getCustomers(userId: string, userRole: Role) {
+  async getCustomers(userId: string, userRole: Role, filters?: { officeId?: string; advisorId?: string }) {
+    const isSuper = userRole === Role.SUPER_ADMIN || (userRole as string) === 'SUPER_ADMIN';
     const customers = await this.prisma.customer.findMany({
-      where: this.getCustomerWhere(userId, userRole),
+      where: {
+        ...(isSuper
+          ? {
+              ...(filters?.advisorId ? { ownerId: filters.advisorId } : {}),
+              ...(filters?.officeId ? { owner: { officeId: filters.officeId } } : {}),
+            }
+          : this.getCustomerWhere(userId, userRole)),
+      },
       include: {
-        owner: { select: { firstName: true, lastName: true, role: true } },
+        owner: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+            officeId: true,
+            office: { select: { id: true, name: true, city: true, district: true } },
+          },
+        },
         activities: { orderBy: { createdAt: 'desc' }, take: 1 },
         tasks: { where: { status: TaskStatus.BEKLIYOR }, orderBy: { dueDate: 'asc' } },
         interests: { where: { isActive: true }, orderBy: [{ priority: 'desc' }, { updatedAt: 'desc' }] },
@@ -393,8 +410,9 @@ export class CrmService {
     // 1. Ofis kontrolü: Kullanıcı bir ofise bağlıysa (üye veya sahip), tüm danışmanların toplamını say
     const user = await client.user.findUnique({
       where: { id: userId },
-      select: { id: true, officeId: true },
+      select: { id: true, officeId: true, role: true },
     });
+    if (user?.role === 'SUPER_ADMIN') return;
 
     let officeId = user?.officeId;
     if (!officeId) {

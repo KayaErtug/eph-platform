@@ -203,7 +203,7 @@ export default function UyelikPage() {
                 </div>
 
                 <Link
-                  href="/messages"
+                  href="/ucretlendirme"
                   className="mt-3 flex min-h-[42px] items-center justify-center rounded-2xl bg-[#2563EB] px-3 text-center text-[12px] font-black text-white shadow-[0_12px_26px_rgba(37,99,235,0.20)]"
                 >
                   Paket Talebi Oluştur
@@ -291,7 +291,7 @@ export default function UyelikPage() {
               <WalletCards size={16} /> Kontör Cüzdanım
             </Link>
             <Link
-              href="/messages"
+              href="/ucretlendirme"
               className="flex min-h-[42px] items-center justify-center gap-2 rounded-2xl bg-[#2563EB] px-4 text-[12px] font-black text-white"
             >
               <MessageCircle size={16} /> Paket Talebi Oluştur

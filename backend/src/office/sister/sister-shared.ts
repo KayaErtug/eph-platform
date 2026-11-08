@@ -37,14 +37,14 @@ export async function resolveOfficeAccess(prisma: PrismaService, userId: string,
 
 export const sortedPair = (a: string, b: string): [string, string] => (a < b ? [a, b] : [b, a]);
 
-export async function allowedPackageCodes(prisma: PrismaService): Promise<string[]> {
+export async function allowedPackageCodes(prisma: Pick<PrismaService, 'systemSetting'>): Promise<string[]> {
   const row = await prisma.systemSetting.findUnique({ where: { key: SISTER_PACKAGES_KEY }, select: { valueJson: true } });
   const raw = row?.valueJson;
   return Array.isArray(raw) ? raw.filter((c): c is string => typeof c === 'string' && !!c.trim()).map(c => c.trim().toUpperCase()) : [];
 }
 
 // "Uygun" = aktif ofis + abonelik paketi izinli listede (süresi dolmamış). Her istekte hesaplanır, saklanmaz.
-export async function eligibilityMap(prisma: PrismaService, officeIds: string[]): Promise<Map<string, boolean>> {
+export async function eligibilityMap(prisma: Pick<PrismaService, 'systemSetting' | 'office'>, officeIds: string[]): Promise<Map<string, boolean>> {
   const ids = [...new Set(officeIds)];
   const result = new Map<string, boolean>(ids.map(id => [id, false]));
   if (!ids.length) return result;

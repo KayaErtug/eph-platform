@@ -71,7 +71,7 @@ export class AdminController {
   @Get("users")
   @RequirePermission("USER_VIEW")
   getUsers(
-    @Query("filter") filter?: "pending" | "approved" | "all",
+    @Query("filter") filter?: "pending" | "approved" | "all" | "deleted",
     @Req() request?: AdminRequest,
   ) {
     return this.adminService.getUsers(filter || "all", this.extractActor(request as AdminRequest));
@@ -83,6 +83,21 @@ export class AdminController {
     return this.adminService.getTrafficSummary(this.extractActor(request));
   }
 
+  @Get("live-activity")
+  getLiveActivity(@Req() request: AdminRequest) {
+    return this.adminService.getLiveActivity(this.extractActor(request));
+  }
+
+  @Patch("users/:id")
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+  updateUser(
+    @Param("id") id: string,
+    @Body() body: any,
+    @Req() request: AdminRequest,
+  ) {
+    return this.adminService.updateUser(id, body, this.extractActor(request));
+  }
+
   @Patch("users/:id/approve")
   @RequirePermission("USER_APPROVE")
   approveUser(@Param("id") id: string, @Req() request: AdminRequest) {
@@ -91,8 +106,8 @@ export class AdminController {
 
   @Delete("users/:id/reject")
   @RequirePermission("USER_DELETE")
-  rejectUser(@Param("id") id: string, @Req() request: AdminRequest) {
-    return this.adminService.rejectUser(id, this.extractActor(request));
+  rejectUser(@Param("id") id: string, @Req() request: AdminRequest, @Body() body?: { reason?: string }) {
+    return this.adminService.rejectUser(id, this.extractActor(request), body?.reason);
   }
 
   @Patch("users/:id/suspend")
@@ -130,6 +145,9 @@ export class AdminController {
       phone: string;
       password: string;
       role: Role | string;
+      city?: string;
+      district?: string;
+      officeId?: string | null;
     },
     @Req() request: AdminRequest,
   ) {

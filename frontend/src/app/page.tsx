@@ -1,7 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent } from "react";
 import Link from "next/link";
+import api from "@/lib/api";
+import { registerSchema } from "@/schemas/auth.schema";
+import { useAuthStore } from "@/store/auth.store";
 import {
   ArrowRight,
   ArrowUp,
@@ -241,36 +244,43 @@ function VerticalMarquee() {
 
 function Header() {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const token = useAuthStore((state) => state.token);
+  const hasHydrated = useAuthStore((state) => state.hasHydrated);
+  const signedIn = mounted && hasHydrated && Boolean(token);
+  const accountHref = signedIn ? "/ucretlendirme" : "/giris";
+  const accountLabel = signedIn ? "PK Satın Al" : "Giriş Yap";
+
+  useEffect(() => setMounted(true), []);
 
   return (
     <>
-      <header className="fixed left-0 right-0 top-0 z-50 border-b border-white/10 bg-[#071326]/76 backdrop-blur-2xl">
+      <header className="fixed left-0 right-0 top-0 z-50 border-b border-blue-200 bg-white/95 backdrop-blur-2xl">
         <div className="mx-auto flex h-[72px] max-w-[1380px] items-center justify-between px-4 sm:px-5 md:h-[76px] md:px-10">
           <Link href="/" className="flex min-w-0 items-center gap-2.5 sm:gap-3">
             <img src="/LOGO_EPH.png" alt="EPH" className="h-10 w-10 shrink-0 object-contain sm:h-11 sm:w-11" />
             <div className="min-w-0 leading-none">
-              <div className="text-[21px] font-black tracking-[0.17em] text-white sm:text-[25px] sm:tracking-[0.2em]">E.P.H.</div>
-              <div className="mt-1 hidden text-[11px] font-medium text-white/76 xs:block sm:block">Emlak Portföy Havuzu</div>
+              <div className="text-[21px] font-black tracking-[0.17em] text-blue-950 sm:text-[25px] sm:tracking-[0.2em]">E.P.H.</div>
+              <div className="mt-1 hidden text-[11px] font-medium text-slate-600 xs:block sm:block">Emlak Portföy Havuzu</div>
             </div>
           </Link>
 
-          <nav className="hidden items-center gap-10 text-[13px] font-medium text-white/78 lg:flex">
-            <a href="#ozellikler" className="transition hover:text-white">Özellikler</a>
-            <a href="#fiyatlandirma" className="transition hover:text-white">Fiyatlandırma</a>
-            <a href="#blog" className="transition hover:text-white">Blog</a>
-            <a href="#iletisim" className="transition hover:text-white">İletişim</a>
+          <nav className="hidden items-center gap-6 text-[17px] font-medium text-slate-600 xl:flex">
+            <a href="#ozellikler" className="inline-flex min-h-11 items-center transition hover:text-blue-700">Özellikler</a>
+            <a href="#fiyatlandirma" className="inline-flex min-h-11 items-center transition hover:text-blue-700">Fiyatlandırma</a>
+            <a href="#blog" className="inline-flex min-h-11 items-center transition hover:text-blue-700">Blog</a>
+            <a href="#iletisim" className="inline-flex min-h-11 items-center transition hover:text-blue-700">İletişim</a>
           </nav>
 
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-            <Link href="/kayit" className="shine-button relative inline-flex h-10 items-center justify-center gap-2 overflow-hidden rounded-[10px] border border-blue-300/35 bg-[#2563EB] px-3.5 text-[12px] font-semibold text-white shadow-[0_12px_34px_rgba(37,99,235,.30)] transition hover:-translate-y-0.5 hover:bg-[#1D4ED8] sm:h-11 sm:px-5 sm:text-[13px]">
-              Başvur
-              <ArrowRight size={15} />
+            <Link href="/mobil-uygulama" className="hidden h-11 items-center justify-center rounded-[10px] border border-blue-300/35 bg-[#2563EB] px-4 text-[17px] font-semibold text-white transition hover:bg-[#1D4ED8] md:inline-flex">
+              Uygulamayı İndir
             </Link>
-            <Link href="/giris" className="hidden h-10 items-center justify-center gap-2 rounded-[10px] border border-white/12 bg-white/[0.05] px-3.5 text-[12px] font-semibold text-white/84 transition hover:-translate-y-0.5 hover:border-white/24 hover:bg-white/[0.09] md:inline-flex md:h-11 md:px-5 md:text-[13px]">
+            <Link href={accountHref} className="hidden h-11 items-center justify-center gap-2 rounded-[10px] border border-blue-300 px-4 text-[17px] font-semibold text-blue-900 transition hover:bg-blue-50 md:inline-flex">
               <LogIn size={15} />
-              Giriş
+              {accountLabel}
             </Link>
-            <button type="button" onClick={() => setOpen(true)} className="flex h-10 w-10 items-center justify-center rounded-[10px] border border-white/10 text-white/82 transition hover:bg-white/8 sm:h-11 sm:w-11" aria-label="Menü">
+            <button type="button" onClick={() => setOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-[10px] border border-blue-200 text-blue-900 transition hover:bg-blue-50" aria-label="Menü" aria-expanded={open} aria-controls="landing-menu">
               <Menu size={23} strokeWidth={1.7} />
             </button>
           </div>
@@ -278,17 +288,18 @@ function Header() {
       </header>
 
       <div className={`fixed inset-0 z-[80] bg-[#071326]/70 backdrop-blur-sm transition ${open ? "opacity-100" : "pointer-events-none opacity-0"}`} onClick={() => setOpen(false)} />
-      <aside className={`fixed right-4 top-4 z-[90] w-[calc(100%-32px)] max-w-[360px] rounded-[24px] border border-white/14 bg-[#10213B] p-5 shadow-[0_30px_100px_rgba(0,0,0,.45)] transition md:right-7 md:top-7 ${open ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-4 opacity-0"}`}>
-        <button type="button" onClick={() => setOpen(false)} className="ml-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/14 text-white" aria-label="Kapat">
+      <aside id="landing-menu" inert={!open} className={`fixed right-4 top-4 z-[90] w-[calc(100%-32px)] max-w-[360px] rounded-[24px] border border-blue-200 bg-white p-5 shadow-[0_30px_100px_rgba(0,0,0,.45)] transition md:right-7 md:top-7 ${open ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-4 opacity-0"}`}>
+        <button type="button" onClick={() => setOpen(false)} className="ml-auto flex h-11 w-11 items-center justify-center rounded-full border border-blue-200 text-blue-900" aria-label="Kapat">
           <X size={18} />
         </button>
-        <div className="mt-4 grid gap-3 text-[16px] font-semibold text-white">
-          <a onClick={() => setOpen(false)} href="#ozellikler">Özellikler</a>
-          <a onClick={() => setOpen(false)} href="#fiyatlandirma">Fiyatlandırma</a>
-          <a onClick={() => setOpen(false)} href="#blog">Blog</a>
-          <a onClick={() => setOpen(false)} href="#iletisim">İletişim</a>
-          <Link href="/kayit" className="mt-4 rounded-[12px] bg-[#2563EB] px-4 py-3 text-center">Ücretsiz Başvur</Link>
-          <Link href="/giris" className="rounded-[12px] border border-white/16 px-4 py-3 text-center text-white/82">Giriş Yap</Link>
+        <div className="mt-4 grid gap-3 text-[17px] font-semibold text-blue-950">
+          <a onClick={() => setOpen(false)} href="#ozellikler" className="flex min-h-11 items-center">Özellikler</a>
+          <a onClick={() => setOpen(false)} href="#fiyatlandirma" className="flex min-h-11 items-center">Fiyatlandırma</a>
+          <a onClick={() => setOpen(false)} href="#blog" className="flex min-h-11 items-center">Blog</a>
+          <a onClick={() => setOpen(false)} href="#iletisim" className="flex min-h-11 items-center">İletişim</a>
+          <Link href="/kayit" className="mt-4 min-h-11 rounded-[12px] bg-[#2563EB] px-4 py-3 text-center text-white">Ücretsiz Başvur</Link>
+          <Link onClick={() => setOpen(false)} href="/mobil-uygulama" className="flex min-h-11 items-center justify-center rounded-[12px] bg-[#2563EB] px-4 py-3 text-center text-[17px] text-white">Uygulamayı İndir</Link>
+          <Link onClick={() => setOpen(false)} href={accountHref} className="flex min-h-11 items-center justify-center rounded-[12px] border border-blue-300 px-4 py-3 text-center text-[17px] text-blue-900">{accountLabel}</Link>
         </div>
       </aside>
     </>
@@ -690,6 +701,54 @@ function PaymentBand() {
 
 function HelpDrawer() {
   const [open, setOpen] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<"success" | "error" | null>(null);
+  const submitting = useRef(false);
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (submitting.current) return;
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const adSoyad = String(data.get("adSoyad") || "").trim();
+    const eposta = String(data.get("eposta") || "").trim();
+    const telefon = String(data.get("telefon") || "").replace(/\s/g, "");
+    const ofisDurumu = data.get("ofisDurumu") === "YOK" ? "YOK" : "VAR";
+    const website = String(data.get("website") || "");
+    const nextErrors: Record<string, string> = {};
+    if (!adSoyad) nextErrors.adSoyad = "Adınızı ve soyadınızı girin.";
+    if (!registerSchema.shape.email.safeParse(eposta).success) {
+      nextErrors.eposta = "Geçerli bir e-posta adresi girin.";
+    }
+    if (!/^5\d{9}$/.test(telefon)) {
+      nextErrors.telefon = "Telefon 10 haneli olmalı ve 5 ile başlamalıdır.";
+    }
+    setErrors(nextErrors);
+    setResult(null);
+    if (Object.keys(nextErrors).length) {
+      form.querySelector<HTMLInputElement>(`[name="${Object.keys(nextErrors)[0]}"]`)?.focus();
+      return;
+    }
+    submitting.current = true;
+    setSending(true);
+    try {
+      await api.post("/public/contact", { adSoyad, eposta, telefon, ofisDurumu, website }, { timeout: 15000 });
+      setResult("success");
+      form.reset();
+    } catch {
+      setResult("error");
+    } finally {
+      submitting.current = false;
+      setSending(false);
+    }
+  };
+
+  const fields = [
+    { name: "adSoyad", label: "Ad Soyad", type: "text", autoComplete: "name" },
+    { name: "eposta", label: "E-posta adresiniz", type: "email", autoComplete: "email" },
+    { name: "telefon", label: "Telefon (5XX XXX XX XX)", type: "tel", autoComplete: "tel-national" },
+  ];
 
   useEffect(() => {
     const timer = window.setTimeout(() => setOpen(true), 30000);
@@ -707,35 +766,52 @@ function HelpDrawer() {
 
       <div className={`fixed inset-0 z-[85] bg-[#061225]/62 backdrop-blur-sm transition ${open ? "opacity-100" : "pointer-events-none opacity-0"}`} onClick={() => setOpen(false)} />
 
-      <aside className={`fixed bottom-0 right-0 z-[90] w-full max-w-[390px] rounded-t-[24px] border border-white/14 bg-[#10213B] p-5 shadow-[0_30px_100px_rgba(0,0,0,.48)] transition md:bottom-6 md:right-6 md:rounded-[24px] ${open ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-8 opacity-0"}`}>
-        <button type="button" onClick={() => setOpen(false)} className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full border border-white/14 text-white/78" aria-label="Kapat">
+      <aside inert={!open} aria-labelledby="contact-title" className={`fixed bottom-0 right-0 z-[90] max-h-[90dvh] w-full max-w-[390px] overflow-y-auto rounded-t-[24px] border border-blue-200 bg-white p-5 text-slate-900 shadow-[0_30px_100px_rgba(0,0,0,.25)] transition md:bottom-6 md:right-6 md:rounded-[24px] ${open ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-8 opacity-0"}`}>
+        <button type="button" onClick={() => setOpen(false)} className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full border border-blue-200 text-blue-900" aria-label="Kapat">
           <X size={17} />
         </button>
 
         <div className="pr-10">
-          <div className="text-[20px] font-semibold text-white">Size nasıl yardımcı olabiliriz?</div>
-          <p className="mt-2 text-[13px] leading-6 text-white/62">Formu doldurun, EPH ekibi kısa süre içinde sizinle iletişime geçsin.</p>
+          <h2 id="contact-title" className="text-center text-[20px] font-semibold text-blue-950">Size nasıl yardımcı olabiliriz?</h2>
+          <p className="mt-2 text-[13px] leading-6 text-slate-600">Formu doldurun, EPH ekibi kısa süre içinde sizinle iletişime geçsin.</p>
         </div>
 
-        <div className="mt-5 grid gap-3">
-          <input className="h-11 rounded-[10px] border border-white/12 bg-white/[0.06] px-4 text-[13px] text-white outline-none placeholder:text-white/38 focus:border-[#60A5FA]" placeholder="Ad Soyad" />
-          <input className="h-11 rounded-[10px] border border-white/12 bg-white/[0.06] px-4 text-[13px] text-white outline-none placeholder:text-white/38 focus:border-[#60A5FA]" placeholder="Telefon" />
-          <input className="h-11 rounded-[10px] border border-white/12 bg-white/[0.06] px-4 text-[13px] text-white outline-none placeholder:text-white/38 focus:border-[#60A5FA]" placeholder="E-posta" />
-
-          <div className="grid grid-cols-2 gap-3">
-            <label className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-[10px] border border-white/12 text-[12px] text-white/72">
-              <input type="radio" name="office" defaultChecked /> Ofisim Var
-            </label>
-            <label className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-[10px] border border-white/12 text-[12px] text-white/72">
-              <input type="radio" name="office" /> Yok
-            </label>
+        <form onSubmit={handleSubmit} noValidate aria-busy={sending} className="mt-5 grid gap-3">
+          {fields.map((field) => (
+            <div key={field.name}>
+              <label htmlFor={`contact-${field.name}`} className="sr-only">{field.label}</label>
+              <input
+                id={`contact-${field.name}`} name={field.name} type={field.type}
+                autoComplete={field.autoComplete} placeholder={field.label} required
+                disabled={sending} aria-invalid={Boolean(errors[field.name])}
+                aria-describedby={errors[field.name] ? `contact-${field.name}-error` : undefined}
+                className="h-11 w-full min-w-0 rounded-[10px] border border-blue-200 bg-slate-50 px-4 text-[17px] text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
+              />
+              {errors[field.name] && <p id={`contact-${field.name}-error`} className="mt-1 text-sm text-red-700">{errors[field.name]}</p>}
+            </div>
+          ))}
+          <div hidden aria-hidden="true">
+            <label htmlFor="contact-website">Web siteniz</label>
+            <input id="contact-website" name="website" type="text" placeholder="Web siteniz" defaultValue="" tabIndex={-1} autoComplete="off" />
           </div>
+          <fieldset disabled={sending} className="grid grid-cols-2 gap-3">
+            <legend className="sr-only">Ofis durumu</legend>
+            <label className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-[10px] border border-blue-200 text-[17px] text-blue-950">
+              <input type="radio" name="ofisDurumu" value="VAR" defaultChecked /> Ofisim Var
+            </label>
+            <label className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-[10px] border border-blue-200 text-[17px] text-blue-950">
+              <input type="radio" name="ofisDurumu" value="YOK" /> Yok
+            </label>
+          </fieldset>
 
-          <button type="button" className="h-11 rounded-[10px] bg-[#2563EB] text-[13px] font-semibold text-white">Gönder</button>
-          <a href={whatsappUrl} target="_blank" rel="noreferrer" className="flex h-11 items-center justify-center gap-2 rounded-[10px] border border-white/12 text-[13px] font-medium text-white/76">
+          <button type="submit" disabled={sending} className="min-h-11 rounded-[10px] bg-[#2563EB] px-4 text-[17px] font-semibold text-white disabled:cursor-wait disabled:opacity-60">{sending ? "Gönderiliyor…" : "Gönder"}</button>
+          <p role="status" aria-live="polite" className={`text-sm ${result === "error" ? "text-red-700" : "text-blue-900"}`}>
+            {result === "success" ? "Mesajınız alındı. EPH ekibi kısa süre içinde sizinle iletişime geçecek." : result === "error" ? "Şu an gönderilemedi, lütfen telefonla ulaşın." : ""}
+          </p>
+          <a href={whatsappUrl} target="_blank" rel="noreferrer" className="flex min-h-11 items-center justify-center gap-2 rounded-[10px] border border-blue-200 text-[17px] font-medium text-blue-900">
             <Phone size={16} /> {whatsappNumber}
           </a>
-        </div>
+        </form>
       </aside>
     </>
   );

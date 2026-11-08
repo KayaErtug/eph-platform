@@ -1,4 +1,5 @@
 import { resolveOfficeWallet } from '../office/office-wallet.rules';
+import { consumeLots, lockWallet } from '../kontor/wallet-lots';
 import { consumeMembershipQuota } from '../membership/membership-quota.rules';
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { KontorHareketTuru, KontorIslemTuru, PoolAudienceMode, PortfolioApprovalStatus, Prisma, Role } from '@prisma/client';
@@ -110,7 +111,7 @@ export class PoolPublicationService {
       const alreadyPublished = current.isPoolVisible && current.approvalStatus === PortfolioApprovalStatus.HAVUZDA;
       if (!alreadyPublished && modern && input.expectedCostPk !== publicationCostPk) throw new BadRequestException('Güncel Havuz yayın ücretini kontrol edip tekrar onaylayın.');
       if (!alreadyPublished && audience?.groupIds.length) {
-        const groups = await tx.poolAudienceGroup.findMany({ where: { id: { in: audience.groupIds }, ownerId: current.project.ownerId }, select: { id: true } });
+        const groups = await tx.poolAudienceGroup.findMany({ where: { id: { in: audience.groupIds }, ...(user.role === Role.SUPER_ADMIN ? {} : { ownerId: current.project.ownerId }) }, select: { id: true } });
         if (groups.length !== audience.groupIds.length) throw new BadRequestException('Seçilen hedef kitle gruplarından biri geçersiz.');
       }
 
@@ -120,15 +121,16 @@ export class PoolPublicationService {
       let remainingBalance = wallet.balance;
       if (!alreadyPublished) {
         await consumeMembershipQuota(tx, user.id, 'HAVUZ');
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`wallet:${wallet.chargeUserId}`}))`;
-        await tx.$queryRaw`SELECT "id" FROM "KontorCuzdani" WHERE "kullaniciId" = ${wallet.chargeUserId} FOR UPDATE`;
-        const lockedWallet = await tx.kontorCuzdani.findUnique({ where: { kullaniciId: wallet.chargeUserId } });
+        // EPH-70B1F: ortak kilit sırası + atomik dönem sonu kapanışı; bakiye bu kapanıştan sonra okunur.
+        const lockedWallet = await lockWallet(tx, wallet.chargeUserId);
         if (!lockedWallet?.aktifMi || lockedWallet.bakiye < publicationCostPk) throw new BadRequestException('Seçilen PK bakiyesi yetersiz veya cüzdan aktif değil.');
         previousBalance = lockedWallet.bakiye;
         remainingBalance = previousBalance - publicationCostPk;
         const debit = await tx.kontorCuzdani.updateMany({ where: { kullaniciId: wallet.chargeUserId, aktifMi: true, bakiye: { gte: publicationCostPk } }, data: { bakiye: { decrement: publicationCostPk }, toplamHarcama: { increment: publicationCostPk } } });
         if (debit.count !== 1) throw new BadRequestException('PK kesintisi doğrulanamadı. Yayınlama geri alındı.');
         const movement = await tx.kontorHareketi.create({ data: { kullaniciId: wallet.chargeUserId, hareketTuru: KontorHareketTuru.HARCAMA, islemTuru: KontorIslemTuru.HAVUZ_PORTFOY_YAYIN, miktar: publicationCostPk, oncekiBakiye: previousBalance, sonrakiBakiye: remainingBalance, aciklama: `Portföy EPH Havuzunda yayınlandı. ${publicationCostPk} PK harcandı.`, ilgiliKayitTuru: 'UNIT', ilgiliKayitId: snapshot.id, olusturanId: user.id } });
+        // EPH-70B1F/D1: lot tüketimi + tahsis kaydı
+        await consumeLots(tx, wallet.chargeUserId, publicationCostPk, { hareketId: movement.id });
         spent = publicationCostPk;
         operationId = movement.id;
       }

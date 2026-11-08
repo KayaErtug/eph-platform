@@ -30,13 +30,18 @@ export function readLocalStorageConfig(
     .map((b) => b.trim())
     .filter(Boolean);
 
+  const defaultPublicRoot = nodePath.resolve(process.cwd(), 'public');
+  const defaultPrivateRoot = nodePath.resolve(process.cwd(), 'storage', 'private');
+  const defaultSigningSecret = 'eph-master-storage-signing-secret-2026';
+  const defaultApiBaseUrl = trim(env.APP_URL || env.API_BASE_URL || 'https://api.emlakportfoyhavuzu.com');
+
   return {
-    publicRoot: trim(env.MEDIA_PUBLIC_ROOT),
-    publicBaseUrl: trim(env.MEDIA_PUBLIC_BASE_URL).replace(/\/+$/, ''),
-    privateRoot: trim(env.MEDIA_PRIVATE_ROOT),
+    publicRoot: trim(env.MEDIA_PUBLIC_ROOT) || defaultPublicRoot,
+    publicBaseUrl: trim(env.MEDIA_PUBLIC_BASE_URL).replace(/\/+$/, '') || '/public',
+    privateRoot: trim(env.MEDIA_PRIVATE_ROOT) || defaultPrivateRoot,
     privateBuckets,
-    signingSecret: trim(env.MEDIA_SIGNING_SECRET),
-    apiBaseUrl: trim(env.MEDIA_API_BASE_URL).replace(/\/+$/, ''),
+    signingSecret: trim(env.MEDIA_SIGNING_SECRET) || defaultSigningSecret,
+    apiBaseUrl: trim(env.MEDIA_API_BASE_URL).replace(/\/+$/, '') || defaultApiBaseUrl,
   };
 }
 
