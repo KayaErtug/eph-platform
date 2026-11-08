@@ -1,15 +1,25 @@
 import { resolveOfficeWallet } from '../office/office-wallet.rules';
+import { grantLot, lockWallet } from '../kontor/wallet-lots';
 import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Optional,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { OfficeEntitlementService, entitlementSource, resolveOfficeEntitlements } from './office-entitlement.service';
+import { TELEFON_HASH_ENV, hashPhone } from '../common/telefon-hash';
+import { addMonthClamped } from '../payments/payment.rules';
+import { EntitlementSettingMissingError, legacyCapacityFields } from './office-legacy';
 import { KontorHareketTuru, KontorIslemTuru, Prisma, Role } from "@prisma/client";
 
 @Injectable()
 export class OfficeService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly entitlements: OfficeEntitlementService;
+
+  constructor(private readonly prisma: PrismaService, @Optional() entitlements?: OfficeEntitlementService) {
+    this.entitlements = entitlements ?? new OfficeEntitlementService(prisma);
+  }
 
   async getMyOffices(userId: string, userRole?: Role | string) {
     if (!userId) return [];
@@ -49,204 +59,62 @@ export class OfficeService {
     return Array.isArray(packages) ? packages.filter((p: any) => p.active !== false) : [];
   }
 
+  /**
+   * EPH-70B2 — kartsız ofis denemesi. Tekillik: ofis (OfisDenemeKaydi.officeId UNIQUE) + telefon (HMAC-SHA256, karar 18h; TELEFON_HASH_ANAHTARI yoksa
+   * deneme AÇILMAZ, sessiz fallback yok). Düzey/gün/PK OFFICE_TRIAL_CONFIG'ten (Gümüş seviyesi); PK, süreli (deneme bitişi) PAKET lotudur.
+   */
   async startOfficeTrial(userId: string, officeId: string, userRole?: Role | string) {
     if (!userId) throw new ForbiddenException('Kullanıcı kimliği doğrulanamadı.');
-    const office = await this.prisma.office.findUnique({
-      where: { id: officeId },
-    });
-
-    if (!office || !office.isActive) {
-      throw new BadRequestException("Aktif ofis bulunamadı.");
-    }
-
-    if (office.ownerUserId !== userId && userRole !== Role.SUPER_ADMIN) {
-      throw new ForbiddenException("Yalnızca ofis sahibi deneme paketi başlatabilir.");
-    }
-
+    const office = await this.prisma.office.findUnique({ where: { id: officeId } });
+    if (!office || !office.isActive) throw new BadRequestException("Aktif ofis bulunamadı.");
+    if (office.ownerUserId !== userId && userRole !== Role.SUPER_ADMIN) throw new ForbiddenException("Yalnızca ofis sahibi deneme paketi başlatabilir.");
     const beneficiaryId = office.ownerUserId;
     if (!beneficiaryId) throw new BadRequestException('Deneme paketi için önce ofis sahibi atanmalıdır.');
-    const packages = await this.getOfficePackages();
-    const trial: any = packages.find((p: any) => p.code === 'DENEME');
-    if (!trial) throw new BadRequestException('Ofis deneme paketi tanımlı veya aktif değil.');
-    const TRIAL_PK = Number(trial.monthlyPk);
-    const trialDays = Number(trial.trialDays);
-    if (!Number.isSafeInteger(TRIAL_PK) || TRIAL_PK < 0 || !Number.isSafeInteger(trialDays) || trialDays <= 0) throw new BadRequestException('Ofis deneme paketi ayarları geçersiz.');
-    return this.prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`office-trial:${beneficiaryId}`}))`;
-      const existingTrial = await tx.kontorHareketi.findFirst({ where: { kullaniciId: beneficiaryId, aciklama: { contains: 'Ofis Deneme Paketi' } } });
-      if (existingTrial) throw new BadRequestException('Bu ofis sahibi için deneme paketi daha önce kullanılmıştır.');
-      const subscription = await tx.systemSetting.findUnique({ where: { key: `OFFICE_SUBSCRIPTION_${officeId}` } });
-      const current: any = subscription?.valueJson;
-      if (current?.packageCode && current.packageCode !== 'DENEME' && new Date(current.expiresAt).getTime() > Date.now()) throw new BadRequestException('Aktif ücretli ofis paketi denemeyle değiştirilemez.');
-      let wallet = await tx.kontorCuzdani.findUnique({
-        where: { kullaniciId: beneficiaryId },
-      });
-
-      if (!wallet) {
-        wallet = await tx.kontorCuzdani.create({
-          data: {
-            kullaniciId: beneficiaryId,
-            bakiye: 0,
-            toplamYukleme: 0,
-            toplamHarcama: 0,
-            toplamHediye: 0,
-            aktifMi: true,
-          },
-        });
-      }
-
-      const nextBalance = wallet.bakiye + TRIAL_PK;
-
-      const updatedWallet = await tx.kontorCuzdani.update({
-        where: { kullaniciId: beneficiaryId },
-        data: {
-          bakiye: { increment: TRIAL_PK },
-          toplamYukleme: { increment: TRIAL_PK },
-          toplamHediye: { increment: TRIAL_PK },
-        },
-      });
-
-      const movement = await tx.kontorHareketi.create({
-        data: {
-          kullaniciId: beneficiaryId,
-          hareketTuru: KontorHareketTuru.YUKLEME,
-          islemTuru: KontorIslemTuru.DIGER,
-          miktar: TRIAL_PK,
-          oncekiBakiye: wallet.bakiye,
-          sonrakiBakiye: nextBalance,
-          aciklama: `Ofis Deneme Paketi: ${trialDays} Günlük Deneme ve ${TRIAL_PK} Ortak PK Yüklendi.`,
-          olusturanId: userId,
-        },
-      });
-
-      const valueJson = { ...trial, officeId, packageCode: trial.code, packageName: trial.name, purchasedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + trialDays * 86400000).toISOString() };
-      await tx.systemSetting.upsert({ where: { key: `OFFICE_SUBSCRIPTION_${officeId}` }, create: { key: `OFFICE_SUBSCRIPTION_${officeId}`, valueJson }, update: { valueJson } });
+    const owner = await this.prisma.user.findUnique({ where: { id: beneficiaryId }, select: { phone: true } });
+    let telefonHash: string;
+    try { telefonHash = hashPhone(String(owner?.phone ?? '')); }
+    catch (error) {
+      const message = error instanceof Error && error.message.includes(TELEFON_HASH_ENV) ? 'Deneme paketi şu anda başlatılamıyor.' : 'Deneme paketi için geçerli bir telefon numarası gerekir.';
+      throw new BadRequestException(message);
+    }
+    try {
+      const result = await this.prisma.$transaction((tx) => this.entitlements.grantTrial(tx, { officeId, ownerUserId: beneficiaryId, telefonHash, actorUserId: userId }), { timeout: 20000 });
       return {
-        ok: true,
-        officeId: office.id,
-        beneficiaryUserId: beneficiaryId,
-        packageName: "Ofis Deneme",
-        grantedPk: TRIAL_PK,
-        trialDays,
-        portfolioCapacity: Number(trial.portfolioCapacity),
-        crmCapacity: Number(trial.crmCapacity),
-        balance: updatedWallet.bakiye,
-        movementId: movement.id,
+        ok: true, officeId: office.id, beneficiaryUserId: beneficiaryId, packageName: "Ofis Deneme", grantedPk: result.grantedPk, trialDays: result.trialDays,
+        portfolioCapacity: result.level.portfolio, crmCapacity: result.level.crm, balance: result.balance, trialId: result.record.id, expiresAt: result.expiresAt,
       };
-    });
+    } catch (error) {
+      if (error && typeof error === 'object' && (error as { code?: string }).code === 'P2002') throw new BadRequestException('Bu ofis veya telefon numarasıyla deneme paketi daha önce kullanılmıştır.');
+      throw error;
+    }
   }
 
-  async purchaseOfficePackage(userId: string, officeId: string, packageCode: string) {
-    const office = await this.prisma.office.findUnique({
-      where: { id: officeId },
-    });
-
-    if (!office || !office.isActive) {
-      throw new BadRequestException("Aktif ofis bulunamadı.");
-    }
-
-    if (office.ownerUserId !== userId) {
-      throw new ForbiddenException("Yalnızca ofis sahibi ofis paketi satın alabilir.");
-    }
-
-    const packages: any = await this.getOfficePackages();
-    const pkg = Array.isArray(packages) ? packages.find((p: any) => p.code === packageCode) : null;
-
-    if (!pkg) {
-      throw new BadRequestException("Geçersiz ofis paketi kodu.");
-    }
-
-    if (['DENEME', 'UCRETSIZ'].includes(pkg.code) || pkg.price === 0) throw new BadRequestException('Ücretsiz ve deneme paketleri satın alma işleminden başlatılamaz.');
-
-    if (pkg.isCustomPrice || typeof pkg.price !== "number") {
-      throw new BadRequestException("Bu paket özel kurumsal teklif gerektirir. Lütfen EPH yönetimiyle iletişime geçin.");
-    }
-
-    const monthlyPk = Number(pkg.monthlyPk || 0);
-
-    return this.prisma.$transaction(async (tx) => {
-      let wallet = await tx.kontorCuzdani.findUnique({
-        where: { kullaniciId: userId },
-      });
-
-      if (!wallet) {
-        wallet = await tx.kontorCuzdani.create({
-          data: {
-            kullaniciId: userId,
-            bakiye: 0,
-            toplamYukleme: 0,
-            toplamHarcama: 0,
-            toplamHediye: 0,
-            aktifMi: true,
-          },
-        });
-      }
-
-      const nextBalance = wallet.bakiye + monthlyPk;
-
-      const updatedWallet = await tx.kontorCuzdani.update({
-        where: { kullaniciId: userId },
-        data: {
-          bakiye: { increment: monthlyPk },
-          toplamYukleme: { increment: monthlyPk },
-        },
-      });
-
-      const movement = await tx.kontorHareketi.create({
-        data: {
-          kullaniciId: userId,
-          hareketTuru: KontorHareketTuru.YUKLEME,
-          islemTuru: KontorIslemTuru.DIGER,
-          miktar: monthlyPk,
-          oncekiBakiye: wallet.bakiye,
-          sonrakiBakiye: nextBalance,
-          aciklama: `${pkg.name} Paketi Satın Alma: ${monthlyPk} Ortak PK Yüklendi.`,
-          olusturanId: userId,
-        },
-      });
-
-      const subRecord = {
-        officeId: office.id,
-        packageCode: pkg.code,
-        packageName: pkg.name,
-        price: pkg.price,
-        monthlyPk: pkg.monthlyPk,
-        portfolioCapacity: pkg.portfolioCapacity,
-        crmCapacity: pkg.crmCapacity,
-        agents: pkg.agents,
-        purchasedAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-      };
-
-      await tx.systemSetting.upsert({
-        where: { key: `OFFICE_SUBSCRIPTION_${office.id}` },
-        create: {
-          key: `OFFICE_SUBSCRIPTION_${office.id}`,
-          valueJson: subRecord,
-        },
-        update: {
-          valueJson: subRecord,
-        },
-      });
-
-      return {
-        ok: true,
-        officeId: office.id,
-        packageCode: pkg.code,
-        packageName: pkg.name,
-        price: pkg.price,
-        grantedPk: monthlyPk,
-        portfolioCapacity: pkg.portfolioCapacity,
-        crmCapacity: pkg.crmCapacity,
-        agents: pkg.agents,
-        balance: updatedWallet.bakiye,
-        movementId: movement.id,
-      };
-    });
+  /**
+   * Karar 18g (EPH-70B2): ödemesiz paket tanımı YALNIZ ADMIN/SÜPER ADMIN. Ortak grant yolundan (kanal ADMIN) geçer; gerekçe zorunlu, denetim kaydı yazılır.
+   * Hak sahibi ofis sahibidir; dönem 1 ay (addMonthClamped). Kullanıcı kaynaklı HTTP yolu yoktur.
+   */
+  async purchaseOfficePackage(actorId: string, officeId: string, packageCode: string, actorRole?: Role | string, gerekce?: string, months?: number) {
+    if (actorRole !== Role.ADMIN && actorRole !== Role.SUPER_ADMIN) throw new ForbiddenException('Ödemesiz ofis paketi yalnız yönetici tarafından tanımlanabilir.');
+    if (!gerekce || !gerekce.trim()) throw new BadRequestException('Gerekçe zorunludur.');
+    // F11: süre koda gömülmez; yönetici ay sayısını açıkça verir (denetim kaydına yazılır)
+    if (!Number.isSafeInteger(months) || (months as number) <= 0) throw new BadRequestException('Süre (ay) zorunludur.');
+    const office = await this.prisma.office.findUnique({ where: { id: officeId }, select: { id: true, isActive: true, ownerUserId: true } });
+    if (!office || !office.isActive || !office.ownerUserId) throw new BadRequestException("Aktif ofis bulunamadı.");
+    const now = new Date();
+    const result = await this.prisma.$transaction((tx) => this.entitlements.grantPackage(tx, {
+      officeId, hakSahibiUserId: office.ownerUserId as string, paketKodu: String(packageCode ?? ''), kanal: 'ADMIN', kaynakAbonelikAnahtari: `admin:${officeId}:${now.getTime()}`,
+      donemBaslangic: now, donemBitis: Array.from({ length: months as number }).reduce<Date>((d) => addMonthClamped(d), now), tutar: 0, admin: { actorUserId: actorId, gerekce: gerekce.trim() }, at: now,
+    }), { timeout: 20000 });
+    return { ok: true, officeId, packageCode: String(packageCode).toUpperCase(), grantedPk: result.grantedPk, abonelikId: result.abonelikId };
   }
 
   async getOfficeCapacity(officeId: string, tx?: Prisma.TransactionClient) {
     const client = tx || this.prisma;
+    if (await entitlementSource(client) === 'relational') {
+      // EPH-70B2: tek çözümleyici. crmCapacity null = sınırsız (eski -1 sözleşmesiyle uyumlu dönüş: -1).
+      const eff = await resolveOfficeEntitlements(client, officeId);
+      return { crmCapacity: eff.crm === null ? -1 : eff.crm, portfolioCapacity: eff.portfolio, agents: eff.agents, packageName: eff.packageName };
+    }
     const subSetting = await client.systemSetting.findUnique({
       where: { key: `OFFICE_SUBSCRIPTION_${officeId}` },
     });
@@ -255,21 +123,16 @@ export class OfficeService {
       const packages = await this.getOfficePackages();
       const configured: any = packages.find((p: any) => p.code === sub.packageCode);
       const current = configured || sub;
-      return {
-        crmCapacity: Number(current.crmCapacity ?? 1500),
-        portfolioCapacity: Number(current.portfolioCapacity ?? 150),
-        agents: Number(current.agents ?? 5),
-        packageName: String(current.name || sub.packageName || "Ofis"),
-      };
+      // ODM-7G-D: türetilmiş (derived) snapshot ek kullanıcı/Ofis Boy dahil ETKİN değeri taşır; katalog satırı üstüne yazmaz. Kodda yedek sayı yok (§0-B).
+      const cap = legacyCapacityFields(sub, configured);
+      if (cap.crmCapacity === null || cap.portfolioCapacity === null || cap.agents === null) throw new EntitlementSettingMissingError(`OFFICE_MEMBERSHIP_PACKAGES/${String(sub.packageCode)} kapasite alanları`);
+      return { crmCapacity: cap.crmCapacity, portfolioCapacity: cap.portfolioCapacity, agents: cap.agents, packageName: String(current.name || sub.packageName || "Ofis") };
     }
     const packages = await this.getOfficePackages();
     const trial: any = packages.find((p: any) => p.code === 'DENEME');
-    return {
-      crmCapacity: Number(trial?.crmCapacity ?? 1500),
-      portfolioCapacity: Number(trial?.portfolioCapacity ?? 150),
-      agents: Number(trial?.agents ?? 5),
-      packageName: String(trial?.name || "Ofis Deneme"),
-    };
+    const cap = legacyCapacityFields({}, trial);
+    if (!trial || cap.crmCapacity === null || cap.portfolioCapacity === null || cap.agents === null) throw new EntitlementSettingMissingError('OFFICE_MEMBERSHIP_PACKAGES/DENEME kapasite alanları');
+    return { crmCapacity: cap.crmCapacity, portfolioCapacity: cap.portfolioCapacity, agents: cap.agents, packageName: String(trial.name || "Ofis Deneme") };
   }
 
   async getWalletQuote(
@@ -280,7 +143,7 @@ export class OfficeService {
   ) {
     if (walletSource === 'OFFICE' && !walletOfficeId) throw new BadRequestException('Ortak PK için ofis seçiniz.');
     if ((walletSource && !['PERSONAL', 'OFFICE'].includes(walletSource)) || (walletSource === 'PERSONAL' && walletOfficeId)) throw new BadRequestException('Geçersiz PK kaynağı.');
-    let costPk = 25;
+    let costPk: number | null = null;
     try {
       const setting =
         (await this.prisma.systemSetting.findUnique({ where: { key: "COST_OZEL_BILGI" } })) ??
@@ -294,8 +157,9 @@ export class OfficeService {
         if (!isNaN(val) && val > 0) costPk = val;
       }
     } catch {
-      // fallback
+      // ayar okunamadı: aşağıda kontrollü hata
     }
+    if (costPk === null) throw new EntitlementSettingMissingError('COST_OZEL_BILGI');
 
     const selected = await resolveOfficeWallet(this.prisma, userId, { walletSource, walletOfficeId });
     const wallet = await this.prisma.kontorCuzdani.findUnique({ where: { kullaniciId: selected.chargeUserId } });

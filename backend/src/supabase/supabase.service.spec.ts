@@ -3,6 +3,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { SupabaseService } from './supabase.service';
 import { PrivateFilesController } from './private-files.controller';
+import { readLocalStorageConfig } from './local-storage.driver';
 
 const ENV_KEYS = [
   'STORAGE_DRIVER', 'MEDIA_PUBLIC_ROOT', 'MEDIA_PUBLIC_BASE_URL',
@@ -33,16 +34,50 @@ describe('SupabaseService - STORAGE_DRIVER', () => {
     await fs.rm(tmp, { recursive: true, force: true });
   });
 
-  it('STORAGE_DRIVER yoksa supabase yolu (SUPABASE_URL zorunlu)', () => {
+  it('STORAGE_DRIVER yoksa varsayılan local (canlı davranışı değişmez; SUPABASE_URL gerekmez)', () => {
     delete process.env.STORAGE_DRIVER;
+    const svc = new SupabaseService();
+    expect(svc.local).not.toBeNull();
+    expect(svc.getPublicUrl('b', 'a/b.jpg')).toBe('https://image.example.test/eph/b/a/b.jpg');
+  });
+
+  it('STORAGE_DRIVER=supabase: aktif sürücü Supabase (SUPABASE_URL zorunlu; local aktif değil)', () => {
+    process.env.STORAGE_DRIVER = 'supabase';
     expect(() => new SupabaseService()).toThrow('SUPABASE_URL');
     process.env.SUPABASE_URL = 'https://x.supabase.co';
     process.env.SUPABASE_ANON_KEY = 'anon';
     const svc = new SupabaseService();
     expect(svc.local).toBeNull();
+    expect(svc.localFallback).not.toBeNull(); // yalnız kota yedeği; aktif sürücü değil
     expect(svc.getPublicUrl('b', 'a/b.jpg')).toBe(
       'https://x.supabase.co/storage/v1/object/public/b/a/b.jpg',
     );
+  });
+
+  it('STORAGE_DRIVER=supabase: yükleme/silme Supabase istemcisine gider, yerel diske yazılmaz', async () => {
+    process.env.STORAGE_DRIVER = 'supabase';
+    process.env.SUPABASE_URL = 'https://x.supabase.co';
+    process.env.SUPABASE_ANON_KEY = 'anon';
+    const svc = new SupabaseService();
+    const upload = jest.fn(async () => ({ data: { path: 'a/b.jpg' }, error: null }));
+    const remove = jest.fn(async () => ({ data: [{ name: 'a/b.jpg' }], error: null }));
+    (svc as any).supabase = { storage: { from: jest.fn(() => ({ upload, remove })) } };
+    await svc.uploadFile('portfolio-images', 'a/b.jpg', Buffer.from('x'), 'image/jpeg');
+    expect(upload).toHaveBeenCalledTimes(1);
+    await svc.removeFile('portfolio-images', ['a/b.jpg']);
+    expect(remove).toHaveBeenCalledWith(['a/b.jpg']);
+    await expect(fs.stat(path.join(tmp, 'pub', 'portfolio-images', 'a', 'b.jpg'))).rejects.toThrow();
+  });
+
+  it('STORAGE_DRIVER=supabase: kota aşımı (402) bilinçli olarak yerel yedeğe yazar', async () => {
+    process.env.STORAGE_DRIVER = 'supabase';
+    process.env.SUPABASE_URL = 'https://x.supabase.co';
+    process.env.SUPABASE_ANON_KEY = 'anon';
+    const svc = new SupabaseService();
+    const upload = jest.fn(async () => ({ data: null, error: { message: 'Quota exceeded', statusCode: 402 } }));
+    (svc as any).supabase = { storage: { from: jest.fn(() => ({ upload })) } };
+    await svc.uploadFile('portfolio-images', 'q/a.jpg', Buffer.from('q'), 'image/jpeg');
+    expect((await fs.readFile(path.join(tmp, 'pub', 'portfolio-images', 'q', 'a.jpg'))).toString()).toBe('q');
   });
 
   it('geçersiz STORAGE_DRIVER hata verir', () => {
@@ -112,6 +147,15 @@ describe('SupabaseService - STORAGE_DRIVER', () => {
     expect(() => local.verifySignedRequest('portfolio-images', 'u1/MYK_1.pdf', exp, sig)).toThrow();
 
     await expect(svc.createSignedUrl('documents', 'yok.pdf')).rejects.toThrow('bulunamadı');
+  });
+
+  it('kaynakta sabit imzalama anahtarı yok: MEDIA_SIGNING_SECRET yoksa yapılandırma boş döner ve imza/doğrulama kapalı kalır (N1)', async () => {
+    delete process.env.MEDIA_SIGNING_SECRET;
+    expect(readLocalStorageConfig().signingSecret).toBe('');
+    const svc = new SupabaseService();
+    await svc.uploadFile('documents', 'u1/x.pdf', Buffer.from('x'), 'application/pdf');
+    expect(() => svc.local!.verifySignedRequest('documents', 'u1/x.pdf', Date.now() + 60_000, 'uydurma-imza')).toThrow('MEDIA_SIGNING_SECRET');
+    expect(() => svc.local!.signedUrl('documents', 'u1/x.pdf', 60)).toThrow('MEDIA_SIGNING_SECRET');
   });
 
   it('local: MEDIA_SIGNING_SECRET yoksa açık hata', async () => {

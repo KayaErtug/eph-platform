@@ -29,6 +29,9 @@ export class OfficePackageSettingsDto {
   @IsInt() @Min(0) @Max(36500) trialDays!: number;
   @IsInt() @Min(0) @Max(1000) agents!: number;
   @IsOptional() @IsInt() @Min(0) @Max(1000) maxTeams?: number;
+  @IsOptional() @IsBoolean() kardesOfis?: boolean;
+  @IsOptional() @IsInt() @Min(0) @Max(100) ofisBoyDahil?: number;
+  @IsOptional() @IsBoolean() ofisBoyEklenti?: boolean;
 }
 
 export class BillingDto {

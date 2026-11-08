@@ -1,4 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Logger } from '@nestjs/common';
+import { entitlementSource, resolveOfficeEntitlements } from '../office/office-entitlement.service';
+import { EntitlementSettingMissingError, legacyCapacityFields } from '../office/office-legacy';
 import { PrismaService } from '../prisma/prisma.service';
 import { LinaDistanceService } from '../lina/geo/lina-distance.service';
 import { DeedOwnerViewer, getOfficeAdvisorIds, redactDeedOwnerInfo } from '../units/deed-owner-privacy';
@@ -365,11 +367,28 @@ export class CrmService {
     );
   }
 
-  async getCustomers(userId: string, userRole: Role) {
+  async getCustomers(userId: string, userRole: Role, filters?: { officeId?: string; advisorId?: string }) {
+    const isSuper = userRole === Role.SUPER_ADMIN || (userRole as string) === 'SUPER_ADMIN';
     const customers = await this.prisma.customer.findMany({
-      where: this.getCustomerWhere(userId, userRole),
+      where: {
+        ...(isSuper
+          ? {
+              ...(filters?.advisorId ? { ownerId: filters.advisorId } : {}),
+              ...(filters?.officeId ? { owner: { officeId: filters.officeId } } : {}),
+            }
+          : this.getCustomerWhere(userId, userRole)),
+      },
       include: {
-        owner: { select: { firstName: true, lastName: true, role: true } },
+        owner: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+            officeId: true,
+            office: { select: { id: true, name: true, city: true, district: true } },
+          },
+        },
         activities: { orderBy: { createdAt: 'desc' }, take: 1 },
         tasks: { where: { status: TaskStatus.BEKLIYOR }, orderBy: { dueDate: 'asc' } },
         interests: { where: { isActive: true }, orderBy: [{ priority: 'desc' }, { updatedAt: 'desc' }] },
@@ -393,8 +412,9 @@ export class CrmService {
     // 1. Ofis kontrolü: Kullanıcı bir ofise bağlıysa (üye veya sahip), tüm danışmanların toplamını say
     const user = await client.user.findUnique({
       where: { id: userId },
-      select: { id: true, officeId: true },
+      select: { id: true, officeId: true, role: true },
     });
+    if (user?.role === 'SUPER_ADMIN') return;
 
     let officeId = user?.officeId;
     if (!officeId) {
@@ -419,13 +439,26 @@ export class CrmService {
           ]),
         );
 
+        // EPH-70B2: relational kapısı açıkken tek çözümleyici (null = sınırsız, 0 = kapalı; eski `limit<0` sınırsız sayımı kullanılmaz)
+        if (await entitlementSource(client) === 'relational') {
+          const eff = await resolveOfficeEntitlements(client, office.id);
+          const total = await client.customer.count({ where: { ownerId: { in: memberIds } } });
+          if (eff.crm !== null && total >= eff.crm) {
+            throw new BadRequestException(`${eff.packageName} paketinizde ofisinizin toplam aktif CRM kapasitesi ${eff.crm}. Ofisteki tüm danışmanların mevcut toplam müşteri sayısı: ${total}. Yeni müşteri eklenemiyor.`);
+          }
+          return;
+        }
+
         const subSetting = await client.systemSetting.findUnique({
           where: { key: `OFFICE_SUBSCRIPTION_${office.id}` },
         });
         const sub: any = subSetting?.valueJson;
         const config = await client.systemSetting.findUnique({ where: { key: 'OFFICE_MEMBERSHIP_PACKAGES' } });
         const current: any = Array.isArray(config?.valueJson) ? config.valueJson.find((p: any) => p.code === sub?.packageCode) : undefined;
-        const limit = Number(current?.crmCapacity ?? sub?.crmCapacity ?? 1500);
+        // ODM-7G-D: türetilmiş snapshot ek kullanıcı dahil etkin kapasiteyi taşır; kodda yedek sayı yok (§0-B)
+        const limitRaw = legacyCapacityFields(sub && typeof sub === 'object' ? sub : {}, current).crmCapacity;
+        if (limitRaw === null) throw new EntitlementSettingMissingError('crmCapacity');
+        const limit = limitRaw;
         const packageName = String(sub?.packageName || 'Ofis');
 
         const totalOfficeCustomers = await client.customer.count({

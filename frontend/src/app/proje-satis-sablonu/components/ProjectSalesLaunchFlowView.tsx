@@ -48,6 +48,7 @@ export function ProjectSalesLaunchFlowView({
   onCreateRenderWorkOrder,
   onCreatePresentationLink,
   onPublishToPool,
+  onWithdrawFromPool,
   renderWorkOrder,
   presentationLink,
   busyAction,
@@ -59,6 +60,7 @@ export function ProjectSalesLaunchFlowView({
   onCreateRenderWorkOrder: () => void;
   onCreatePresentationLink: () => void;
   onPublishToPool: () => void;
+  onWithdrawFromPool: () => void;
   renderWorkOrder: ProjectRenderWorkOrderResponse | null;
   presentationLink: ProjectPresentationLinkResponse | null;
   busyAction: string | null;
@@ -179,6 +181,7 @@ export function ProjectSalesLaunchFlowView({
         <PublishReadinessPanel
           launch={launch}
           busyAction={busyAction}
+          onWithdrawFromPool={onWithdrawFromPool}
           onPublishToPool={onPublishToPool}
         />
       )}
@@ -206,7 +209,7 @@ function RenderBriefPanel({
       <SectionTitle
         icon={<ImagePlus size={22} />}
         title="3D Render Oluştur"
-        subtitle="Müteahhitin verdiği bilgilerden satışa hazır render brief'i üretin."
+        subtitle="Sahne, çekim ve çıktı ihtiyaçlarını hazırlayın. Bu işlem fotoğraf veya 3D görsel üretmez."
       />
 
       <div
@@ -272,7 +275,7 @@ function RenderBriefPanel({
         <ImagePlus size={18} />
         {busyAction === "render-work-order"
           ? "İş Emri Hazırlanıyor"
-          : "Render İş Emri Oluştur"}
+          : "Render Görseli İçin Brief Hazırla"}
       </button>
 
       <button
@@ -456,10 +459,12 @@ function PublishReadinessPanel({
   launch,
   busyAction,
   onPublishToPool,
+  onWithdrawFromPool,
 }: {
   launch: ProjectLaunchCenterResponse;
   busyAction: string | null;
   onPublishToPool: () => void;
+  onWithdrawFromPool: () => void;
 }) {
   return (
     <section style={{ ...cardStyle, padding: 13 }}>
@@ -495,6 +500,8 @@ function PublishReadinessPanel({
         ))}
       </div>
 
+      {launch.publishReadiness.issues?.length ? <div role="alert" style={{marginTop:12,fontSize:13,lineHeight:1.8}}><strong>Tamamlanması Gerekenler</strong><ul>{launch.publishReadiness.issues.map(issue=><li key={issue.code}>{issue.message}</li>)}</ul></div> : null}
+      <button type="button" disabled={Boolean(busyAction)} onClick={onWithdrawFromPool} style={{...secondaryButtonStyle,width:'100%',marginTop:12}}>Havuzdan Geri Çek</button>
       <InfoBand tone="warning">
         {launch.publishReadiness.warning}
       </InfoBand>
@@ -520,7 +527,7 @@ function PublishReadinessPanel({
         {busyAction === "publish-to-pool"
           ? "Havuza Yayınlanıyor"
           : launch.publishReadiness.ready
-            ? "Projeyi Havuza Yayınla"
+            ? "Havuza Gönder"
             : "Eksikler Tamamlanmadan Yayın Kapalı"}
       </button>
 

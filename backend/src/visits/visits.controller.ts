@@ -18,10 +18,20 @@ export class VisitsController {
 
   @Post('log')
   @UseGuards(JwtAuthGuard)
-  async logVisit(@Req() req: any, @Body() body: { page: string }) {
+  async logVisit(
+    @Req() req: any,
+    @Body()
+    body: {
+      page: string;
+      durationSeconds?: number;
+      visitId?: string;
+    },
+  ) {
     return this.visitsService.logVisit({
       userId: req.user?.id,
       page: body.page,
+      durationSeconds: body.durationSeconds,
+      visitId: body.visitId,
       ip: req.ip,
       userAgent: req.headers['user-agent'],
     });
@@ -31,6 +41,13 @@ export class VisitsController {
   @UseGuards(JwtAuthGuard)
   async getPresence(@Req() req: any) {
     return this.visitsService.getPresence(req.user?.id);
+  }
+
+  // Süper Admin Canlı Kullanıcı & Ekran Süreleri Takip Servisi
+  @Get('live-activity')
+  @UseGuards(JwtAuthGuard)
+  async getLiveActivity(@Req() req: any) {
+    return this.visitsService.getLiveActivity(req.user?.id);
   }
 
   @Get()

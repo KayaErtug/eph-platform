@@ -97,7 +97,7 @@ describe('Piyasa ticker (EPH-28)', () => {
       manual: [{ key: 'MARKET_MANUAL_CEYREK_ALTIN', valueJson: { value: 10425 }, updatedAt: at }],
     });
     const t = await s.getTicker();
-    expect(t.items.find(i => i.code === 'CEYREK_ALTIN')).toEqual({ code: 'CEYREK_ALTIN', label: 'Çeyrek Altın', value: 10425, unit: '₺', changePct: null, source: 'Yönetici' });
+    expect(t.items.find(i => i.code === 'CEYREK_ALTIN')).toEqual({ code: 'CEYREK_ALTIN', label: 'Çeyrek Altın', value: 10425, unit: '₺', changePct: 0, source: 'Yönetici' }); // ODM-7F-D: getTicker null değişimi eski mobil sözleşme için 0'a çevirir
     expect(t.items.find(i => i.code === 'GRAM_ALTIN')?.source).toBe('Truncgil');
     expect(t.loan).toMatchObject({ monthlyRatePct: 2.74, source: 'Akbank İlk Evim', updatedAt: at.toISOString() });
     const empty = await service({ valueJson: 2.5, updatedAt: at }, { source: { valueJson: { value: '  ' } } }).getTicker();
@@ -127,7 +127,7 @@ describe('Piyasa ticker (EPH-28)', () => {
     it('MARKET_MANUAL_ONS_ALTIN otomatik değerin yerine geçer', async () => {
       mock();
       const t = await service(null, { manual: [{ key: 'MARKET_MANUAL_ONS_ALTIN', valueJson: { value: 3400 }, updatedAt: at }] }).getTicker();
-      expect(t.items.find(i => i.code === 'ONS_ALTIN')).toEqual({ code: 'ONS_ALTIN', label: 'Ons Altın', value: 3400, unit: '$', changePct: null, source: 'Yönetici' });
+      expect(t.items.find(i => i.code === 'ONS_ALTIN')).toEqual({ code: 'ONS_ALTIN', label: 'Ons Altın', value: 3400, unit: '$', changePct: 0, source: 'Yönetici' });
     });
 
     it('tüketici ayarı yoksa alanlar dönmez (varsayılan uydurulmaz)', async () => {

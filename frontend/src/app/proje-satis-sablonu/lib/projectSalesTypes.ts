@@ -1,4 +1,4 @@
-﻿export type NoticeState = {
+export type NoticeState = {
   tone: "success" | "warning" | "error";
   title: string;
   message: string;
@@ -16,6 +16,12 @@ export type ProjectSummary = {
   name: string;
   code: string | null;
   description: string | null;
+  lifecycleStage: string | null;
+  completionPercent: number | null;
+  defaultDeliveryDate: string | null;
+  plannedStartDate?: string | null;
+  permitNumber?: string | null;
+  permitAuthority?: string | null;
   city: string;
   district: string;
   neighborhood: string | null;
@@ -28,6 +34,7 @@ export type ProjectSummary = {
   declaredIndependentUnitCount: number | null;
   declaredSalesInventoryCount: number | null;
   plannedUnitTypes: string[];
+  plannedOtherUnitTypeName: string | null;
   geometryType: string;
   setupStatus: string;
   wizardStep: string;
@@ -40,6 +47,12 @@ export type ProjectForm = {
   name: string;
   code: string;
   description: string;
+  lifecycleStage: string;
+  completionPercent: string;
+  defaultDeliveryDate: string;
+  plannedStartDate: string;
+  permitNumber: string;
+  permitAuthority: string;
   city: string;
   district: string;
   neighborhood: string;
@@ -53,6 +66,7 @@ export type ProjectForm = {
   declaredSalesInventoryCount: string;
   geometryType: string;
   plannedUnitTypes: string[];
+  plannedOtherUnitTypeName: string;
 };
 
 export type PageMode =
@@ -69,6 +83,7 @@ export type PageMode =
   | "publish";
 
 export type WizardStep = 1 | 2 | 3 | 4 | 5;
+export type ProjectNumberingMode = "FLOOR_CODED" | "CONTINUOUS";
 export type ProjectSaveDestination =
   | "stay"
   | "structure"
@@ -112,6 +127,7 @@ export type ProjectSpaceSummary = {
 };
 
 export type ProjectUnitSummary = {
+  description?: string | null;
   id: string;
   blockId: string | null;
   floorId: string | null;
@@ -404,6 +420,7 @@ export type ProjectLaunchCenterResponse = {
     }>;
   };
   publishReadiness: {
+    issues?: Array<{code:string;message:string}>;
     ready: boolean;
     checks: Array<{
       key: string;
@@ -470,6 +487,7 @@ export type StructurePreview = {
 };
 
 export type UnitGroupForm = {
+  description?: string;
   key: string;
   type: string;
   count: string;

@@ -1,0 +1,45 @@
+-- ODM-2 GERİ ALMA — TASLAK, ÇALIŞTIRILMAZ.
+-- migration.sql'in tersi. Kullanım (yalnız onayla, yedek alındıktan sonra): psql -v ON_ERROR_STOP=1 -f rollback.sql
+-- Sonrasında "_prisma_migrations" tablosundaki "20261108120000_odm2_store_payments" satırı elle işaretlenmeli
+-- (prisma migrate resolve --rolled-back 20261108120000_odm2_store_payments).
+BEGIN;
+
+-- KORUMA: mağaza kaynaklı veri varsa geri alma durur (veri kaybını önlemek için).
+-- Bilerek silmek isteniyorsa önce bu bloğu yorum satırı yapın ve yedeği doğrulayın.
+DO $$
+DECLARE n integer;
+BEGIN
+  SELECT count(*) INTO n FROM "PaymentOrder" WHERE "kanal" IN ('APPLE', 'GOOGLE');
+  IF n > 0 THEN RAISE EXCEPTION 'Geri alma durduruldu: % mağaza siparişi var.', n; END IF;
+  SELECT count(*) INTO n FROM "StoreSubscription";
+  IF n > 0 THEN RAISE EXCEPTION 'Geri alma durduruldu: % mağaza aboneliği kaydı var.', n; END IF;
+END $$;
+
+-- Tablolar (kısıtlar ve indeksler tabloyla birlikte düşer)
+DROP TABLE IF EXISTS "StoreSubscription";
+DROP TABLE IF EXISTS "StoreProduct";
+
+-- PaymentTransaction tekillik indeksi
+DROP INDEX IF EXISTS "PaymentTransaction_providerId_providerTransactionId_islemTu_key";
+
+-- PaymentOrder
+DROP INDEX IF EXISTS "PaymentOrder_kanal_idx";
+DROP INDEX IF EXISTS "PaymentOrder_ortam_idx";
+ALTER TABLE "PaymentOrder" DROP COLUMN IF EXISTS "kanal", DROP COLUMN IF EXISTS "ortam";
+
+-- KullaniciUyelikPaketi
+ALTER TABLE "KullaniciUyelikPaketi" DROP COLUMN IF EXISTS "kaynakKanal", DROP COLUMN IF EXISTS "otomatikYenileme";
+
+-- User
+DROP INDEX IF EXISTS "User_storeAccountToken_key";
+ALTER TABLE "User" DROP COLUMN IF EXISTS "storeAccountToken";
+
+-- Enumlar (sütunlar düştükten sonra)
+DROP TYPE IF EXISTS "StoreSubscriptionStatus";
+DROP TYPE IF EXISTS "StoreProductSegment";
+DROP TYPE IF EXISTS "StoreProductKind";
+DROP TYPE IF EXISTS "StorePlatform";
+DROP TYPE IF EXISTS "PaymentEnvironment";
+DROP TYPE IF EXISTS "PaymentChannel";
+
+COMMIT;

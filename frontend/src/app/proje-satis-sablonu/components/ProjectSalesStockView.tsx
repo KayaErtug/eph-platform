@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 
 import type {
+  ProjectBlockSummary,
   ProjectSalesStockDraft,
   ProjectSalesStockResponse,
   ProjectSalesStockUnit,
@@ -37,9 +38,11 @@ import {
   primaryButtonStyle,
   secondaryButtonStyle,
 } from "../lib/projectSalesStyles";
+import UnitFacadeEditor from "./UnitFacadeEditor";
 import { Field, Metric, SectionTitle } from "./ProjectSalesPrimitives";
 
 export function ProjectSalesStockView({
+  blocks,
   stock,
   drafts,
   busyAction,
@@ -48,6 +51,7 @@ export function ProjectSalesStockView({
   onSaveUnits,
   onSaveUnit,
 }: {
+  blocks: ProjectBlockSummary[];
   stock: ProjectSalesStockResponse;
   drafts: Record<string, ProjectSalesStockDraft>;
   busyAction: string | null;
@@ -71,6 +75,7 @@ export function ProjectSalesStockView({
   const [statusFilter, setStatusFilter] = useState("TUMU");
   const [typeFilter, setTypeFilter] = useState("TUMU");
   const [roomFilter, setRoomFilter] = useState("TUMU");
+  const [floorIds, setFloorIds] = useState<string[]>([]);
   const [selectedUnitIds, setSelectedUnitIds] = useState<string[]>([]);
   const [bulkPrice, setBulkPrice] = useState("");
   const [bulkStatus, setBulkStatus] = useState("DEGISTIRME");
@@ -102,6 +107,17 @@ export function ProjectSalesStockView({
       ),
     [stock.units],
   );
+
+  const floorOptions = useMemo(() => blocks.filter(block=>blockFilter==='TUMU'||block.id===blockFilter).flatMap(block=>block.floors.map(floor=>({id:floor.id,blockId:block.id,level:floor.level,label:`${block.code} · ${floor.label}`}))),[blocks,blockFilter]);
+  const selectFloorPreset = (preset: string) => {
+    setSelectedUnitIds([]);
+    if (preset === 'clear') { setFloorIds([]); return; }
+    setFloorIds(floorOptions.filter(floor => {
+      if(floor.level == null) return false;
+      const maximum = Math.max(...floorOptions.filter(item=>item.blockId===floor.blockId&&item.level!=null).map(item=>item.level!));
+      return preset==='ground'?floor.level===0:preset==='middle'?floor.level>0&&floor.level<maximum:floor.level===maximum;
+    }).map(floor=>floor.id));
+  };
 
   const typeOptions = useMemo(
     () => Array.from(new Set(stock.units.map((unit) => unit.type))).sort(),
@@ -151,6 +167,8 @@ export function ProjectSalesStockView({
         return false;
       }
 
+      if (floorIds.length && !floorIds.includes(unit.floorId || unit.projectFloor?.id || '')) return false;
+
       if (statusFilter !== "TUMU" && unit.status !== statusFilter) {
         return false;
       }
@@ -184,6 +202,7 @@ export function ProjectSalesStockView({
     });
   }, [
     blockFilter,
+    floorIds,
     roomFilter,
     search,
     statusFilter,
@@ -665,7 +684,7 @@ export function ProjectSalesStockView({
           <Field label="Blok">
             <select
               value={blockFilter}
-              onChange={(event) => setBlockFilter(event.target.value)}
+              onChange={(event) => { setBlockFilter(event.target.value); setFloorIds([]); setSelectedUnitIds([]); }}
               style={inputStyle}
             >
               <option value="TUMU">Tüm bloklar</option>
@@ -722,6 +741,7 @@ export function ProjectSalesStockView({
             </select>
           </Field>
         </div>
+        <div style={{display:'grid',gap:10,marginTop:12}}><strong style={{fontSize:13,color:'#17345B'}}>Katlar · Çoklu Seçim</strong><div style={{display:'flex',flexWrap:'wrap',gap:7}}>{[{value:'ground',label:'Zemin'},{value:'middle',label:'Ara Katlar'},{value:'top',label:'Son Kat'},{value:'clear',label:'Tüm Katlar'}].map(item=><button key={item.value} type="button" disabled={Boolean(busyAction)||(item.value!=='clear'&&!floorOptions.some(floor=>item.value==='ground'?floor.level===0:item.value==='middle'?floor.level>0&&floor.level<Math.max(...floorOptions.filter(other=>other.blockId===floor.blockId).map(other=>other.level)):floor.level===Math.max(...floorOptions.filter(other=>other.blockId===floor.blockId).map(other=>other.level))))} style={secondaryButtonStyle} onClick={()=>selectFloorPreset(item.value)}>{item.label}</button>)}</div><div style={{display:'flex',flexWrap:'wrap',gap:7}}>{floorOptions.map(floor=><button key={floor.id} type="button" aria-pressed={floorIds.includes(floor.id)} disabled={Boolean(busyAction)} style={{...secondaryButtonStyle,background:floorIds.includes(floor.id)?'#DBEAFE':'#FFFFFF'}} onClick={()=>{setSelectedUnitIds([]);setFloorIds(current=>current.includes(floor.id)?current.filter(id=>id!==floor.id):[...current,floor.id]);}}>{floor.label}</button>)}</div><span style={{fontSize:12,color:'#64748B'}}>İstediğiniz katları birlikte seçin; görünenleri seçerek aynı fiyatı topluca kaydedin.</span></div>
       </section>
 
 
@@ -890,6 +910,7 @@ export function ProjectSalesStockView({
                   </span>
                 </div>
 
+                <UnitFacadeEditor unitId={unit.id} facades={unit.facades || []}/>
                 <div
                   style={{
                     display: "grid",

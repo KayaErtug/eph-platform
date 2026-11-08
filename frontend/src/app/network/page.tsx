@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   Bell,
   Bookmark,
+  CheckCircle2,
   ChevronDown,
   Edit3,
   Loader2,
@@ -15,6 +16,8 @@ import {
   SlidersHorizontal,
   Sparkles,
   Trash2,
+  TriangleAlert,
+  X,
 } from "lucide-react";
 
 import ForumAdvancedFilter, {
@@ -29,7 +32,12 @@ import {
   type EPHSchemaState,
 } from "@/components/schema-engine";
 import {
+  deriveLegacyLocationFields,
+  normalizeLocationAreas as normalizeEPHLocationAreas,
+} from "@/components/create-system";
+import {
   FORUM_REQUEST_CATEGORY_OPTIONS,
+  FORUM_PROPERTY_TYPE_OPTIONS,
   FORUM_REQUEST_VISIBILITY_OPTIONS,
   getForumRequestCategoryVisual,
   getForumRequestIntentVisual,
@@ -68,6 +76,10 @@ type NetworkPost = {
   maxRoom?: number | null;
   minBudget?: number | null;
   maxBudget?: number | null;
+  propertyTypes?: string[] | null;
+  roomCounts?: string[] | null;
+  features?: string[] | null;
+  priceCurrency?: string | null;
   areas?: Array<{
     city?: string | null;
     district?: string | null;
@@ -80,6 +92,12 @@ type NetworkPost = {
   viewCount?: number | null;
   followerCount?: number | null;
   requestCount?: number | null;
+  allowPhoneCall?: boolean;
+  contactPhone?: string | null;
+  phoneCallAllowed?: boolean;
+  allowWhatsapp?: boolean;
+  whatsappPhone?: string | null;
+  whatsappAllowed?: boolean;
 };
 
 type ForumCategory =
@@ -105,23 +123,94 @@ type ForumAreaEntry = {
   neighborhood: string;
 };
 
-function normalizeForumAreas(value: unknown): ForumAreaEntry[] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((item) => ({
-      city: String((item as { city?: unknown })?.city || "").trim(),
-      district: String((item as { district?: unknown })?.district || "").trim(),
-      neighborhood: String(
-        (item as { neighborhood?: unknown })?.neighborhood || "",
-      ).trim(),
-    }))
-    .filter((item) => item.city && item.district);
+function normalizeForumAreas(
+  value: unknown,
+): ForumAreaEntry[] {
+  return normalizeEPHLocationAreas(value).map(
+    (area) => ({
+      city: area.city,
+      district: area.district,
+      neighborhood: area.neighborhood,
+    }),
+  );
+}
+
+function formatForumArea(
+  area: ForumAreaEntry,
+) {
+  return [
+    area.city,
+    area.district,
+    area.neighborhood,
+  ]
+    .filter(Boolean)
+    .join(" / ");
+}
+
+function getPostAreaLabels(
+  post: Pick<
+    NetworkPost,
+    | "areas"
+    | "city"
+    | "district"
+    | "neighborhood"
+  >,
+) {
+  const normalizedAreas =
+    normalizeForumAreas(post.areas);
+
+  const areaLabels = normalizedAreas
+    .map(formatForumArea)
+    .filter(Boolean);
+
+  if (areaLabels.length > 0) {
+    return Array.from(
+      new Set(areaLabels),
+    );
+  }
+
+  const legacyLocation = [
+    post.city,
+    post.district,
+    post.neighborhood,
+  ]
+    .filter(Boolean)
+    .join(" / ");
+
+  return legacyLocation
+    ? [legacyLocation]
+    : [];
+}
+
+function getPostAreaCompactLabel(
+  post: Pick<
+    NetworkPost,
+    | "areas"
+    | "city"
+    | "district"
+    | "neighborhood"
+  >,
+) {
+  const areas = getPostAreaLabels(post);
+
+  if (areas.length === 0) {
+    return "Konum belirtilmedi";
+  }
+
+  if (areas.length === 1) {
+    return areas[0];
+  }
+
+  return `${areas[0]} +${
+    areas.length - 1
+  } bölge`;
 }
 
 type TopicForm = {
   title: string;
   category: ForumCategory | "";
   requestIntent: string;
+  propertyType: string;
   areas: ForumAreaEntry[];
   city: string;
   district: string;
@@ -138,6 +227,28 @@ type TopicForm = {
   urgency: string;
   validFor: string;
   visibility: string;
+  allowPhoneCall: boolean;
+  contactPhone: string;
+  allowWhatsapp: boolean;
+  whatsappPhone: string;
+};
+
+type PropertyValidationWarningIssue = {
+  code: string;
+  field?: string;
+  message?: string;
+  metadata?: {
+    linaExplanation?: string;
+    [key: string]: unknown;
+  };
+};
+
+type PropertyValidationConfirmation = {
+  form: TopicForm;
+  linaTitle: string;
+  confirmationText: string;
+  requiredWarningCodes: string[];
+  warnings: PropertyValidationWarningIssue[];
 };
 
 type PersonalTabKey = "ALL" | "MINE" | "SAVED" | "INTERESTED";
@@ -312,6 +423,7 @@ const DEFAULT_FORM: TopicForm = {
   title: "",
   category: "",
   requestIntent: "",
+  propertyType: "",
   areas: [],
   city: "",
   district: "",
@@ -328,6 +440,10 @@ const DEFAULT_FORM: TopicForm = {
   urgency: "Normal",
   validFor: "7 gün",
   visibility: "TUM_EPH",
+  allowPhoneCall: false,
+  contactPhone: "",
+  allowWhatsapp: false,
+  whatsappPhone: "",
 };
 
 function normalizeText(value?: string | null) {
@@ -471,6 +587,93 @@ function formatMoney(value?: string | number | null, currency = "TRY") {
   return `${numeric.toLocaleString("tr-TR")} ${currency === "TRY" ? "TL" : currency}`;
 }
 
+function formatRequestRange(
+  min?: number | null,
+  max?: number | null,
+  suffix = "",
+) {
+  const minimum = min != null && Number(min) > 0 ? Number(min) : null;
+  const maximum = max != null && Number(max) > 0 ? Number(max) : null;
+  const format = (value: number) =>
+    `${value.toLocaleString("tr-TR")}${suffix ? ` ${suffix}` : ""}`;
+
+  if (minimum !== null && maximum !== null) {
+    return minimum === maximum
+      ? format(minimum)
+      : `${format(minimum)} – ${format(maximum)}`;
+  }
+  if (minimum !== null) return `${format(minimum)} ve üzeri`;
+  if (maximum !== null) return `${format(maximum)}'a kadar`;
+  return "Belirtilmedi";
+}
+
+function getRequestPropertyTypeLabel(post: NetworkPost) {
+  const values = Array.isArray(post.propertyTypes) ? post.propertyTypes : [];
+  if (values.length === 0) return "Belirtilmedi";
+
+  return values
+    .map(
+      (value) =>
+        FORUM_PROPERTY_TYPE_OPTIONS.find((item) => item.value === value)?.label ||
+        String(value).replaceAll("_", " "),
+    )
+    .join(", ");
+}
+
+function formatPostBudget(post: NetworkPost) {
+  const currency = budgetCurrencyFromPost(post);
+
+  const minBudget =
+    post.minBudget != null && Number(post.minBudget) > 0
+      ? Number(post.minBudget)
+      : null;
+
+  const maxBudget =
+    post.maxBudget != null && Number(post.maxBudget) > 0
+      ? Number(post.maxBudget)
+      : null;
+
+  if (
+    minBudget !== null &&
+    maxBudget !== null
+  ) {
+    if (minBudget === maxBudget) {
+      return formatMoney(minBudget, currency);
+    }
+
+    return `${formatMoney(
+      minBudget,
+      currency,
+    )} – ${formatMoney(
+      maxBudget,
+      currency,
+    )}`;
+  }
+
+  if (minBudget !== null) {
+    return `${formatMoney(
+      minBudget,
+      currency,
+    )} ve üzeri`;
+  }
+
+  if (maxBudget !== null) {
+    return `${formatMoney(
+      maxBudget,
+      currency,
+    )}'a kadar`;
+  }
+
+  if (
+    post.budget != null &&
+    Number(post.budget) > 0
+  ) {
+    return formatMoney(post.budget, currency);
+  }
+
+  return "Bütçe belirtilmedi";
+}
+
 function formatBudgetInput(value: string) {
   const digits = String(value || "")
     .replace(/\D/g, "")
@@ -574,6 +777,10 @@ function formFromPost(post: NetworkPost): TopicForm {
     title: post.title || "",
     category: getCategoryOption(post.type).value,
     requestIntent: getRequestIntentFromPost(post),
+    propertyType:
+      Array.isArray(post.propertyTypes) && post.propertyTypes.length > 0
+        ? String(post.propertyTypes[0] || "")
+        : "",
     areas: normalizeForumAreas(post.areas),
     city: post.city || "",
     district: post.district || "",
@@ -583,13 +790,27 @@ function formFromPost(post: NetworkPost): TopicForm {
     maxArea: post.maxArea != null ? String(post.maxArea) : "",
     minRoom: post.minRoom != null ? String(post.minRoom) : "",
     maxRoom: post.maxRoom != null ? String(post.maxRoom) : "",
-    minBudget: post.minBudget ? formatBudgetInput(String(post.minBudget)) : "",
-    maxBudget: post.maxBudget ? formatBudgetInput(String(post.maxBudget)) : "",
-    currency: budgetCurrencyFromPost(post),
+    minBudget:
+      post.minBudget
+        ? formatBudgetInput(String(post.minBudget))
+        : post.budget
+          ? formatBudgetInput(String(post.budget))
+          : "",
+    maxBudget:
+      post.maxBudget
+        ? formatBudgetInput(String(post.maxBudget))
+        : post.budget
+          ? formatBudgetInput(String(post.budget))
+          : "",
+    currency: post.priceCurrency || budgetCurrencyFromPost(post),
     detail: post.description || "",
     urgency: post.urgency || "Normal",
     validFor: validForFromExpiresAt(post.expiresAt),
     visibility: post.visibility || "TUM_EPH",
+    allowPhoneCall: Boolean(post.allowPhoneCall),
+    contactPhone: post.contactPhone || "",
+    allowWhatsapp: Boolean(post.allowWhatsapp),
+    whatsappPhone: post.whatsappPhone || "",
   };
 }
 
@@ -638,6 +859,8 @@ export default function NetworkPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<NetworkPost | null>(null);
   const [saving, setSaving] = useState(false);
+  const [propertyValidationConfirmation, setPropertyValidationConfirmation] =
+    useState<PropertyValidationConfirmation | null>(null);
   const [deletingId, setDeletingId] = useState("");
   const [flowFilter, setFlowFilter] = useState("Tüm Talepler");
   const [intentFilter, setIntentFilter] = useState("Tümü");
@@ -781,7 +1004,10 @@ export default function NetworkPage() {
     INTERESTED: interestedCount,
   };
 
-  const saveTopic = async (form: TopicForm) => {
+  const saveTopic = async (
+    form: TopicForm,
+    acknowledgedWarningCodes: string[] = [],
+  ) => {
     if (!user?.id) {
       alert("Oturum bulunamadı. Lütfen tekrar giriş yapın.");
       router.push("/giris");
@@ -807,6 +1033,14 @@ export default function NetworkPage() {
       return;
     }
 
+    if (
+      form.category === "PORTFOY_ARIYORUM" &&
+      !form.propertyType
+    ) {
+      alert("Lütfen gayrimenkul tipini seçin.");
+      return;
+    }
+
     if (!form.title.trim()) {
       alert("Lütfen talep başlığını yazın.");
       return;
@@ -829,31 +1063,58 @@ export default function NetworkPage() {
       form.city,
       form.district,
       form.neighborhood,
-      form.budget ? `Döviz:${form.currency}` : "",
+      form.budget || form.minBudget || form.maxBudget
+        ? `Döviz:${form.currency}`
+        : "",
     ]
       .filter(Boolean)
       .slice(0, 8);
 
+    const minBudgetValue = form.minBudget
+      ? Number(form.minBudget.replace(/\D/g, ""))
+      : null;
+
+    const maxBudgetValue = form.maxBudget
+      ? Number(form.maxBudget.replace(/\D/g, ""))
+      : null;
+
+    const legacyBudgetValue =
+      maxBudgetValue ||
+      minBudgetValue ||
+      (form.budget
+        ? Number(form.budget.replace(/\D/g, ""))
+        : null);
+
     const payload = {
       userId: user.id,
       type: selectedCategory.value,
+      propertyTypes:
+        form.category === "PORTFOY_ARIYORUM" && form.propertyType
+          ? [form.propertyType]
+          : [],
+      priceCurrency: form.currency,
       title: form.title.trim(),
       description: form.detail.trim(),
       city: form.city.trim() || null,
       district: form.district.trim() || null,
       neighborhood: form.neighborhood.trim() || null,
-      budget: form.budget ? Number(form.budget.replace(/\D/g, "")) : null,
+      budget: legacyBudgetValue,
       minArea: form.minArea ? Number(form.minArea.replace(/\D/g, "")) : null,
       maxArea: form.maxArea ? Number(form.maxArea.replace(/\D/g, "")) : null,
       minRoom: form.minRoom ? Number(form.minRoom.replace(/\D/g, "")) : null,
       maxRoom: form.maxRoom ? Number(form.maxRoom.replace(/\D/g, "")) : null,
-      minBudget: form.minBudget ? Number(form.minBudget.replace(/\D/g, "")) : null,
-      maxBudget: form.maxBudget ? Number(form.maxBudget.replace(/\D/g, "")) : null,
+      minBudget: minBudgetValue,
+      maxBudget: maxBudgetValue,
       areas: form.areas,
       urgency: form.urgency,
       visibility: form.visibility,
+      allowPhoneCall: form.allowPhoneCall,
+      contactPhone: form.allowPhoneCall ? form.contactPhone.trim() : null,
+      allowWhatsapp: form.allowWhatsapp,
+      whatsappPhone: form.allowWhatsapp ? form.whatsappPhone.trim() : null,
       tags,
       expiresAt: expiresAtFromValidFor(form.validFor),
+      acknowledgedWarningCodes,
     };
 
     try {
@@ -866,10 +1127,46 @@ export default function NetworkPage() {
       }
 
       await fetchPosts();
+      setPropertyValidationConfirmation(null);
       setModalOpen(false);
       setEditingPost(null);
     } catch (error: any) {
-      alert(error?.response?.data?.message || "Talep kaydedilemedi.");
+      const responseData = error?.response?.data;
+
+      if (
+        responseData?.code ===
+        "PROPERTY_VALIDATION_CONFIRMATION_REQUIRED"
+      ) {
+        const requiredWarningCodes = Array.isArray(
+          responseData.requiredWarningCodes,
+        )
+          ? responseData.requiredWarningCodes.filter(
+              (code: unknown): code is string =>
+                typeof code === "string" && Boolean(code.trim()),
+            )
+          : [];
+
+        const warnings = Array.isArray(responseData.warnings)
+          ? responseData.warnings
+          : [];
+
+        if (requiredWarningCodes.length > 0) {
+          setPropertyValidationConfirmation({
+            form,
+            linaTitle:
+              responseData.linaTitle ||
+              "Lina olağan dışı bir değer fark etti",
+            confirmationText:
+              responseData.confirmationText ||
+              "Bu değerin doğru olduğunu onaylıyorum",
+            requiredWarningCodes,
+            warnings,
+          });
+          return;
+        }
+      }
+
+      alert(responseData?.message || "Talep kaydedilemedi.");
     } finally {
       setSaving(false);
     }
@@ -1394,15 +1691,6 @@ export default function NetworkPage() {
         </section>
       </div>
 
-      <button
-        type="button"
-        onClick={() => router.push("/lina")}
-        className="fixed right-4 z-30 flex h-[76px] w-[76px] flex-col items-center justify-center rounded-full bg-gradient-to-br from-[#7C3AED] to-[#4F46E5] text-white shadow-[0_18px_38px_rgba(79,70,229,0.34)]"
-        style={{ bottom: "calc(84px + env(safe-area-inset-bottom, 0px))" }}
-      >
-        <Sparkles size={25} fill="white" />
-        <span className="mt-1 text-[13px] font-black">Lina</span>
-      </button>
 
       <ForumAdvancedFilter
         open={advancedFilterOpen}
@@ -1423,13 +1711,164 @@ export default function NetworkPage() {
           categories={roleCategories}
           userRole={user?.role}
           onClose={() => {
+            setPropertyValidationConfirmation(null);
             setModalOpen(false);
             setEditingPost(null);
           }}
           onSave={saveTopic}
         />
       )}
+
+      {propertyValidationConfirmation && (
+        <LinaPropertyValidationModal
+          warning={propertyValidationConfirmation}
+          saving={saving}
+          onClose={() =>
+            setPropertyValidationConfirmation(null)
+          }
+          onConfirm={async () => {
+            const currentWarning =
+              propertyValidationConfirmation;
+
+            setPropertyValidationConfirmation(null);
+
+            await saveTopic(
+              currentWarning.form,
+              currentWarning.requiredWarningCodes,
+            );
+          }}
+        />
+      )}
     </main>
+  );
+}
+
+function LinaPropertyValidationModal({
+  warning,
+  saving,
+  onClose,
+  onConfirm,
+}: {
+  warning: PropertyValidationConfirmation;
+  saving: boolean;
+  onClose: () => void;
+  onConfirm: () => void | Promise<void>;
+}) {
+  const [confirmed, setConfirmed] = useState(false);
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/60 p-0 backdrop-blur-[2px] sm:items-center sm:p-5">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="lina-property-warning-title"
+        className="max-h-[92dvh] w-full overflow-y-auto rounded-t-[30px] border border-amber-300 bg-[#FFFBEB] shadow-[0_28px_90px_rgba(15,23,42,0.35)] sm:max-w-[560px] sm:rounded-[30px]"
+      >
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-amber-200 bg-[#FFFBEB]/95 px-5 py-5 backdrop-blur sm:px-6">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+              <Sparkles size={25} />
+            </div>
+
+            <div className="min-w-0">
+              <p className="text-[11px] font-black uppercase tracking-[0.14em] text-amber-700">
+                Lina Kontrolü
+              </p>
+              <h2
+                id="lina-property-warning-title"
+                className="mt-1 text-[20px] font-black leading-tight text-slate-900"
+              >
+                {warning.linaTitle}
+              </h2>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            aria-label="Uyarıyı kapat"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-amber-200 bg-white text-slate-600 disabled:opacity-50"
+          >
+            <X size={19} />
+          </button>
+        </div>
+
+        <div className="space-y-4 px-5 py-5 sm:px-6">
+          <div className="flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-100/70 p-4">
+            <TriangleAlert
+              size={22}
+              className="mt-0.5 shrink-0 text-amber-700"
+            />
+            <p className="text-[13px] font-semibold leading-6 text-amber-950">
+              Girdiğiniz değer mümkün görünüyor; ancak olağan aralığın
+              dışında. Yazım hatası olmadığını kontrol edin.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            {warning.warnings.map((issue, index) => (
+              <div
+                key={`${issue.code}-${index}`}
+                className="rounded-2xl border border-amber-200 bg-white p-4"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                    <TriangleAlert size={16} />
+                  </div>
+
+                  <p className="text-[13px] font-bold leading-6 text-slate-800">
+                    {issue.metadata?.linaExplanation ||
+                      issue.message ||
+                      "Olağan dışı bir kriter değeri tespit edildi."}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-amber-300 bg-white p-4">
+            <input
+              type="checkbox"
+              checked={confirmed}
+              onChange={(event) =>
+                setConfirmed(event.target.checked)
+              }
+              disabled={saving}
+              className="mt-1 h-5 w-5 shrink-0 accent-amber-600"
+            />
+            <span className="text-[13px] font-black leading-6 text-slate-900">
+              {warning.confirmationText}
+            </span>
+          </label>
+
+          <div className="grid grid-cols-1 gap-3 pt-1 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+              className="h-12 rounded-2xl border border-slate-300 bg-white px-4 text-[13px] font-black text-slate-700 disabled:opacity-50"
+            >
+              Değeri Düzelt
+            </button>
+
+            <button
+              type="button"
+              onClick={onConfirm}
+              disabled={!confirmed || saving}
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-amber-600 px-4 text-[13px] font-black text-white shadow-lg shadow-amber-600/20 disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              {saving ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <CheckCircle2 size={18} />
+              )}
+              Onayla ve Devam Et
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1495,12 +1934,12 @@ function RequestCard({
         ? "GÜMÜŞ"
         : "";
   const urgency = String(post.urgency || "Normal");
-  const location = [post.city, post.district, post.neighborhood]
-    .filter(Boolean)
-    .join(" / ");
-  const budget = post.budget
-    ? formatMoney(post.budget, budgetCurrencyFromPost(post))
-    : "Bütçe belirtilmedi";
+  const location =
+    getPostAreaCompactLabel(post);
+  const budget = formatPostBudget(post);
+  const propertyType = getRequestPropertyTypeLabel(post);
+  const areaRange = formatRequestRange(post.minArea, post.maxArea, "m²");
+  const roomRange = formatRequestRange(post.minRoom, post.maxRoom, "oda");
   const remaining = remainingTime(post.expiresAt);
   const remainingMatch = remaining.match(/\d+/);
   const remainingDay = remainingMatch ? Number(remainingMatch[0]) : null;
@@ -1548,6 +1987,16 @@ function RequestCard({
         : urgency === "Müşteri Hazır"
           ? "border-emerald-200 bg-emerald-50 text-emerald-700"
           : "border-slate-200 bg-slate-50 text-slate-600";
+  const requestFacts = [
+    { label: "Talep Türü", value: requestIntent },
+    { label: "Gayrimenkul", value: propertyType },
+    { label: "Konum", value: location },
+    { label: "Bütçe", value: budget },
+    { label: "Alan", value: areaRange },
+    { label: "Oda", value: roomRange },
+    { label: "Aciliyet", value: urgency },
+    { label: "Süre", value: remaining },
+  ];
 
   return (
     <article
@@ -1668,38 +2117,37 @@ function RequestCard({
       <button
         type="button"
         onClick={onOpen}
-        className="mt-1.5 grid w-full grid-cols-2 gap-x-2 gap-y-1 rounded-[12px] px-2 py-1.5 text-left"
-        style={{
-          backgroundColor: hasPortfolioIntent
-            ? intentVisual.backgroundColor
-            : categoryVisual.selectedBackgroundColor,
-          border: `1px solid ${
-            hasPortfolioIntent
-              ? intentVisual.borderColor
-              : categoryVisual.borderColor
-          }`,
-        }}
+        className="mt-1.5 grid w-full grid-cols-4 gap-1.5 rounded-[14px] border border-white/80 bg-white/78 p-1.5 text-center"
       >
-        <span className="min-w-0 break-words text-[9.5px] font-black leading-3 text-[#EA580C]">
-          {budget}
-        </span>
+        {requestFacts.map((fact) => (
+          <span
+            key={fact.label}
+            className="flex min-h-[54px] min-w-0 flex-col items-center justify-center rounded-[11px] border border-[#F3D8B6] bg-[#FFF9F0] px-1 py-1"
+          >
+            <span className="text-[7px] font-black uppercase leading-[9px] tracking-[0.04em] text-[#9A6B35]">
+              {fact.label}
+            </span>
+            <span
+              className={`mt-1 line-clamp-2 break-words text-[8.5px] font-black leading-[10px] ${
+                fact.label === "Süre" && remainingDanger
+                  ? "text-red-500"
+                  : "text-[#3A2208]"
+              }`}
+            >
+              {fact.value || "Belirtilmedi"}
+            </span>
+          </span>
+        ))}
+      </button>
 
-        <span
-          className={`min-w-0 break-words text-right text-[9.5px] font-black leading-3 ${
-            remainingDanger ? "text-red-500" : "text-emerald-600"
-          }`}
-        >
-          {remaining}
-        </span>
-
-        <span className="min-w-0 break-words text-[9px] font-bold leading-3 text-[#6F4E2B]">
+      <div className="mt-1 flex items-center justify-between gap-2 px-1 text-[8.5px] font-bold leading-3 text-[#7C5A36]">
+        <span className="min-w-0 break-words">
           👤 {ownerName} · {ownerRole}
         </span>
-
-        <span className="min-w-0 break-words text-right text-[9px] font-bold leading-3 text-[#7C5A36]">
+        <span className="shrink-0 text-right">
           {createdDate} · {visibility}
         </span>
-      </button>
+      </div>
 
       <div className="mt-1.5 flex min-w-0 items-center justify-between gap-2 rounded-[12px] border border-white/80 bg-white/88 px-1.5 py-1.5 shadow-[0_3px_10px_rgba(15,23,42,0.06)]">
         <div className="flex min-w-0 items-center gap-1">
@@ -1844,6 +2292,7 @@ function topicFormToSchemaState(form: TopicForm): EPHSchemaState {
   return {
     category: form.category,
     requestIntent: form.requestIntent,
+    propertyType: form.propertyType,
     areas: form.areas as unknown as string[],
     title: form.title,
     city: form.city,
@@ -1860,19 +2309,36 @@ function topicFormToSchemaState(form: TopicForm): EPHSchemaState {
     urgency: form.urgency,
     validFor: form.validFor,
     visibility: form.visibility,
+    allowPhoneCall: form.allowPhoneCall,
+    contactPhone: form.contactPhone,
+    allowWhatsapp: form.allowWhatsapp,
+    whatsappPhone: form.whatsappPhone,
     description: form.detail,
   };
 }
 
-function schemaStateToTopicForm(state: EPHSchemaState): TopicForm {
+function schemaStateToTopicForm(
+  state: EPHSchemaState,
+): TopicForm {
+  const areas = normalizeForumAreas(state.areas);
+  const primaryLocation =
+    deriveLegacyLocationFields(areas);
+
   return {
     category: String(state.category || "") as ForumCategory | "",
     requestIntent: String(state.requestIntent || ""),
-    areas: normalizeForumAreas(state.areas),
+    propertyType: String(state.propertyType || ""),
+    areas,
     title: String(state.title || ""),
-    city: String(state.city || ""),
-    district: String(state.district || ""),
-    neighborhood: String(state.neighborhood || ""),
+    city:
+      primaryLocation.city ||
+      String(state.city || ""),
+    district:
+      primaryLocation.district ||
+      String(state.district || ""),
+    neighborhood:
+      primaryLocation.neighborhood ||
+      String(state.neighborhood || ""),
     budget: String(state.budget || ""),
     minArea: String(state.minArea || ""),
     maxArea: String(state.maxArea || ""),
@@ -1884,6 +2350,10 @@ function schemaStateToTopicForm(state: EPHSchemaState): TopicForm {
     urgency: String(state.urgency || "Normal"),
     validFor: String(state.validFor || "7 gün"),
     visibility: String(state.visibility || "TUM_EPH"),
+    allowPhoneCall: Boolean(state.allowPhoneCall),
+    contactPhone: String(state.contactPhone || ""),
+    allowWhatsapp: Boolean(state.allowWhatsapp),
+    whatsappPhone: String(state.whatsappPhone || ""),
     detail: String(state.description || ""),
   };
 }
@@ -1974,4 +2444,3 @@ function TopicModal({
     />
   );
 }
-

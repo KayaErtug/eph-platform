@@ -6,6 +6,14 @@ const nextConfig = withPWA({
   aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,
   disable: process.env.NODE_ENV === "development",
-})({});
+  extendDefaultRuntimeCaching: true,
+  workboxOptions: {
+    runtimeCaching: [{
+      urlPattern: /\/api\/payments(?:\/|$)/,
+      handler: "NetworkOnly",
+      options: { cacheName: "eph-payments-network-only" },
+    }],
+  },
+})({ devIndicators: false });
 
 export default nextConfig;

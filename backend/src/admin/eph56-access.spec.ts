@@ -157,7 +157,7 @@ describe('EPH-56 first trial duration', () => {
     const result = await service.updateUserMembership('target', { paketKodu: 'DENEME', gunSayisi: days }, actor(Role.SUPER_ADMIN));
     expect((result.uyelik.bitisTarihi.getTime() - result.uyelik.baslangicTarihi.getTime()) / 86400000).toBe(days);
     expect(tx.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ actorId: 'actor', action: AuditAction.UPDATE_USER_PACKAGE }) }));
-    expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
+    expect(tx.$executeRaw).toHaveBeenCalledTimes(2); // EPH-70B1F/D7: payment-user kilidi + mevcut üyelik kilidi
   });
 
   it('SUPER_ADMIN assigns one calendar month using aySayisi', async () => {

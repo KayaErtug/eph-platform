@@ -9,7 +9,6 @@ import {
   MessageCircle,
   Plus,
   Search,
-  Sparkles,
   Star,
   TrendingUp,
   UsersRound,
@@ -74,7 +73,7 @@ export default function ForumV3PreviewPage() {
 
             <div className="min-w-0 text-center">
               <p className="mx-auto inline-flex min-h-[26px] items-center justify-center rounded-full bg-[#EFF6FF] px-3 py-1 text-center text-[11px] font-black text-[#1557D6]">
-                Forum Merkezi
+                Talep Merkezi
               </p>
 
               <h1 className="mt-2 text-center text-[24px] font-black leading-none tracking-[-0.045em] text-[#06194A]">
@@ -90,13 +89,13 @@ export default function ForumV3PreviewPage() {
               type="button"
               onClick={() => router.push("/network")}
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] bg-[#1557D6] text-white shadow-[0_14px_28px_rgba(21,87,214,0.24)]"
-              aria-label="Mevcut forum sayfasına git"
+              aria-label="Talep Merkezi sayfasına git"
             >
               <Plus size={21} />
             </button>
           </div>
 
-          <div className="mt-3 grid grid-cols-3 gap-2">
+          <div className="mt-3 grid grid-cols-2 gap-2">
             <CompactStat label="Paylaşım" value="3" />
             <CompactStat label="Mesaj" value="5" />
             <CompactStat label="Takip" value="0" quiet />
@@ -164,7 +163,7 @@ export default function ForumV3PreviewPage() {
             </h2>
 
             <Link href="/network" className="text-center text-[12px] font-black text-[#1557D6]">
-              Forum
+              Talep Merkezi
             </Link>
           </div>
 
@@ -178,9 +177,8 @@ export default function ForumV3PreviewPage() {
             Bildirimler
           </h2>
 
-          <div className="mt-3 grid grid-cols-3 gap-2">
+          <div className="mt-3 grid grid-cols-2 gap-2">
             <ActionButton icon={<Bell size={17} />} label="Bildirim" href="/notification-settings" />
-            <ActionButton icon={<Sparkles size={17} />} label="Lina" href="/lina" />
             <ActionButton icon={<MessageCircle size={17} />} label="Mesaj" href="/messages" />
           </div>
         </section>

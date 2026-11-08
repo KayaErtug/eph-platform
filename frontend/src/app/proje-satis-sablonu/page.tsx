@@ -1,5 +1,7 @@
 "use client";
+import { isShop, expandShops, shopError } from './lib/commercialInventory';
 
+import { MONTH_NAMES, monthChoices, parseSharedLocation, validateProjectDates } from './lib/planningInput';
 import {
   useCallback,
   useEffect,
@@ -57,6 +59,7 @@ import type {
   PageMode,
   ProjectForm,
   ProjectLaunchCenterResponse,
+  ProjectNumberingMode,
   ProjectMediaConfig,
   ProjectMediaEnsureResponse,
   ProjectMediaPackagesResponse,
@@ -70,7 +73,6 @@ import type {
   ProjectSaveDestination,
   ProjectSetupResponse,
   ProjectSpaceForm,
-  ProjectSpacesPreview,
   ProjectSummary,
   ProjectUnitSummary,
   StructurePreview,
@@ -80,7 +82,6 @@ import type {
 
 import {
   FLOOR_CARD_PALETTES,
-  PROJECT_SPACE_CARD_PALETTES,
   UNIT_GROUP_PALETTES,
   cardStyle,
   inputStyle,
@@ -90,6 +91,9 @@ import {
 import { DeleteProjectModal, NoticeModal } from "./components/ProjectSalesModals";
 import { Field, InfoBand, Metric, SectionTitle } from "./components/ProjectSalesPrimitives";
 import { ProjectMediaCenterView } from "./components/ProjectMediaCenterView";
+import { ProjectInventoryNumberingPanel } from "./components/ProjectInventoryNumberingPanel";
+import { resolveProjectLocation } from "./lib/projectLocation";
+import { ProjectLocationMap } from "./components/ProjectLocationMap";
 import { ProjectSalesLaunchFlowView } from "./components/ProjectSalesLaunchFlowView";
 import { ProjectSalesStockView } from "./components/ProjectSalesStockView";
 import {
@@ -103,8 +107,6 @@ import {
   PROJECT_SPACE_TYPE_OPTIONS,
   SALES_COMMERCIAL_PURPOSES,
   SALES_STATUS_OPTIONS,
-  SPACE_COMMERCIAL_PURPOSE_OPTIONS,
-  SPACE_LEGAL_STATUS_OPTIONS,
   TECHNICAL_SPACE_TYPES,
   UNIT_TYPE_OPTIONS,
 } from "./lib/projectSalesOptions";
@@ -128,7 +130,42 @@ import {
   statusLabel,
   unitTypeLabel,
 } from "./lib/projectSalesFormatters";
+import {
+  defaultNumberPrefix,
+  inferProjectNumberingMode,
+} from "./lib/projectSalesNumbering";
 
+
+const PROJECT_LIFECYCLE_OPTIONS = [
+  {
+    value: "READY",
+    title: "Hazır Proje",
+    description:
+      "Yapımı tamamlandı; bağımsız bölümler hemen satışa veya teslime hazır.",
+  },
+  {
+    value: "UNDER_CONSTRUCTION",
+    title: "Devam Eden Proje",
+    description:
+      "İnşaat sürüyor; ön satış, ilerleme ve teslim tarihi yönetilecek.",
+  },
+  {
+    value: "PLANNED",
+    title: "Planlanan Proje",
+    description:
+      "Henüz başlamadı; ön talep, yatırımcı ve müşteri ilgisi toplanacak.",
+  },
+] as const;
+
+const SIMPLE_UNIT_TYPES = new Set(['DAIRE','DUKKAN_MAGAZA','VILLA','OFIS_BURO','DUBLEKS','PENTHOUSE','DIGER']);
+const PROJECT_ROOM_OPTIONS=Array.from({length:10},(_,index)=>Array.from({length:5},(_,salon)=>`${index+1}+${salon}`)).flat();
+
+function projectLifecycleLabel(value: string | null | undefined) {
+  return (
+    PROJECT_LIFECYCLE_OPTIONS.find((option) => option.value === value)?.title ||
+    "Aşama Seçilmedi"
+  );
+}
 
 function facadeCountForGeometry(geometryType: string) {
   const counts: Record<string, number> = {
@@ -232,7 +269,10 @@ function buildFloors(block: BlockForm) {
 }
 
 
-function createUnitGroup(defaultType = "DAIRE"): UnitGroupForm {
+function createUnitGroup(
+  defaultType = "DAIRE",
+  defaultConceptLabel = "",
+): UnitGroupForm {
   return {
     key: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
     type: defaultType,
@@ -242,7 +282,8 @@ function createUnitGroup(defaultType = "DAIRE"): UnitGroupForm {
     grossArea: "",
     commercialPurpose: "SATISA_SUNULACAK",
     facades: [],
-    conceptLabel: "",
+    conceptLabel:
+      defaultType === "DIGER" ? defaultConceptLabel : "",
   };
 }
 
@@ -268,25 +309,49 @@ function floorNumberingFromUnits(
     };
   }
 
-  const floorMarker =
-    floorLevel < 0
-      ? `-B${Math.abs(floorLevel)}`
-      : floorLevel === 0
-        ? "-Z"
-        : `-${floorLevel}`;
-  const markerIndex = firstNumber.lastIndexOf(floorMarker);
+  if (floorLevel <= 0) {
+    const markers =
+      floorLevel < 0
+        ? [`-B${Math.abs(floorLevel)}-`, `-B${Math.abs(floorLevel)}`]
+        : ["-Z-", "-Z"];
+    const marker = markers.find((candidate) => firstNumber.includes(candidate));
+    const markerIndex = marker ? firstNumber.lastIndexOf(marker) : -1;
 
-  if (markerIndex <= 0) {
+    if (!marker || markerIndex <= 0) {
+      return {
+        numberPrefix: fallbackPrefix,
+        startingSequence: "1",
+      };
+    }
+
+    const rawSequence = firstNumber.slice(markerIndex + marker.length).trim();
+    const parsedSequence = Number(rawSequence);
+
+    return {
+      numberPrefix: firstNumber.slice(0, markerIndex).trim() || fallbackPrefix,
+      startingSequence:
+        Number.isInteger(parsedSequence) && parsedSequence > 0
+          ? String(parsedSequence)
+          : "1",
+    };
+  }
+
+  const lastDashIndex = firstNumber.lastIndexOf("-");
+
+  if (lastDashIndex <= 0) {
     return {
       numberPrefix: fallbackPrefix,
       startingSequence: "1",
     };
   }
 
-  const numberPrefix = firstNumber.slice(0, markerIndex).trim();
-  const rawSequence = firstNumber
-    .slice(markerIndex + floorMarker.length)
-    .trim();
+  const numberPrefix = firstNumber.slice(0, lastDashIndex).trim();
+  const tail = firstNumber.slice(lastDashIndex + 1).trim();
+  const floorCode = String(floorLevel);
+  const rawSequence =
+    tail.startsWith(floorCode) && tail.length > floorCode.length
+      ? tail.slice(floorCode.length)
+      : tail;
   const parsedSequence = Number(rawSequence);
 
   return {
@@ -300,6 +365,8 @@ function floorNumberingFromUnits(
 
 function floorPlansFromSetup(setup: ProjectSetupResponse): FloorPlanForm[] {
   const defaultType = setup.plannedUnitTypes?.[0] || "DAIRE";
+  const defaultOtherUnitTypeName =
+    setup.plannedOtherUnitTypeName || "";
   const units = Array.isArray(setup.units) ? setup.units : [];
 
   return setup.blocks.flatMap((block) =>
@@ -328,12 +395,12 @@ function floorPlansFromSetup(setup: ProjectSetupResponse): FloorPlanForm[] {
           [...(unit.facades || [])].sort(),
           unit.conceptLabel || "",
         ]);
-        const current = groupedUnits.get(groupKey);
+        const current = isShop(unit.type) ? undefined : groupedUnits.get(groupKey);
 
         if (current) {
           current.count += 1;
         } else {
-          groupedUnits.set(groupKey, {
+          groupedUnits.set(isShop(unit.type) ? `${groupKey}-${unit.id}` : groupKey, {
             sample: unit,
             count: 1,
           });
@@ -346,7 +413,7 @@ function floorPlansFromSetup(setup: ProjectSetupResponse): FloorPlanForm[] {
               key: `saved-${sample.id}`,
               type: sample.type,
               count: String(count),
-              roomCount: sample.roomCount || "",
+              roomCount: isShop(sample.type) ? "" : sample.roomCount || "",
               netArea:
                 sample.netArea === null ? "" : String(sample.netArea),
               grossArea:
@@ -356,12 +423,18 @@ function floorPlansFromSetup(setup: ProjectSetupResponse): FloorPlanForm[] {
                 ? [...sample.facades]
                 : [],
               conceptLabel: sample.conceptLabel || "",
+              description: sample.description || "",
             }))
-          : [createUnitGroup(defaultType)];
+          : [
+              createUnitGroup(
+                defaultType,
+                defaultOtherUnitTypeName,
+              ),
+            ];
       const numbering = floorNumberingFromUnits(
         floorUnits,
         floor.level,
-        block.normalizedCode || block.code,
+        defaultNumberPrefix(block.normalizedCode || block.code),
       );
 
       return {
@@ -462,6 +535,12 @@ function emptyForm(): ProjectForm {
     name: "",
     code: "",
     description: "",
+    lifecycleStage: "",
+    completionPercent: "",
+    defaultDeliveryDate: "",
+    plannedStartDate: "",
+    permitNumber: "",
+    permitAuthority: "",
     city: "",
     district: "",
     neighborhood: "",
@@ -475,6 +554,7 @@ function emptyForm(): ProjectForm {
     declaredSalesInventoryCount: "",
     geometryType: "DIKDORTGEN",
     plannedUnitTypes: ["DAIRE"],
+    plannedOtherUnitTypeName: "",
   };
 }
 
@@ -483,6 +563,17 @@ function formFromProject(project: ProjectSummary): ProjectForm {
     name: project.name || "",
     code: project.code || "",
     description: project.description || "",
+    lifecycleStage: project.lifecycleStage || "",
+    completionPercent:
+      project.completionPercent === null
+        ? ""
+        : String(project.completionPercent),
+    plannedStartDate: project.plannedStartDate || "",
+    permitNumber: project.permitNumber || "",
+    permitAuthority: project.permitAuthority || "",
+    defaultDeliveryDate: project.defaultDeliveryDate
+      ? project.defaultDeliveryDate.slice(0, 10)
+      : "",
     city: project.city || "",
     district: project.district || "",
     neighborhood: project.neighborhood || "",
@@ -505,6 +596,8 @@ function formFromProject(project: ProjectSummary): ProjectForm {
       project.plannedUnitTypes?.length > 0
         ? project.plannedUnitTypes
         : ["DAIRE"],
+    plannedOtherUnitTypeName:
+      project.plannedOtherUnitTypeName || "",
   };
 }
 
@@ -524,7 +617,49 @@ function integerOrNull(value: string) {
   return parsed !== null && Number.isInteger(parsed) ? parsed : null;
 }
 
+function projectFormSnapshot(form: ProjectForm) {
+  return JSON.stringify({
+    ...form,
+    plannedUnitTypes: [...form.plannedUnitTypes].sort(),
+  });
+}
+
+function blockFormsSnapshot(blocks: BlockForm[]) {
+  return JSON.stringify(
+    blocks.map(({ key: _key, ...block }) => block),
+  );
+}
+
+function floorPlansSnapshot(
+  numberingMode: ProjectNumberingMode,
+  floorPlans: FloorPlanForm[],
+) {
+  return JSON.stringify({
+    numberingMode,
+    floorPlans: floorPlans.map(
+      ({ key: _floorKey, unitGroups, ...floorPlan }) => ({
+        ...floorPlan,
+        unitGroups: unitGroups.map(({ key: _groupKey, facades, ...group }) => ({
+          ...group,
+          facades: [...facades].sort(),
+        })),
+      }),
+    ),
+  });
+}
+
+function projectSpacesSnapshot(spaces: ProjectSpaceForm[]) {
+  return JSON.stringify(
+    spaces.map(({ key: _key, ...space }) => space),
+  );
+}
+
+function isDesignReviewIssue(code: string) {
+  return code.startsWith("SOFTWARE_TEAM_REVIEW");
+}
+
 export default function ProjectSalesCenterPage() {
+  const areaDefaults=useRef<Record<string,{netArea:string;grossArea:string}>>({});
   const router = useRouter();
   const { user, hasHydrated } = useAuthStore();
 
@@ -549,17 +684,25 @@ export default function ProjectSalesCenterPage() {
   const [inventoryPreview, setInventoryPreview] =
     useState<InventoryPreview | null>(null);
   const [inventoryEditMode, setInventoryEditMode] = useState(false);
+  const [numberingMode, setNumberingMode] =
+    useState<ProjectNumberingMode>("FLOOR_CODED");
   const [spacesProject, setSpacesProject] =
     useState<ProjectSetupResponse | null>(null);
   const [projectSpaces, setProjectSpaces] = useState<ProjectSpaceForm[]>([]);
-  const [spacesPreview, setSpacesPreview] =
-    useState<ProjectSpacesPreview | null>(null);
+
+  const [formBaseline, setFormBaseline] = useState(() =>
+    projectFormSnapshot(emptyForm()),
+  );
+  const [structureBaseline, setStructureBaseline] = useState("");
+  const [inventoryBaseline, setInventoryBaseline] = useState("");
+  const [spacesBaseline, setSpacesBaseline] = useState("");
 
   const [completionProject, setCompletionProject] =
     useState<ProjectSetupResponse | null>(null);
   const [completionPreview, setCompletionPreview] =
     useState<CompletionPreview | null>(null);
   const [designReviewMessage, setDesignReviewMessage] = useState("");
+  const [salesStockBlocks,setSalesStockBlocks] = useState<ProjectSetupResponse["blocks"]>([]);
   const [salesStock, setSalesStock] =
     useState<ProjectSalesStockResponse | null>(null);
   const [salesStockDrafts, setSalesStockDrafts] = useState<
@@ -638,15 +781,39 @@ export default function ProjectSalesCenterPage() {
   };
 
   const startNewProject = () => {
+    areaDefaults.current={};
+    const nextForm = emptyForm();
+
     setEditingProject(null);
-    setForm(emptyForm());
+    setForm(nextForm);
+    setFormBaseline(projectFormSnapshot(nextForm));
     setMode("form");
   };
 
-  const editProject = (project: ProjectSummary) => {
-    setEditingProject(project);
-    setForm(formFromProject(project));
-    setMode("form");
+  const editProject = async (project: ProjectSummary) => {
+    setBusyAction("form-load");
+
+    try {
+      const response = await api.get<ProjectSetupResponse>(
+        `/project-sales/projects/${project.id}/setup`,
+      );
+      const setup = response.data;
+      const nextForm = formFromProject(setup);
+
+      setEditingProject(setup);
+      setStructureProject(setup);
+      setForm(nextForm);
+      setFormBaseline(projectFormSnapshot(nextForm));
+      setMode("form");
+    } catch (error) {
+      setNotice({
+        tone: "error",
+        title: "Proje Bilgileri Açılamadı",
+        message: apiMessage(error),
+      });
+    } finally {
+      setBusyAction(null);
+    }
   };
 
   const deleteProject = async () => {
@@ -841,6 +1008,15 @@ export default function ProjectSalesCenterPage() {
     }
   };
 
+  const withdrawProjectFromPool = async () => {
+    if(!launchProject||busyAction)return;
+    if(!window.confirm('Projenin Havuzdaki bölümleri geri çekilecek; proje ve fotoğraflar silinmez. Devam edilsin mi?'))return;
+    setBusyAction('withdraw-from-pool');
+    try {const response=await api.post<{withdrawnUnitCount:number}>(`/project-sales/projects/${launchProject.id}/launch/withdraw-from-pool`);setLaunchCenter((await api.get<ProjectLaunchCenterResponse>(`/project-sales/projects/${launchProject.id}/launch`)).data);setNotice({tone:'success',title:'Havuzdan Geri Çekildi',message:`${response.data.withdrawnUnitCount} bölüm Havuzdan geri çekildi.`});void loadProjects();}
+    catch(error){setNotice({tone:'error',title:'Geri Çekilemedi',message:apiMessage(error)});}
+    finally{setBusyAction(null);}
+  };
+
   const previewMediaArchive = async () => {
     if (!mediaProject?.code || !mediaFile) {
       setNotice({
@@ -971,10 +1147,12 @@ export default function ProjectSalesCenterPage() {
     setBusyAction("sales-stock-load");
 
     try {
-      const response = await api.get<ProjectSalesStockResponse>(
-        `/project-sales/projects/${project.id}/sales-stock`,
-      );
+      const [response,setupResponse] = await Promise.all([
+        api.get<ProjectSalesStockResponse>(`/project-sales/projects/${project.id}/sales-stock`),
+        api.get<ProjectSetupResponse>(`/project-sales/projects/${project.id}/setup`),
+      ]);
       const stock = response.data;
+      setSalesStockBlocks(setupResponse.data.blocks);
 
       setSalesStock(stock);
       setSalesStockDrafts(
@@ -1180,9 +1358,14 @@ export default function ProjectSalesCenterPage() {
       const setup = response.data;
 
       setStructureProject(setup);
+      const nextForm = formFromProject(setup);
+      const nextBlocks = blockFormsFromSetup(setup);
+
       setEditingProject(setup);
-      setForm(formFromProject(setup));
-      setBlocks(blockFormsFromSetup(setup));
+      setForm(nextForm);
+      setFormBaseline(projectFormSnapshot(nextForm));
+      setBlocks(nextBlocks);
+      setStructureBaseline(blockFormsSnapshot(nextBlocks));
       setStructurePreview(null);
       setMode("structure");
     } catch (error) {
@@ -1197,6 +1380,7 @@ export default function ProjectSalesCenterPage() {
   };
 
   const openInventory = async (project: ProjectSummary) => {
+    areaDefaults.current={};
     setBusyAction("inventory-load");
 
     try {
@@ -1211,10 +1395,17 @@ export default function ProjectSalesCenterPage() {
         );
       }
 
+      const nextNumberingMode = inferProjectNumberingMode(setup.units);
+      const nextFloorPlans = floorPlansFromSetup(setup);
+
       setInventoryProject(setup);
       setStructureProject(setup);
       setEditingProject(setup);
-      setFloorPlans(floorPlansFromSetup(setup));
+      setNumberingMode(nextNumberingMode);
+      setFloorPlans(nextFloorPlans);
+      setInventoryBaseline(
+        floorPlansSnapshot(nextNumberingMode, nextFloorPlans),
+      );
       setInventoryPreview(null);
       setInventoryEditMode(false);
       setMode("inventory");
@@ -1247,9 +1438,11 @@ export default function ProjectSalesCenterPage() {
       setSpacesProject(setup);
       setInventoryProject(setup);
       setStructureProject(setup);
+      const nextSpaces = projectSpaceFormsFromSetup(setup);
+
       setEditingProject(setup);
-      setProjectSpaces(projectSpaceFormsFromSetup(setup));
-      setSpacesPreview(null);
+      setProjectSpaces(nextSpaces);
+      setSpacesBaseline(projectSpacesSnapshot(nextSpaces));
       setMode("spaces");
     } catch (error) {
       setNotice({
@@ -1335,7 +1528,15 @@ export default function ProjectSalesCenterPage() {
   };
 
   const completeProject = async () => {
-    if (!completionProject || !completionPreview?.ready) return;
+    const blockingIssues =
+      completionPreview?.issues.filter(
+        (issue) => !isDesignReviewIssue(issue.code),
+      ) || [];
+    const canComplete =
+      Boolean(completionPreview) &&
+      (completionPreview?.ready || blockingIssues.length === 0);
+
+    if (!completionProject || !canComplete) return;
 
     setBusyAction("complete-project");
 
@@ -1348,7 +1549,7 @@ export default function ProjectSalesCenterPage() {
         tone: "success",
         title: "Proje Kurulumu Tamamlandı",
         message:
-          "Proje, bloklar, katlar, bağımsız bölümler ve proje alanları başarıyla tamamlandı.",
+          "Proje kurulumu tamamlandı. Satış stoku, görsel paketleri, müşteri sunumu ve havuza yayın araçları kullanıma hazır.",
       });
 
       await loadProjects();
@@ -1364,146 +1565,99 @@ export default function ProjectSalesCenterPage() {
     }
   };
 
-  const updateProjectSpace = <K extends keyof ProjectSpaceForm>(
-    key: string,
-    field: K,
-    value: ProjectSpaceForm[K],
-  ) => {
-    setProjectSpaces((current) =>
-      current.map((space) => {
-        if (space.key !== key) return space;
+  const toggleProjectSpaceType = (spaceType: string) => {
+    setProjectSpaces((current) => {
+      const selected = current.some(
+        (space) => space.spaceType === spaceType,
+      );
 
-        if (field === "spaceType") {
-          const spaceType = String(value);
-          const legalStatus = defaultSpaceLegalStatus(spaceType);
+      if (selected) {
+        return current.filter(
+          (space) => space.spaceType !== spaceType,
+        );
+      }
 
-          return {
-            ...space,
-            spaceType,
-            name:
-              space.name ||
-              PROJECT_SPACE_TYPE_OPTIONS.find(
-                (option) => option.value === spaceType,
-              )?.label ||
-              "Proje Alanı",
-            legalStatus,
-            commercialPurpose: defaultSpaceCommercialPurpose(legalStatus),
-          };
-        }
+      const option = PROJECT_SPACE_TYPE_OPTIONS.find(
+        (item) => item.value === spaceType,
+      );
+      const legalStatus = defaultSpaceLegalStatus(spaceType);
+      const newSpace = createProjectSpaceForm();
 
-        if (field === "legalStatus") {
-          const legalStatus = String(value);
-
-          return {
-            ...space,
-            legalStatus,
-            commercialPurpose: defaultSpaceCommercialPurpose(legalStatus),
-          };
-        }
-
-        if (field === "blockCode" && !value) {
-          return {
-            ...space,
-            blockCode: "",
-            floorLevel: "",
-          };
-        }
-
-        return { ...space, [field]: value };
-      }),
-    );
-    setSpacesPreview(null);
-  };
-
-  const addProjectSpace = () => {
-    setProjectSpaces((current) => [...current, createProjectSpaceForm()]);
-    setSpacesPreview(null);
-  };
-
-  const removeProjectSpace = (key: string) => {
-    setProjectSpaces((current) =>
-      current.filter((space) => space.key !== key),
-    );
-    setSpacesPreview(null);
+      return [
+        ...current,
+        {
+          ...newSpace,
+          spaceType,
+          name: option?.label || "Proje Alanı",
+          count: "1",
+          customTypeName: "",
+          blockCode: "",
+          floorLevel: "",
+          grossArea: "",
+          legalStatus,
+          commercialPurpose:
+            defaultSpaceCommercialPurpose(legalStatus),
+          description: "",
+          isCustomerVisible: true,
+        },
+      ];
+    });
   };
 
   const buildSpacesPayload = () => ({
-    projectSpaces: projectSpaces
-      .filter((space) => countValue(space.count) > 0)
-      .map((space) => ({
-        name: space.name.trim(),
-        spaceType: space.spaceType,
-        customTypeName:
-          space.spaceType === "DIGER"
-            ? space.customTypeName.trim() || null
-            : null,
-        count: countValue(space.count),
-        blockCode: space.blockCode || null,
-        floorLevel:
-          space.blockCode && space.floorLevel !== ""
-            ? Number(space.floorLevel)
-            : null,
-        grossArea: numberOrNull(space.grossArea),
-        legalStatus: space.legalStatus,
-        commercialPurpose: space.commercialPurpose,
-        description: space.description.trim() || null,
-        isCustomerVisible: space.isCustomerVisible,
-      })),
+    projectSpaces: PROJECT_SPACE_TYPE_OPTIONS
+      .filter((option) => option.value !== "DIGER")
+      .filter((option) =>
+        projectSpaces.some(
+          (space) => space.spaceType === option.value,
+        ),
+      )
+      .map((option) => {
+        const legalStatus = defaultSpaceLegalStatus(option.value);
+
+        return {
+          name: option.label,
+          spaceType: option.value,
+          customTypeName: null,
+          count: 1,
+          blockCode: null,
+          floorLevel: null,
+          grossArea: null,
+          legalStatus,
+          commercialPurpose:
+            defaultSpaceCommercialPurpose(legalStatus),
+          description: null,
+          isCustomerVisible: true,
+        };
+      }),
   });
 
-  const previewProjectSpaces = async () => {
-    if (!spacesProject) return;
-
-    setBusyAction("spaces-preview");
-
-    try {
-      const response = await api.post<ProjectSpacesPreview>(
-        `/project-sales/projects/${spacesProject.id}/spaces/preview`,
-        buildSpacesPayload(),
-      );
-
-      setSpacesPreview(response.data);
-      setNotice({
-        tone: "success",
-        title: "Proje Alanları Kontrol Edildi",
-        message:
-          response.data.summary.projectSpaceCount > 0
-            ? `${response.data.summary.projectSpaceCount} sosyal, ortak veya teknik alan doğrulandı.`
-            : "Bu projede sosyal, ortak veya teknik alan bulunmadığı doğrulandı.",
-      });
-    } catch (error) {
-      setSpacesPreview(null);
-      setNotice({
-        tone: "error",
-        title: "Proje Alanları Doğrulanamadı",
-        message: apiMessage(error),
-      });
-    } finally {
-      setBusyAction(null);
-    }
-  };
-
   const applyProjectSpaces = async () => {
-    if (!spacesProject || !spacesPreview) return;
+    if (!spacesProject) return;
 
     setBusyAction("spaces-apply");
 
     try {
+      const payload = buildSpacesPayload();
+      const selectedCount = payload.projectSpaces.length;
+
       await api.post(
         `/project-sales/projects/${spacesProject.id}/spaces/apply`,
-        buildSpacesPayload(),
+        payload,
       );
 
+      setSpacesBaseline(projectSpacesSnapshot(projectSpaces));
       setNotice({
         tone: "success",
         title: "Proje Alanları Kaydedildi",
         message:
-          spacesPreview.summary.projectSpaceCount > 0
-            ? "Sosyal, ortak ve teknik alanlar başarıyla oluşturuldu. Proje son kontrol aşamasına hazır."
-            : "Projede ortak, sosyal veya teknik alan olmadığı kaydedildi. Proje son kontrol aşamasına hazır.",
+          selectedCount > 0
+            ? `${selectedCount} proje alanı bilgi amaçlı kaydedildi.`
+            : "Bu projede sosyal veya ortak alan bulunmadığı kaydedildi.",
       });
+
       await loadProjects();
-      await openSpaces(spacesProject);
+      await openCompletion(spacesProject);
     } catch (error) {
       setNotice({
         tone: "error",
@@ -1536,18 +1690,18 @@ export default function ProjectSalesCenterPage() {
     field: K,
     value: UnitGroupForm[K],
   ) => {
-    setFloorPlans((current) =>
-      current.map((floorPlan) =>
-        floorPlan.key === floorKey
-          ? {
-              ...floorPlan,
-              unitGroups: floorPlan.unitGroups.map((group) =>
-                group.key === groupKey ? { ...group, [field]: value } : group,
-              ),
-            }
-          : floorPlan,
-      ),
-    );
+    const areaSource=floorPlans.find(plan=>plan.key===floorKey)?.unitGroups.find(group=>group.key===groupKey);
+    if(areaSource&&!isShop(areaSource.type)&&(field==='netArea'||field==='grossArea'))areaDefaults.current[`${areaSource.type}|${areaSource.roomCount}`]={netArea:field==='netArea'?String(value):areaSource.netArea,grossArea:field==='grossArea'?String(value):areaSource.grossArea};
+    setFloorPlans(current=>{
+      const source=current.find(plan=>plan.key===floorKey)?.unitGroups.find(group=>group.key===groupKey);
+      return current.map(plan=>({...plan,unitGroups:expandShops(plan.unitGroups.map(group=>{
+        const exact=plan.key===floorKey&&group.key===groupKey;
+        const sameArea=source&&!isShop(source.type)&&(field==='netArea'||field==='grossArea')&&group.type===source.type&&group.roomCount===source.roomCount;
+        if(!exact&&!sameArea)return group;
+        if(field==='type')return {...group,type:String(value),roomCount:isShop(String(value))?'':group.roomCount,conceptLabel:String(value)==='DIGER'&&!group.conceptLabel.trim()?inventoryProject?.plannedOtherUnitTypeName||'':group.conceptLabel};
+        return {...group,...(field==='roomCount'?areaDefaults.current[`${group.type}|${String(value)}`]:{}),[field]:value};
+      }))}));
+    });
     setInventoryPreview(null);
   };
 
@@ -1591,7 +1745,7 @@ export default function ProjectSalesCenterPage() {
     setInventoryPreview(null);
   };
 
-  const addUnitGroup = (floorKey: string) => {
+  const addUnitGroup = (floorKey: string, roomCount = "") => {
     setFloorPlans((current) =>
       current.map((floorPlan) =>
         floorPlan.key === floorKey
@@ -1599,9 +1753,10 @@ export default function ProjectSalesCenterPage() {
               ...floorPlan,
               unitGroups: [
                 ...floorPlan.unitGroups,
-                createUnitGroup(
+                {...createUnitGroup(
                   inventoryProject?.plannedUnitTypes?.[0] || "DAIRE",
-                ),
+                  inventoryProject?.plannedOtherUnitTypeName || "",
+                ),...areaDefaults.current[`${inventoryProject?.plannedUnitTypes?.[0]||"DAIRE"}|${roomCount}`],roomCount},
               ],
             }
           : floorPlan,
@@ -1694,24 +1849,28 @@ export default function ProjectSalesCenterPage() {
   };
 
   const buildInventoryPayload = () => ({
+    numberingMode,
     floorPlans: floorPlans
       .map((floorPlan) => ({
         blockCode: floorPlan.blockCode,
         floorLevel: floorPlan.floorLevel,
-        numberPrefix: floorPlan.numberPrefix.trim() || floorPlan.blockCode,
+        numberPrefix:
+          floorPlan.numberPrefix.trim() ||
+          defaultNumberPrefix(floorPlan.blockCode),
         startingSequence: positiveInteger(floorPlan.startingSequence),
         unitGroups: floorPlan.unitGroups
           .filter((group) => countValue(group.count) > 0)
           .map((group) => ({
             count: countValue(group.count),
             type: group.type,
-            roomCount: group.roomCount.trim() || null,
+            roomCount: isShop(group.type) ? null : group.roomCount.trim() || null,
             netArea: numberOrNull(group.netArea),
             grossArea: numberOrNull(group.grossArea),
             facades: group.facades,
             conceptLabel: group.conceptLabel.trim() || null,
             legalStatus: "TAPUDA_BAGIMSIZ_BOLUM",
             commercialPurpose: group.commercialPurpose,
+            description: group.description?.trim() || null,
           })),
       }))
       .filter((floorPlan) => floorPlan.unitGroups.length > 0),
@@ -1720,6 +1879,8 @@ export default function ProjectSalesCenterPage() {
 
   const previewInventory = async () => {
     if (!inventoryProject) return;
+    const commercialError = shopError(floorPlans.flatMap(plan => plan.unitGroups));
+    if (commercialError) { setNotice({ tone: 'error', title: 'Mağaza alanları eksik', message: commercialError }); return; }
 
     setBusyAction("inventory-preview");
 
@@ -1875,7 +2036,16 @@ export default function ProjectSalesCenterPage() {
       setInventoryProject(refreshedSetup);
       setStructureProject(refreshedSetup);
       setEditingProject(refreshedSetup);
-      setFloorPlans(floorPlansFromSetup(refreshedSetup));
+      const nextNumberingMode = inferProjectNumberingMode(
+        refreshedSetup.units,
+      );
+      const nextFloorPlans = floorPlansFromSetup(refreshedSetup);
+
+      setNumberingMode(nextNumberingMode);
+      setFloorPlans(nextFloorPlans);
+      setInventoryBaseline(
+        floorPlansSnapshot(nextNumberingMode, nextFloorPlans),
+      );
       setInventoryPreview(null);
       setInventoryEditMode(false);
       setMode("inventory");
@@ -1924,6 +2094,17 @@ export default function ProjectSalesCenterPage() {
         return { ...block, [field]: value };
       }),
     );
+    setStructurePreview(null);
+  };
+
+  const setBlockCount = (count:number) => {
+    if(!Number.isInteger(count)||count<1||count>50)return;
+    if(count<blocks.length&&!window.confirm('Son bloklara ait kaydedilmemiş kat bilgileri taslaktan çıkarılacak. Devam edilsin mi?'))return;
+    setBlocks(current=>{
+      const next=current.slice(0,count);
+      while(next.length<count){let index=0;const used=new Set(next.map(block=>block.code.trim().toUpperCase()));while(used.has(blockCodeForIndex(index)))index++;next.push(createBlockForm(index,structureProject?.geometryType||'DIKDORTGEN'));}
+      return next;
+    });
     setStructurePreview(null);
   };
 
@@ -2042,18 +2223,22 @@ export default function ProjectSalesCenterPage() {
     setBusyAction("location");
 
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      async (position) => {
         setForm((current) => ({
           ...current,
           latitude: position.coords.latitude.toFixed(7),
           longitude: position.coords.longitude.toFixed(7),
           mapAddress: current.mapAddress || "Cihazın mevcut konumu",
         }));
+        try {
+          const address=await resolveProjectLocation(position.coords.latitude,position.coords.longitude);
+          setForm(current=>Math.abs(Number(current.latitude)-position.coords.latitude)<0.000001&&Math.abs(Number(current.longitude)-position.coords.longitude)<0.000001?{...current,...address}:current);
+        } catch { setBusyAction(null);setNotice({tone:'warning',title:'Pin Kaydedildi',message:'Adres otomatik alınamadı. İl, ilçe ve mahalleyi elle tamamlayın.'});return; }
         setBusyAction(null);
         setNotice({
           tone: "success",
           title: "Konum Alındı",
-          message: "Enlem ve boylam bilgileri forma eklendi.",
+          message: "Koordinat ve adres bilgileri forma eklendi; eksik alanları kontrol edin.",
         });
       },
       (error) => {
@@ -2074,8 +2259,14 @@ export default function ProjectSalesCenterPage() {
 
   const buildPayload = () => ({
     name: form.name.trim(),
+    permitNumber: form.permitNumber.trim() || null,
+    permitAuthority: form.permitAuthority.trim() || null,
     code: form.code.trim() || undefined,
     description: form.description.trim() || null,
+    lifecycleStage: form.lifecycleStage,
+    completionPercent: integerOrNull(form.completionPercent),
+    defaultDeliveryDate: form.lifecycleStage === "READY" ? null : form.defaultDeliveryDate || null,
+    plannedStartDate: form.lifecycleStage === "PLANNED" ? form.plannedStartDate || null : null,
     city: form.city.trim(),
     district: form.district.trim(),
     neighborhood: form.neighborhood.trim(),
@@ -2092,10 +2283,71 @@ export default function ProjectSalesCenterPage() {
       form.declaredSalesInventoryCount,
     ),
     plannedUnitTypes: form.plannedUnitTypes,
+    plannedOtherUnitTypeName:
+      form.plannedOtherUnitTypeName.trim() || null,
     geometryType: form.geometryType,
   });
 
   const saveProject = async (destination: ProjectSaveDestination) => {
+    const dateError = validateProjectDates(form.lifecycleStage, form.defaultDeliveryDate, form.plannedStartDate);
+    if (dateError) { setNotice({ tone: 'warning', title: 'Tarihleri Kontrol Edin', message: dateError }); return; }
+
+    if (!form.lifecycleStage) {
+      setNotice({
+        tone: "warning",
+        title: "Proje Aşaması Seçilmedi",
+        message:
+          "Projeyi kaydetmeden önce Hazır, Devam Eden veya Planlanan seçeneklerinden birini seçin.",
+      });
+      return;
+    }
+
+    if (form.lifecycleStage === "UNDER_CONSTRUCTION") {
+      const completionPercent = integerOrNull(form.completionPercent);
+
+      if (
+        completionPercent === null ||
+        completionPercent <= 0 ||
+        completionPercent >= 100
+      ) {
+        setNotice({
+          tone: "warning",
+          title: "Tamamlanma Oranı Geçersiz",
+          message:
+            "Devam eden projelerde tamamlanma oranı 1 ile 99 arasında olmalıdır.",
+        });
+        return;
+      }
+
+      if (!form.defaultDeliveryDate) {
+        setNotice({
+          tone: "warning",
+          title: "Teslim Tarihi Eksik",
+          message:
+            "Devam eden projelerde tahmini teslim tarihi zorunludur.",
+        });
+        return;
+      }
+    }
+
+    if (form.plannedUnitTypes.includes("DIGER")) {
+      const otherUnitTypeName =
+        form.plannedOtherUnitTypeName.trim();
+
+      if (
+        otherUnitTypeName.length < 2 ||
+        otherUnitTypeName.length > 80
+      ) {
+        setNotice({
+          tone: "warning",
+          title: "Diğer Türün Adı Eksik",
+          message:
+            "Diğer seçeneği için bağımsız bölüm türünün adını 2 ile 80 karakter arasında yazın.",
+        });
+        return;
+      }
+    }
+
     setBusyAction("save");
 
     try {
@@ -2110,8 +2362,11 @@ export default function ProjectSalesCenterPage() {
           );
       const savedProject = response.data;
 
+      const savedForm = formFromProject(savedProject);
+
       setEditingProject(savedProject);
-      setForm(formFromProject(savedProject));
+      setForm(savedForm);
+      setFormBaseline(projectFormSnapshot(savedForm));
       setNotice({
         tone: "success",
         title: "Proje Kaydedildi",
@@ -2156,6 +2411,52 @@ export default function ProjectSalesCenterPage() {
               ? completionProject
               : null;
 
+  const hasUnsavedWizardChanges = useMemo(() => {
+    if (mode === "form") {
+      return projectFormSnapshot(form) !== formBaseline;
+    }
+
+    if (mode === "structure") {
+      return blockFormsSnapshot(blocks) !== structureBaseline;
+    }
+
+    if (mode === "inventory") {
+      return (
+        floorPlansSnapshot(numberingMode, floorPlans) !== inventoryBaseline
+      );
+    }
+
+    if (mode === "spaces") {
+      return projectSpacesSnapshot(projectSpaces) !== spacesBaseline;
+    }
+
+    if (mode === "completion") {
+      return designReviewMessage.trim().length > 0;
+    }
+
+    return false;
+  }, [
+    blocks,
+    designReviewMessage,
+    floorPlans,
+    form,
+    formBaseline,
+    inventoryBaseline,
+    mode,
+    numberingMode,
+    projectSpaces,
+    spacesBaseline,
+    structureBaseline,
+  ]);
+
+  const confirmDiscardChanges = () => {
+    if (!hasUnsavedWizardChanges) return true;
+
+    return window.confirm(
+      "Bu adımda kaydedilmemiş değişiklikler var. Değişiklikleri kaybetmeden önce mevcut adımı kaydedin. Yine de ayrılmak istiyor musunuz?",
+    );
+  };
+
   const handleWizardStepChange = (step: WizardStep) => {
     if (busyAction) return;
 
@@ -2176,10 +2477,10 @@ export default function ProjectSalesCenterPage() {
       return;
     }
 
-    if (!currentWizardProject) return;
+    if (!currentWizardProject || !confirmDiscardChanges()) return;
 
     if (step === 1) {
-      editProject(currentWizardProject);
+      void editProject(currentWizardProject);
       return;
     }
 
@@ -2236,6 +2537,13 @@ export default function ProjectSalesCenterPage() {
       return;
     }
 
+    if (
+      ["structure", "inventory", "spaces", "completion"].includes(mode) &&
+      !confirmDiscardChanges()
+    ) {
+      return;
+    }
+
     if (mode === "structure" && structureProject) {
       void openInventory(structureProject);
       return;
@@ -2271,6 +2579,142 @@ export default function ProjectSalesCenterPage() {
       setMode("list");
       void loadProjects();
     }
+  };
+
+  const handleBackNavigation = async () => {
+    if (busyAction || !confirmDiscardChanges()) return false;
+
+    if (mode === "publish") {
+      setMode("presentation");
+      return true;
+    }
+
+    if (mode === "presentation") {
+      setMode("render");
+      return true;
+    }
+
+    if (mode === "render") {
+      setMode("media");
+      return true;
+    }
+
+    if (mode === "media" || mode === "sales") {
+      setMode("list");
+      await loadProjects();
+      return true;
+    }
+
+    if (mode === "completion" && completionProject) {
+      await openSpaces(completionProject);
+      return true;
+    }
+
+    if (mode === "spaces" && spacesProject) {
+      await openInventory(spacesProject);
+      return true;
+    }
+
+    if (mode === "inventory" && inventoryProject) {
+      await openStructure(inventoryProject);
+      return true;
+    }
+
+    if (mode === "structure" && structureProject) {
+      await editProject(structureProject);
+      return true;
+    }
+
+    if (mode === "form") {
+      setMode("list");
+      await loadProjects();
+      return true;
+    }
+
+    router.push("/uretkenlik");
+    return true;
+  };
+
+  const modeRef = useRef(mode);
+  const backHandlerRef = useRef(handleBackNavigation);
+
+  modeRef.current = mode;
+  backHandlerRef.current = handleBackNavigation;
+
+  useEffect(() => {
+    if (!hasUnsavedWizardChanges) return;
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [hasUnsavedWizardChanges]);
+
+  useEffect(() => {
+    if (mode === "list") return;
+
+    const currentState = window.history.state || {};
+
+    if (!currentState.__ephProjectWizardGuard) {
+      window.history.pushState(
+        {
+          ...currentState,
+          __ephProjectWizardGuard: true,
+        },
+        "",
+        window.location.href,
+      );
+    }
+  }, [mode]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (modeRef.current === "list") return;
+
+      void backHandlerRef.current().finally(() => {
+        window.setTimeout(() => {
+          if (
+            modeRef.current !== "list" &&
+            !window.history.state?.__ephProjectWizardGuard
+          ) {
+            window.history.pushState(
+              {
+                ...(window.history.state || {}),
+                __ephProjectWizardGuard: true,
+              },
+              "",
+              window.location.href,
+            );
+          }
+        }, 0);
+      });
+    };
+
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
+
+  const requestBackNavigation = () => {
+    if (busyAction) return;
+
+    if (
+      mode !== "list" &&
+      window.history.state?.__ephProjectWizardGuard
+    ) {
+      window.history.back();
+      return;
+    }
+
+    void handleBackNavigation();
   };
 
   if (!hasHydrated) {
@@ -2345,59 +2789,7 @@ export default function ProjectSalesCenterPage() {
         >
           <button
             type="button"
-            onClick={() => {
-              if (mode === "publish") {
-                setMode("presentation");
-                return;
-              }
-
-              if (mode === "presentation") {
-                setMode("render");
-                return;
-              }
-
-              if (mode === "render") {
-                setMode("media");
-                return;
-              }
-
-              if (mode === "media") {
-                setMode("list");
-                return;
-              }
-
-              if (mode === "sales") {
-                setMode("list");
-                return;
-              }
-
-              if (mode === "completion") {
-                setMode("spaces");
-                return;
-              }
-
-              if (mode === "spaces") {
-                setMode("inventory");
-                return;
-              }
-
-              if (mode === "inventory") {
-                setMode("structure");
-                return;
-              }
-
-              if (mode === "structure") {
-                setMode("form");
-                return;
-              }
-
-              if (mode === "form") {
-                setMode("list");
-                return;
-              }
-
-              router.push("/uretkenlik");
-            }}
+            onClick={requestBackNavigation}
             aria-label="Geri dön"
             style={{
               width: 42,
@@ -2530,6 +2922,7 @@ export default function ProjectSalesCenterPage() {
             preview={structurePreview}
             busyAction={busyAction}
             onUpdateBlock={updateBlock}
+            onSetBlockCount={setBlockCount}
             onAddBlock={addBlock}
             onRemoveBlock={removeBlock}
             onPreview={previewStructure}
@@ -2544,12 +2937,17 @@ export default function ProjectSalesCenterPage() {
             preview={inventoryPreview}
             busyAction={busyAction}
             editMode={inventoryEditMode}
+            numberingMode={numberingMode}
             onUpdateFloorPlan={updateFloorPlan}
             onUpdateUnitGroup={updateUnitGroup}
             onToggleFacade={toggleUnitFacade}
             onAddUnitGroup={addUnitGroup}
             onRemoveUnitGroup={removeUnitGroup}
             onCopyToAll={copyFloorDistributionToAll}
+            onNumberingModeChange={(nextMode) => {
+              setNumberingMode(nextMode);
+              setInventoryPreview(null);
+            }}
             onPreview={previewInventory}
             onApply={applyInventory}
             onReplace={replaceInventory}
@@ -2562,14 +2960,9 @@ export default function ProjectSalesCenterPage() {
           <ProjectSpacesView
             project={spacesProject}
             spaces={projectSpaces}
-            preview={spacesPreview}
             busyAction={busyAction}
-            onUpdateSpace={updateProjectSpace}
-            onAddSpace={addProjectSpace}
-            onRemoveSpace={removeProjectSpace}
-            onPreview={previewProjectSpaces}
-            onApply={applyProjectSpaces}
-            onContinue={() => void openCompletion(spacesProject)}
+            onToggleSpace={toggleProjectSpaceType}
+            onSave={applyProjectSpaces}
             onStepChange={handleWizardStepChange}
           />
         ) : mode === "media" &&
@@ -2597,6 +2990,7 @@ export default function ProjectSalesCenterPage() {
           />
         ) : mode === "sales" && salesStock ? (
           <ProjectSalesStockView
+            blocks={salesStockBlocks}
             stock={salesStock}
             drafts={salesStockDrafts}
             busyAction={busyAction}
@@ -2617,6 +3011,7 @@ export default function ProjectSalesCenterPage() {
             onModeChange={(nextMode) => setMode(nextMode)}
             onCreateRenderWorkOrder={createRenderWorkOrder}
             onCreatePresentationLink={createPresentationLink}
+            onWithdrawFromPool={withdrawProjectFromPool}
             onPublishToPool={publishProjectToPool}
             renderWorkOrder={renderWorkOrder}
             presentationLink={presentationLink}
@@ -2989,6 +3384,25 @@ function ProjectList({
                         .filter(Boolean)
                         .join(" / ")}
                     </p>
+
+                    <div style={{ marginTop: 6 }}>
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          borderRadius: 999,
+                          border: "1px solid #BFDBFE",
+                          background: "#EFF6FF",
+                          color: "#1D4ED8",
+                          padding: "4px 8px",
+                          fontSize: 9,
+                          fontWeight: 950,
+                        }}
+                      >
+                        {projectLifecycleLabel(project.lifecycleStage)}
+                      </span>
+                    </div>
                   </div>
 
                   <span
@@ -3092,27 +3506,39 @@ function ProjectList({
                   </button>
                 )}
 
-                {project._count.units > 0 && (
-                  <button 
-                    type="button"
-                    onClick={() => onSpaces(project)}
-                    disabled={Boolean(busyAction)}
-                    style={{
-                      ...secondaryButtonStyle,
-                      width: "100%",
-                      borderColor: "#A7F3D0",
-                      background: "#F0FDF4",
-                      color: "#047857",
-                    }}
-                  >
-                    {busyAction === "spaces-load" ? (
-                      <Loader2 size={17} className="eph-spin" />
-                    ) : (
-                      <Landmark size={17} />
-                    )}
-                    Proje Alanları
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => onSpaces(project)}
+                  disabled={Boolean(busyAction) || project._count.units === 0}
+                  title={
+                    project._count.units > 0
+                      ? "Proje alanları adımını aç"
+                      : "Önce bağımsız bölümleri oluşturun"
+                  }
+                  style={{
+                    ...secondaryButtonStyle,
+                    width: "100%",
+                    borderColor:
+                      project._count.units > 0 ? "#A7F3D0" : "#CBD5E1",
+                    background:
+                      project._count.units > 0 ? "#F0FDF4" : "#F8FAFC",
+                    color:
+                      project._count.units > 0 ? "#047857" : "#94A3B8",
+                    cursor:
+                      project._count.units > 0 && !busyAction
+                        ? "pointer"
+                        : "not-allowed",
+                  }}
+                >
+                  {busyAction === "spaces-load" ? (
+                    <Loader2 size={17} className="eph-spin" />
+                  ) : (
+                    <Landmark size={17} />
+                  )}
+                  {project._count.units > 0
+                    ? "Proje Alanları"
+                    : "Proje Alanları • Önce Bağımsız Bölümler"}
+                </button>
 
                 {project._count.units > 0 && (
                   <button 
@@ -3278,666 +3704,99 @@ function ProjectList({
   );
 }
 
-function ProjectFormView({
-  form,
-  editingProject,
-  busyAction,
-  onChange,
-  onToggleUnitType,
-  onUseCurrentLocation,
-  onSave,
-  onStepChange,
-}: {
-  form: ProjectForm;
-  editingProject: ProjectSummary | null;
-  busyAction: string | null;
-  onChange: <K extends keyof ProjectForm>(
-    field: K,
-    value: ProjectForm[K],
-  ) => void;
-  onToggleUnitType: (unitType: string) => void;
-  onUseCurrentLocation: () => void;
-  onSave: (destination: ProjectSaveDestination) => void;
-  onStepChange: (step: WizardStep) => void;
+function ProjectFormView({ form, editingProject, busyAction, onChange, onToggleUnitType, onUseCurrentLocation, onSave, onStepChange }: {
+  form: ProjectForm; editingProject: ProjectSummary | null; busyAction: string | null;
+  onChange: <K extends keyof ProjectForm>(field: K, value: ProjectForm[K]) => void;
+  onToggleUnitType: (unitType: string) => void; onUseCurrentLocation: () => void;
+  onSave: (destination: ProjectSaveDestination) => void; onStepChange: (step: WizardStep) => void;
 }) {
-  const [provinceOptions, setProvinceOptions] = useState<LocationOption[]>([]);
-  const [districtOptions, setDistrictOptions] = useState<LocationOption[]>([]);
-  const [placeOptions, setPlaceOptions] = useState<LocationOption[]>([]);
-  const [locationLoading, setLocationLoading] = useState({
-    province: false,
-    district: false,
-    place: false,
-  });
-
-  const saving = busyAction === "save";
-  const locating = busyAction === "location";
-  const complex = COMPLEX_GEOMETRIES.has(form.geometryType);
-
+  const [step, setStep] = useState(0);
+  const [provinces, setProvinces] = useState<LocationOption[]>([]);
+  const [districts, setDistricts] = useState<LocationOption[]>([]);
+  const [places, setPlaces] = useState<LocationOption[]>([]);
+  const [shared, setShared] = useState('');
+  const [resolving,setResolving]=useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState({ province: false, district: false, place: false });
+  const busy = Boolean(busyAction)||resolving;
   useEffect(() => {
     let active = true;
-
-    setLocationLoading((current) => ({ ...current, province: true }));
-
-    void fetchProvinceOptions()
-      .then((options) => {
-        if (active) setProvinceOptions(options);
-      })
-      .finally(() => {
-        if (active) {
-          setLocationLoading((current) => ({
-            ...current,
-            province: false,
-          }));
-        }
-      });
-
-    return () => {
-      active = false;
-    };
+    setLoading(current => ({ ...current, province: true }));
+    void fetchProvinceOptions().then(items => { if (active) setProvinces(items); }).catch(() => { if(active) setProvinces([]); }).finally(() => { if(active) setLoading(current => ({ ...current, province: false })); });
+    return () => { active = false; };
   }, []);
-
   useEffect(() => {
-    let active = true;
-
-    if (!form.city) {
-      setDistrictOptions([]);
-      setPlaceOptions([]);
-      return () => {
-        active = false;
-      };
-    }
-
-    setLocationLoading((current) => ({ ...current, district: true }));
-
-    void fetchDistrictOptions(form.city)
-      .then((options) => {
-        if (active) setDistrictOptions(options);
-      })
-      .finally(() => {
-        if (active) {
-          setLocationLoading((current) => ({
-            ...current,
-            district: false,
-          }));
-        }
-      });
-
-    return () => {
-      active = false;
-    };
+    let active = true; setDistricts([]); setPlaces([]);
+    if (!form.city) return;
+    setLoading(current => ({ ...current, district: true }));
+    void fetchDistrictOptions(form.city).then(items => { if(active) setDistricts(items); }).catch(() => { if(active) setDistricts([]); }).finally(() => { if(active) setLoading(current => ({ ...current, district: false })); });
+    return () => { active = false; };
   }, [form.city]);
-
   useEffect(() => {
-    let active = true;
-
-    if (!form.city || !form.district) {
-      setPlaceOptions([]);
-      return () => {
-        active = false;
-      };
-    }
-
-    const selectedDistrict = districtOptions.find(
-      (option) => option.name === form.district,
-    );
-
-    setLocationLoading((current) => ({ ...current, place: true }));
-
-    void fetchPlaceOptions(form.city, form.district, selectedDistrict?.id)
-      .then((options) => {
-        if (active) setPlaceOptions(options);
-      })
-      .finally(() => {
-        if (active) {
-          setLocationLoading((current) => ({
-            ...current,
-            place: false,
-          }));
-        }
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [districtOptions, form.city, form.district]);
-
-  const visibleProvinceOptions = useMemo(() => {
-    if (
-      !form.city ||
-      provinceOptions.some((option) => option.name === form.city)
-    ) {
-      return provinceOptions;
-    }
-
-    return [
-      { id: `current-${form.city}`, name: form.city },
-      ...provinceOptions,
-    ];
-  }, [form.city, provinceOptions]);
-
-  const visibleDistrictOptions = useMemo(() => {
-    if (
-      !form.district ||
-      districtOptions.some((option) => option.name === form.district)
-    ) {
-      return districtOptions;
-    }
-
-    return [
-      { id: `current-${form.district}`, name: form.district },
-      ...districtOptions,
-    ];
-  }, [districtOptions, form.district]);
-
-  const visiblePlaceOptions = useMemo(() => {
-    if (
-      !form.neighborhood ||
-      placeOptions.some((option) => option.name === form.neighborhood)
-    ) {
-      return placeOptions;
-    }
-
-    return [
-      { id: `current-${form.neighborhood}`, name: form.neighborhood },
-      ...placeOptions,
-    ];
-  }, [form.neighborhood, placeOptions]);
-
-  return (
-    <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
-      <WizardProgress
-        activeStep={1}
-        project={editingProject}
-        navigationLocked={Boolean(busyAction)}
-        onStepChange={onStepChange}
-      />
-
-      <section style={{ ...cardStyle, padding: 13 }}>
-        <SectionTitle
-          icon={<Building2 size={20} />}
-          title={editingProject ? "Proje Bilgilerini Düzenle" : "Yeni Proje"}
-          subtitle="Ada ve parsel numarası opsiyoneldir."
-        />
-
-        <div
-          style={{
-            width: "100%",
-            maxWidth: 560,
-            margin: "12px auto 0",
-            display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
-            gap: 10,
-          }}
-        >
-          <Field label="Proje adı *">
-            <input
-              value={form.name}
-              onChange={(event) => onChange("name", event.target.value)}
-              placeholder="Ör. EPH Park Evleri"
-              style={inputStyle}
-            />
-          </Field>
-
-          <Field label="Proje kodu">
-            <input
-              value={form.code}
-              onChange={(event) => onChange("code", event.target.value)}
-              placeholder="Boşsa otomatik üretilir"
-              style={inputStyle}
-            />
-          </Field>
-        </div>
-
-        <div
-          style={{
-            marginTop: 10,
-            border: "2px solid #8CC8F6",
-            borderRadius: 18,
-            background: "#EDF8FF",
-            padding: 12,
-            boxShadow: "0 12px 26px rgba(2, 132, 199, 0.08)",
-          }}
-        >
-            <div
-              style={{
-                borderRadius: 14,
-                background: "#0284C7",
-                color: "#FFFFFF",
-                padding: "8px 12px",
-                textAlign: "center",
-                fontSize: 11,
-                fontWeight: 950,
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-              }}
-            >
-              Adres Bilgileri — 81 İl + KKTC
-            </div>
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns:
-                  "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
-                gap: 10,
-                marginTop: 10,
-              }}
-            >
-              <Field label="İl / KKTC *">
-                <select
-                  value={form.city}
-                  onChange={(event) => {
-                    onChange("city", event.target.value);
-                    onChange("district", "");
-                    onChange("neighborhood", "");
-                  }}
-                  disabled={locationLoading.province}
-                  style={inputStyle}
-                >
-                  <option value="">
-                    {locationLoading.province
-                      ? "İller ve KKTC yükleniyor"
-                      : "İl / KKTC seçin"}
-                  </option>
-                  {visibleProvinceOptions.map((option) => (
-                    <option key={option.id} value={option.name}>
-                      {option.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              <Field
-                label={
-                  form.city === "KKTC"
-                    ? "KKTC Bölgesi *"
-                    : "İlçe *"
-                }
-              >
-                {!form.city ||
-                locationLoading.district ||
-                visibleDistrictOptions.length > 0 ? (
-                  <select
-                    value={form.district}
-                    onChange={(event) => {
-                      onChange("district", event.target.value);
-                      onChange("neighborhood", "");
-                    }}
-                    disabled={!form.city || locationLoading.district}
-                    style={inputStyle}
-                  >
-                    <option value="">
-                      {!form.city
-                        ? "Önce il / KKTC seçin"
-                        : locationLoading.district
-                          ? form.city === "KKTC"
-                            ? "KKTC bölgeleri yükleniyor"
-                            : "İlçeler yükleniyor"
-                          : form.city === "KKTC"
-                            ? "KKTC bölgesi seçin"
-                            : "İlçe seçin"}
-                    </option>
-                    {visibleDistrictOptions.map((option) => (
-                      <option key={option.id} value={option.name}>
-                        {option.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    value={form.district}
-                    onChange={(event) => {
-                      onChange("district", event.target.value);
-                      onChange("neighborhood", "");
-                    }}
-                    placeholder="İlçe / bölge adını yazın"
-                    style={inputStyle}
-                  />
-                )}
-              </Field>
-
-              <Field label="Mahalle / Köy / Mevki *">
-                {!form.city ||
-                !form.district ||
-                locationLoading.place ||
-                visiblePlaceOptions.length > 0 ? (
-                  <select
-                    value={form.neighborhood}
-                    onChange={(event) =>
-                      onChange("neighborhood", event.target.value)
-                    }
-                    disabled={
-                      !form.city ||
-                      !form.district ||
-                      locationLoading.place
-                    }
-                    style={inputStyle}
-                  >
-                    <option value="">
-                      {!form.district
-                        ? "Önce ilçe / bölge seçin"
-                        : locationLoading.place
-                          ? "Mahalle / köy / mevki yükleniyor"
-                          : "Mahalle / köy / mevki seçin"}
-                    </option>
-                    {visiblePlaceOptions.map((option) => (
-                      <option key={option.id} value={option.name}>
-                        {option.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    value={form.neighborhood}
-                    onChange={(event) =>
-                      onChange("neighborhood", event.target.value)
-                    }
-                    placeholder="Mahalle / köy / mevki adını yazın"
-                    style={inputStyle}
-                  />
-                )}
-              </Field>
-            </div>
-
-            <div
-              style={{
-                marginTop: 9,
-                border: "1px solid #BAE6FD",
-                borderRadius: 12,
-                background: "#F8FDFF",
-                color: "#075985",
-                padding: "8px 10px",
-                textAlign: "center",
-                fontSize: 11,
-                fontWeight: 850,
-                lineHeight: 1.45,
-              }}
-            >
-              Portföy girişindeki ortak locationData.ts sistemi kullanılır.
-              İl değişince ilçe ve mahalle; ilçe değişince mahalle otomatik
-              temizlenir. Liste alınamazsa manuel giriş alanı açılır.
-            </div>
-          </div>
-
-        <div
-          style={{
-            width: "100%",
-            maxWidth: 820,
-            margin: "10px auto 0",
-            display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
-            gap: 10,
-          }}
-        >
-          <Field label="Proje geometrisi / cephe yapısı *">
-            <select
-              value={form.geometryType}
-              onChange={(event) => onChange("geometryType", event.target.value)}
-              style={inputStyle}
-            >
-              <optgroup label="Cephe sayısına göre">
-                {FACADE_GEOMETRY_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </optgroup>
-              <optgroup label="Özel plan ve geometri">
-                {ADVANCED_GEOMETRY_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </optgroup>
-            </select>
-          </Field>
-
-          <Field label="Ada No (Opsiyonel)">
-            <input
-              inputMode="numeric"
-              maxLength={6}
-              value={form.adaNo}
-              onChange={(event) =>
-                onChange("adaNo", event.target.value.replace(/\D/g, ""))
-              }
-              placeholder="Boş bırakılabilir"
-              style={inputStyle}
-            />
-          </Field>
-
-          <Field label="Parsel No (Opsiyonel)">
-            <input
-              inputMode="numeric"
-              maxLength={6}
-              value={form.parselNo}
-              onChange={(event) =>
-                onChange("parselNo", event.target.value.replace(/\D/g, ""))
-              }
-              placeholder="Boş bırakılabilir"
-              style={inputStyle}
-            />
-          </Field>
-        </div>
-
-        <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
-          <Field label="Açık adres *">
-            <textarea
-              value={form.address}
-              onChange={(event) => onChange("address", event.target.value)}
-              rows={3}
-              style={{ ...inputStyle, resize: "vertical" }}
-            />
-          </Field>
-
-          <Field label="Proje açıklaması">
-            <textarea
-              value={form.description}
-              onChange={(event) => onChange("description", event.target.value)}
-              rows={3}
-              style={{ ...inputStyle, resize: "vertical" }}
-            />
-          </Field>
-        </div>
-
-        {complex && (
-          <InfoBand tone="warning">
-            Bu geometri standart EPH şablonlarının dışında olabilir. Sonraki
-            aşamalarda Yazılım Ekibi incelemesi istenecektir.
-          </InfoBand>
-        )}
-      </section>
-
-      <section style={{ ...cardStyle, padding: 13 }}>
-        <SectionTitle
-          icon={<MapPin size={20} />}
-          title="Harita Konumu"
-          subtitle="Bir proje için tek harita pini kullanılır."
-        />
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(min(100%, 190px), 1fr))",
-            gap: 10,
-            marginTop: 12,
-          }}
-        >
-          <Field label="Enlem *">
-            <input
-              inputMode="decimal"
-              value={form.latitude}
-              onChange={(event) => onChange("latitude", event.target.value)}
-              placeholder="37.7765200"
-              style={inputStyle}
-            />
-          </Field>
-
-          <Field label="Boylam *">
-            <input
-              inputMode="decimal"
-              value={form.longitude}
-              onChange={(event) => onChange("longitude", event.target.value)}
-              placeholder="29.0863900"
-              style={inputStyle}
-            />
-          </Field>
-
-          <Field label="Harita adresi">
-            <input
-              value={form.mapAddress}
-              onChange={(event) => onChange("mapAddress", event.target.value)}
-              placeholder="Haritada görünen adres"
-              style={inputStyle}
-            />
-          </Field>
-        </div>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(min(100%, 210px), 1fr))",
-            gap: 8,
-            marginTop: 10,
-          }}
-        >
-          <button 
-            type="button"
-            onClick={onUseCurrentLocation}
-            disabled={locating}
-            style={secondaryButtonStyle}
-          >
-            {locating ? (
-              <Loader2 size={18} className="eph-spin" />
-            ) : (
-              <LocateFixed size={18} />
-            )}
-            {locating ? "Konum Alınıyor" : "Mevcut Konumumu Kullan"}
-          </button>
-
-          {form.latitude && form.longitude && (
-            <a
-              
-              href={`https://www.google.com/maps?q=${encodeURIComponent(
-                form.latitude,
-              )},${encodeURIComponent(form.longitude)}`}
-              target="_blank"
-              rel="noreferrer"
-              style={{
-                ...secondaryButtonStyle,
-                textDecoration: "none",
-              }}
-            >
-              <MapPin size={18} />
-              Haritada Kontrol Et
-            </a>
-          )}
-        </div>
-      </section>
-
-      <section style={{ ...cardStyle, padding: 13 }}>
-        <SectionTitle
-          icon={<ClipboardList size={20} />}
-          title="Envanter Beyanı"
-          subtitle="Tapuda numaralı bağımsız bölümler ile satış stokunu ayrı girin."
-        />
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
-            gap: 10,
-            marginTop: 12,
-          }}
-        >
-          <Field label="Toplam bağımsız bölüm *">
-            <input
-              inputMode="numeric"
-              value={form.declaredIndependentUnitCount}
-              onChange={(event) =>
-                onChange("declaredIndependentUnitCount", event.target.value)
-              }
-              placeholder="Ör. 120"
-              style={inputStyle}
-            />
-          </Field>
-
-          <Field label="Satış / kiralama stoku *">
-            <input
-              inputMode="numeric"
-              value={form.declaredSalesInventoryCount}
-              onChange={(event) =>
-                onChange("declaredSalesInventoryCount", event.target.value)
-              }
-              placeholder="Ör. 96"
-              style={inputStyle}
-            />
-          </Field>
-        </div>
-
-        <div style={{ marginTop: 12 }}>
-          <Field label="Planlanan bağımsız bölüm türleri *">
-            <UnitTypeMultiSelect
-              selected={form.plannedUnitTypes}
-              onToggle={onToggleUnitType}
-            />
-          </Field>
-        </div>
-
-        <InfoBand tone="info">
-          Daire, stüdyo, villa, ticari ünite ve benzeri gerçek bağımsız
-          bölümleri buradan çoklu seçin. Havuz, lobi, otopark ve teknik odalar
-          sonraki pakette ayrı proje alanı olarak oluşturulacaktır.
-        </InfoBand>
-      </section>
-
-      <div
-        style={{
-          ...cardStyle,
-          position: "sticky",
-          bottom: "calc(8px + env(safe-area-inset-bottom))",
-          zIndex: 20,
-          display: "flex",
-          flexWrap: "wrap",
-          justifyContent: "center",
-          gap: 8,
-          padding: 9,
-        }}
-      >
-        <button 
-          type="button"
-          onClick={() => onSave("stay")}
-          disabled={saving}
-          style={secondaryButtonStyle}
-        >
-          {saving ? (
-            <Loader2 size={18} className="eph-spin" />
-          ) : (
-            <Save size={18} />
-          )}
-          Taslak Kaydet
-        </button>
-
-        <button 
-          type="button"
-          onClick={() => onSave("structure")}
-          disabled={saving}
-          style={primaryButtonStyle}
-        >
-          {saving ? (
-            <Loader2 size={18} className="eph-spin" />
-          ) : (
-            <CheckCircle2 size={18} />
-          )}
-          Kaydet ve Blok/Kat Adımına Geç
-        </button>
-      </div>
+    let active = true; setPlaces([]);
+    if (!form.city || !form.district) return;
+    setLoading(current => ({ ...current, place: true }));
+    void fetchPlaceOptions(form.city, form.district, districts.find(item => item.name === form.district)?.id).then(items => { if(active) setPlaces(items); }).catch(() => { if(active) setPlaces([]); }).finally(() => { if(active) setLoading(current => ({ ...current, place: false })); });
+    return () => { active = false; };
+  }, [form.city, form.district, districts]);
+  const changeStep = (next: number) => { setError(''); setStep(next); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const next = () => {
+    const issue = step === 0 ? (!form.name.trim() ? 'Proje adı zorunludur.' : '')
+      : !form.city.trim() ? 'İl seçin.' : !form.district.trim() ? 'İlçe seçin.' : !form.neighborhood.trim() ? 'Mahalle seçin.' : !form.address.trim() ? 'Açık adres girin.' : !form.lifecycleStage ? 'Proje aşamasını seçin.' : validateProjectDates(form.lifecycleStage, form.defaultDeliveryDate, form.plannedStartDate) || (form.lifecycleStage === 'UNDER_CONSTRUCTION' && (!/^\d+$/.test(form.completionPercent) || Number(form.completionPercent)<1 || Number(form.completionPercent)>99) ? 'Tamamlanma oranı 1–99 arasında tam sayı olmalıdır.' : '');
+    if (issue) { setError(issue); return; }
+    changeStep(Math.min(2, step + 1));
+  };
+  const locationRequest = useRef(0);
+  const selectPoint = async(latitude:number,longitude:number)=>{
+    const request=++locationRequest.current;onChange('latitude',String(latitude));onChange('longitude',String(longitude));
+    onChange('city','');onChange('district','');onChange('neighborhood','');onChange('address','');onChange('mapAddress','');setResolving(true);setError('');
+    try {const address=await resolveProjectLocation(latitude,longitude);if(request!==locationRequest.current)return;for(const field of ['city','district','neighborhood','address','mapAddress'] as const)onChange(field,address[field]);if(!address.city||!address.district||!address.neighborhood)setError('Pin kaydedildi. Çözümlenemeyen adres alanlarını elle tamamlayın.');}
+    catch{if(request===locationRequest.current)setError('Pin kaydedildi; otomatik adres alınamadı. Adres alanlarını elle tamamlayın.');}
+    finally{if(request===locationRequest.current)setResolving(false);}
+  };
+  const locationField = (label: string, value: string, items: LocationOption[], disabled: boolean, onSelect: (value: string) => void) => {
+    const visible = value && !items.some(item => item.name === value) ? [{ id: 'saved', name: value }, ...items] : items;
+    return <Field label={label}>{items.length || disabled ? <select aria-label={label} style={inputStyle} value={value} disabled={disabled} onChange={event => onSelect(event.target.value)}><option value="">{disabled ? 'Liste yükleniyor…' : 'Seçin'}</option>{visible.map(item => <option key={item.id} value={item.name}>{item.name}</option>)}</select> : <input aria-label={label} style={inputStyle} value={value} onChange={event => onSelect(event.target.value)} placeholder="Bilgiyi yazın"/>}</Field>;
+  };
+  return <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
+    <WizardProgress activeStep={1} project={editingProject} navigationLocked={busy} onStepChange={onStepChange}/>
+    <div style={{ display: 'flex', gap: 8 }}>{['Proje Adı', 'Konum / Aşama', 'Bölüm Türleri'].map((label, index) => <button key={label} type="button" disabled={busy || index > step} aria-current={index === step ? 'step' : undefined} onClick={() => changeStep(index)} style={{ ...secondaryButtonStyle, flex: 1, whiteSpace: 'normal', background: index === step ? '#DBEAFE' : '#FFFFFF' }}>{index + 1}. {label}</button>)}</div>
+    <section style={{ ...cardStyle, padding: 16, maxWidth: 820, width: '100%', boxSizing: 'border-box', margin: '0 auto', display: 'grid', gap: 14 }}>
+      {step === 0 ? <><SectionTitle icon={<Building2 size={20}/>} title="Projenizin Adı" subtitle="Projenizi adıyla tanımlayın."/><Field label="Proje adı *"><input autoFocus aria-label="Proje adı" value={form.name} onChange={event => onChange('name', event.target.value)} placeholder="IHLAMUR EVLERİ" style={inputStyle}/></Field></> : null}
+      {step === 1 ? <>
+        <SectionTitle icon={<Building2 size={20}/>} title="Konum ve Proje Aşaması" subtitle={form.name}/>
+        {locationField('İl *', form.city, provinces, loading.province, value => { onChange('city',value);onChange('district','');onChange('neighborhood',''); })}
+        {locationField('İlçe *', form.district, districts, loading.district, value => { onChange('district',value);onChange('neighborhood',''); })}
+        {locationField('Mahalle *', form.neighborhood, places, loading.place, value => onChange('neighborhood',value))}
+        <Field label="Açık adres *"><textarea aria-label="Açık adres" style={inputStyle} value={form.address} onChange={event => onChange('address',event.target.value)}/></Field>
+        <button type="button" disabled={busy} style={secondaryButtonStyle} onClick={onUseCurrentLocation}>{busyAction==='location'?'Konum alınıyor…':'Mevcut Konumumu Kullan'}</button>
+        <Field label="WhatsApp’tan gelen konum"><input aria-label="Paylaşılan konum" style={inputStyle} value={shared} onChange={event=>setShared(event.target.value)} placeholder="Harita bağlantısı veya enlem, boylam"/></Field>
+        <button type="button" disabled={busy || !shared.trim()} style={secondaryButtonStyle} onClick={async()=>{setResolving(true);try{const point=parseSharedLocation(shared)||(await api.post<{latitude:number;longitude:number}>('/project-sales/location/resolve-shared',{url:shared.trim()})).data;await selectPoint(point.latitude,point.longitude);}catch(issue){setError(apiMessage(issue));}finally{setResolving(false);}}}>Paylaşılan Konumu Haritada Göster</button>
+        <ProjectLocationMap latitude={form.latitude} longitude={form.longitude} onLocationChange={(latitude,longitude)=>void selectPoint(latitude,longitude)}/>
+        <details><summary style={{cursor:'pointer',padding:12,color:'#17345B',fontWeight:800}}>Ada / Parsel · Opsiyonel</summary><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,paddingTop:10}}><Field label="Ada no"><input inputMode="numeric" maxLength={6} style={inputStyle} value={form.adaNo} onChange={event=>onChange('adaNo',event.target.value.replace(/\D/g,''))}/></Field><Field label="Parsel no"><input inputMode="numeric" maxLength={4} style={inputStyle} value={form.parselNo} onChange={event=>onChange('parselNo',event.target.value.replace(/\D/g,''))}/></Field></div></details>
+        <Field label="Proje aşaması *"><select aria-label="Proje aşaması" style={inputStyle} value={form.lifecycleStage} onChange={event=>{const value=event.target.value;onChange('lifecycleStage',value);onChange('completionPercent',value==='READY'?'100':value==='PLANNED'?'0':'');if(value==='READY')onChange('defaultDeliveryDate','');if(value!=='PLANNED')onChange('plannedStartDate','');}}><option value="">Aşama seçin</option><option value="READY">Tamamlanan Proje</option><option value="UNDER_CONSTRUCTION">Devam Eden Proje</option><option value="PLANNED">Planlanan Proje</option></select></Field>
+        {form.lifecycleStage==='UNDER_CONSTRUCTION'?<Field label="Tamamlanma oranı (%) *"><input aria-label="Tamamlanma oranı" type="number" min={1} max={99} step={1} style={inputStyle} value={form.completionPercent} onChange={event=>onChange('completionPercent',event.target.value)}/></Field>:null}
+        {form.lifecycleStage==='PLANNED'?<ProjectMonthField label="Proje başlangıcı" value={form.plannedStartDate} onChange={value=>onChange('plannedStartDate',value)}/>:null}
+        {form.lifecycleStage==='PLANNED'?<details><summary style={{cursor:'pointer',padding:12,color:'#17345B',fontWeight:800}}>İnşaat Ruhsatı Bilgileri · Opsiyonel</summary><div style={{display:'grid',gap:10,paddingTop:10}}><Field label="Ruhsat numarası"><input maxLength={80} value={form.permitNumber} onChange={event=>onChange('permitNumber',event.target.value)} style={inputStyle}/></Field><Field label="Ruhsatı veren idare"><input maxLength={120} value={form.permitAuthority} onChange={event=>onChange('permitAuthority',event.target.value)} style={inputStyle}/></Field></div></details>:null}
+        {form.lifecycleStage && form.lifecycleStage!=='READY'?<><ProjectMonthField label="Tahmini teslim" value={form.defaultDeliveryDate} onChange={value=>onChange('defaultDeliveryDate',value)}/><p style={{fontSize:12,textAlign:'center',color:'#64748B',margin:0}}>Bu aydan itibaren en fazla 36 ay seçilebilir.</p></>:null}
+      </>:null}
+      {step === 2 ? <>
+        <SectionTitle icon={<Building2 size={20}/>} title="Bağımsız Bölüm Planı" subtitle="Blok ve kat dağılımından önce bölüm türlerini belirleyin."/>
+        <UnitTypeMultiSelect selected={form.plannedUnitTypes} onToggle={onToggleUnitType}/>
+        {form.plannedUnitTypes.includes('DIGER')?<Field label="Diğer tür adı *"><input style={inputStyle} value={form.plannedOtherUnitTypeName} maxLength={80} onChange={event=>onChange('plannedOtherUnitTypeName',event.target.value)}/></Field>:null}
+      </>:null}
+      {error?<p role="alert" style={{color:'#B91C1C',fontSize:13,lineHeight:1.6}}>{error}</p>:null}
+    </section>
+    <div style={{...cardStyle,padding:12,display:'flex',flexWrap:'wrap',gap:8,justifyContent:'center'}}>
+      {step>0?<button type="button" style={secondaryButtonStyle} disabled={busy} onClick={()=>changeStep(step-1)}>Geri</button>:null}
+      {step<2?<button type="button" style={primaryButtonStyle} disabled={busy} onClick={next}>Devam Et</button>:<><button type="button" style={secondaryButtonStyle} disabled={busy} onClick={()=>onSave('stay')}>Taslak Kaydet</button><button type="button" style={primaryButtonStyle} disabled={busy} onClick={()=>onSave('structure')}>{busy?'Kaydediliyor…':'Kaydet ve Blok / Katlara Geç'}</button></>}
     </div>
-  );
+  </div>;
+}
+
+function ProjectMonthField({label,value,onChange}:{label:string;value:string;onChange:(value:string)=>void}) {
+  const choices=monthChoices();const [draftYear,setDraftYear]=useState('');const year=value.slice(0,4)||draftYear||choices[0].year;const month=value.slice(5,7);
+  return <fieldset style={{border:'1px solid #C7D6E8',borderRadius:14,padding:12,margin:0}}><legend style={{fontSize:12,fontWeight:800,color:'#17345B'}}>{label} *</legend><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}><select aria-label={`${label} yılı`} style={inputStyle} value={year} onChange={event=>{const next=event.target.value;setDraftYear(next);if(value)onChange(choices.find(item=>item.year===next&&item.month===month)?.value||choices.find(item=>item.year===next)!.value);}}>{Array.from(new Set(choices.map(item=>item.year))).map(item=><option key={item} value={item}>{item}</option>)}</select><select aria-label={`${label} ayı`} style={inputStyle} value={month} onChange={event=>onChange(event.target.value?`${year}-${event.target.value}-01`:'')}><option value="">Ay seçin</option>{choices.filter(item=>item.year===year).map(item=><option key={item.value} value={item.month}>{MONTH_NAMES[Number(item.month)-1]}</option>)}</select></div></fieldset>;
 }
 
 function ProjectStructureView({
@@ -3946,6 +3805,7 @@ function ProjectStructureView({
   preview,
   busyAction,
   onUpdateBlock,
+  onSetBlockCount,
   onAddBlock,
   onRemoveBlock,
   onPreview,
@@ -3962,6 +3822,7 @@ function ProjectStructureView({
     field: K,
     value: BlockForm[K],
   ) => void;
+  onSetBlockCount:(count:number)=>void;
   onAddBlock: () => void;
   onRemoveBlock: (key: string) => void;
   onPreview: () => void;
@@ -3971,6 +3832,20 @@ function ProjectStructureView({
 }) {
   const previewing = busyAction === "structure-preview";
   const applying = busyAction === "structure-apply";
+  const [expandedBlockKey, setExpandedBlockKey] = useState<string | null>(
+    blocks[0]?.key ?? null,
+  );
+
+  useEffect(() => {
+    setExpandedBlockKey((current) => {
+      if (current && blocks.some((block) => block.key === current)) {
+        return current;
+      }
+
+      return blocks[0]?.key ?? null;
+    });
+  }, [blocks]);
+
   const totalFloorCount = blocks.reduce(
     (total, block) => total + buildFloors(block).length,
     0,
@@ -4016,11 +3891,11 @@ function ProjectStructureView({
         >
           <Metric label="Blok" value={blocks.length} />
           <Metric label="Toplam Kat" value={totalFloorCount} />
-          <Metric label="Cephe Görünümü" value={totalFacadeCount} />
         </div>
 
+        <div style={{marginTop:12}}><Field label="Kaç adet blok var?"><select aria-label="Blok adedi" value={blocks.length} style={inputStyle} disabled={Boolean(busyAction)} onChange={event=>onSetBlockCount(Number(event.target.value))}>{Array.from({length:50},(_,index)=><option key={index+1} value={index+1}>{index+1} blok</option>)}</select></Field></div>
         <InfoBand tone="info">
-          Bodrum, zemin ve normal kat sayılarını blok bazında tanımlayın. Aynı
+          Kat sayılarını blok bazında tanımlayın. Aynı
           projede A Blok dört cepheli, B Blok çift cepheli olabilir.
         </InfoBand>
       </section>
@@ -4031,15 +3906,49 @@ function ProjectStructureView({
             block.geometryType,
           );
           const floors = buildFloors(block);
+          const expanded = expandedBlockKey === block.key;
+          const accordionContentId = `project-block-${block.key}-content`;
 
           return (
-            <section key={block.key} style={{ ...cardStyle, padding: 13 }}>
+            <section
+              key={block.key}
+              style={{
+                ...cardStyle,
+                padding: 0,
+                overflow: "hidden",
+                borderColor: expanded ? "#93C5FD" : "#C7D6E8",
+                boxShadow: expanded
+                  ? "0 12px 30px rgba(37, 99, 235, 0.12)"
+                  : cardStyle.boxShadow,
+              }}
+            >
               <div
+                role="button"
+                tabIndex={0}
+                aria-expanded={expanded}
+                aria-controls={accordionContentId}
+                onClick={() =>
+                  setExpandedBlockKey((current) =>
+                    current === block.key ? null : block.key,
+                  )
+                }
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setExpandedBlockKey((current) =>
+                      current === block.key ? null : block.key,
+                    );
+                  }
+                }}
                 style={{
                   display: "grid",
                   gridTemplateColumns: "42px minmax(0, 1fr) 42px",
                   alignItems: "center",
                   gap: 9,
+                  padding: 13,
+                  background: expanded ? "#F8FBFF" : "#FFFFFF",
+                  cursor: "pointer",
+                  outline: "none",
                 }}
               >
                 <div
@@ -4077,31 +3986,44 @@ function ProjectStructureView({
                       fontWeight: 750,
                     }}
                   >
-                    {floors.length} kat • {standardFacadeCount ?? block.facadeViewCount} cephe
+                    {floors.length} kat
                   </p>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => onRemoveBlock(block.key)}
-                  disabled={blocks.length === 1 || Boolean(busyAction)}
-                  aria-label="Bloğu kaldır"
+
+
+                <div
+                  aria-hidden="true"
                   style={{
                     width: 42,
                     height: 42,
-                    border: "1.5px solid #FECACA",
+                    border: "1.5px solid #BFDBFE",
                     borderRadius: 13,
                     display: "grid",
                     placeItems: "center",
-                    background: blocks.length === 1 ? "#F8FAFC" : "#FEF2F2",
-                    color: blocks.length === 1 ? "#94A3B8" : "#DC2626",
-                    cursor: blocks.length === 1 ? "not-allowed" : "pointer",
+                    background: "#EFF6FF",
+                    color: "#1557D6",
                   }}
                 >
-                  <Trash2 size={17} />
-                </button>
+                  <ChevronDown
+                    size={19}
+                    style={{
+                      transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
+                      transition: "transform 180ms ease",
+                    }}
+                  />
+                </div>
               </div>
 
+              {expanded && (
+                <div
+                  id={accordionContentId}
+                  style={{
+                    padding: "0 13px 13px",
+                    borderTop: "1px solid #DBEAFE",
+                    background: "#FFFFFF",
+                  }}
+                >
               <div
                 style={{
                   display: "grid",
@@ -4134,130 +4056,10 @@ function ProjectStructureView({
                   />
                 </Field>
 
-                <Field label="Blok geometrisi / cephe yapısı *">
-                  <select
-                    value={block.geometryType}
-                    onChange={(event) =>
-                      onUpdateBlock(
-                        block.key,
-                        "geometryType",
-                        event.target.value,
-                      )
-                    }
-                    style={inputStyle}
-                  >
-                    <optgroup label="Cephe sayısına göre">
-                      {FACADE_GEOMETRY_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </optgroup>
-                    <optgroup label="Özel plan ve geometri">
-                      {ADVANCED_GEOMETRY_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </optgroup>
-                  </select>
-                </Field>
-
-                <Field label="Cephe görünüm sayısı *">
-                  <input
-                    inputMode="numeric"
-                    value={
-                      standardFacadeCount === null
-                        ? block.facadeViewCount
-                        : String(standardFacadeCount)
-                    }
-                    onChange={(event) =>
-                      onUpdateBlock(
-                        block.key,
-                        "facadeViewCount",
-                        event.target.value.replace(/\D/g, "").slice(0, 1),
-                      )
-                    }
-                    disabled={standardFacadeCount !== null}
-                    placeholder="1-8"
-                    style={{
-                      ...inputStyle,
-                      opacity: standardFacadeCount !== null ? 0.72 : 1,
-                    }}
-                  />
-                </Field>
-
-                <Field label="Bodrum kat sayısı">
-                  <input
-                    type="number"
-                    min={0}
-                    max={20}
-                    value={block.basementFloorCount}
-                    onChange={(event) =>
-                      onUpdateBlock(
-                        block.key,
-                        "basementFloorCount",
-                        event.target.value,
-                      )
-                    }
-                    style={inputStyle}
-                  />
-                </Field>
-
-                <Field label="Normal kat sayısı">
-                  <input
-                    type="number"
-                    min={0}
-                    max={200}
-                    value={block.normalFloorCount}
-                    onChange={(event) =>
-                      onUpdateBlock(
-                        block.key,
-                        "normalFloorCount",
-                        event.target.value,
-                      )
-                    }
-                    style={inputStyle}
-                  />
+                <Field label="Kat sayısı">
+                  <input type="number" min={Math.max(1,Number(block.basementFloorCount)+(block.hasGroundFloor?1:0))} max={220} value={floors.length} onChange={event=>onUpdateBlock(block.key,'normalFloorCount',String(Math.max(0,Number(event.target.value)-Number(block.basementFloorCount)-(block.hasGroundFloor?1:0))))} style={inputStyle}/>
                 </Field>
               </div>
-
-              <button
-                type="button"
-                onClick={() =>
-                  onUpdateBlock(
-                    block.key,
-                    "hasGroundFloor",
-                    !block.hasGroundFloor,
-                  )
-                }
-                style={{
-                  ...secondaryButtonStyle,
-                  width: "100%",
-                  marginTop: 9,
-                  borderColor: block.hasGroundFloor ? "#2563EB" : "#C7D6E8",
-                  background: block.hasGroundFloor ? "#EFF6FF" : "#FFFFFF",
-                  color: block.hasGroundFloor ? "#1D4ED8" : "#475569",
-                }}
-              >
-                <span
-                  style={{
-                    width: 20,
-                    height: 20,
-                    display: "grid",
-                    placeItems: "center",
-                    borderRadius: 6,
-                    border: block.hasGroundFloor
-                      ? "1px solid #2563EB"
-                      : "1px solid #CBD5E1",
-                    background: block.hasGroundFloor ? "#2563EB" : "#F8FAFC",
-                    color: "#FFFFFF",
-                  }}
-                >
-                  {block.hasGroundFloor && <Check size={14} strokeWidth={3} />}
-                </span>
-                Zemin kat {block.hasGroundFloor ? "var" : "yok"}
-              </button>
 
               <div
                 style={{
@@ -4301,20 +4103,14 @@ function ProjectStructureView({
                   </span>
                 )}
               </div>
+                </div>
+              )}
             </section>
           );
         })}
       </div>
 
-      <button 
-        type="button"
-        onClick={onAddBlock}
-        disabled={blocks.length >= 50 || Boolean(busyAction)}
-        style={{ ...secondaryButtonStyle, width: "100%" }}
-      >
-        <Plus size={18} />
-        Yeni Blok Ekle
-      </button>
+
 
       {preview && (
         <section
@@ -4354,13 +4150,16 @@ function ProjectStructureView({
             }}
           >
             {preview.summary.blockCount} blok ve {preview.summary.floorCount} kat doğrulandı.
+            Taslağı onaylıyor musunuz?
             {preview.summary.complexGeometryDetected
               ? " Özel geometri nedeniyle Yazılım Ekibi incelemesi gerekecek."
               : " Standart yapı doğrulaması başarılı."}
           </p>
+          <div style={{display:'flex',flexWrap:'wrap',justifyContent:'center',alignItems:'flex-end',gap:14,marginTop:14}}>{blocks.map(block=><div key={block.key} style={{minWidth:120,display:'grid',gap:3}}><strong style={{fontSize:12}}>{block.name||block.code}</strong>{buildFloors(block).slice().reverse().slice(0,16).map(floor=><div key={floor.level} style={{padding:6,border:'1px solid #94A3B8',background:floor.level<0?'#E2E8F0':floor.level===0?'#DBEAFE':'#FFFFFF',fontSize:11}}>{floor.label}</div>)}{buildFloors(block).length>16?<span style={{fontSize:11}}>{buildFloors(block).length} katın ilk 16’sı gösteriliyor.</span>:null}</div>)}</div>
         </section>
       )}
 
+      {project._count.blocks>0?<a href={`/proje-satis-sablonu/3d/${project.id}`} style={{...secondaryButtonStyle,textDecoration:'none'}}>Mimari Ölçüler ve 3D Taslak · Opsiyonel</a>:null}
       {project._count.blocks > 0 && (
         <button 
           type="button"
@@ -4418,7 +4217,7 @@ function ProjectStructureView({
           ) : (
             <CheckCircle2 size={18} />
           )}
-          Blok ve Katları Kaydet
+          Taslağı Onayla ve Kaydet
         </button>
       </div>
     </div>
@@ -4432,12 +4231,14 @@ function ProjectInventoryView({
   preview,
   busyAction,
   editMode,
+  numberingMode,
   onUpdateFloorPlan,
   onUpdateUnitGroup,
   onToggleFacade,
   onAddUnitGroup,
   onRemoveUnitGroup,
   onCopyToAll,
+  onNumberingModeChange,
   onPreview,
   onApply,
   onReplace,
@@ -4451,6 +4252,7 @@ function ProjectInventoryView({
   preview: InventoryPreview | null;
   busyAction: string | null;
   editMode: boolean;
+  numberingMode: ProjectNumberingMode;
   onUpdateFloorPlan: <K extends keyof FloorPlanForm>(
     floorKey: string,
     field: K,
@@ -4467,12 +4269,13 @@ function ProjectInventoryView({
     groupKey: string,
     facade: string,
   ) => void;
-  onAddUnitGroup: (floorKey: string) => void;
+  onAddUnitGroup: (floorKey: string,roomCount?:string) => void;
   onRemoveUnitGroup: (floorKey: string, groupKey: string) => void;
   onCopyToAll: (
     floorKey: string,
     options: FloorCopyOptions,
   ) => void;
+  onNumberingModeChange: (mode: ProjectNumberingMode) => void;
   onPreview: () => void;
   onApply: () => void;
   onReplace: () => void;
@@ -4527,6 +4330,93 @@ function ProjectInventoryView({
     declaredSalesCount !== null &&
     declaredSalesCount !== undefined &&
     plannedSalesCount !== declaredSalesCount;
+  const blockFloorGroups = useMemo(() => {
+    const groups: Array<{
+      blockCode: string;
+      blockName: string;
+      floors: Array<{
+        floorPlan: FloorPlanForm;
+        floorIndex: number;
+      }>;
+    }> = [];
+
+    floorPlans.forEach((floorPlan, floorIndex) => {
+      const existing = groups.find(
+        (group) => group.blockCode === floorPlan.blockCode,
+      );
+
+      if (existing) {
+        existing.floors.push({ floorPlan, floorIndex });
+        return;
+      }
+
+      groups.push({
+        blockCode: floorPlan.blockCode,
+        blockName: floorPlan.blockName,
+        floors: [{ floorPlan, floorIndex }],
+      });
+    });
+
+    return groups;
+  }, [floorPlans]);
+  const [expandedInventoryBlockCode, setExpandedInventoryBlockCode] =
+    useState<string | null>(blockFloorGroups[0]?.blockCode ?? null);
+  const [expandedInventoryFloorKey, setExpandedInventoryFloorKey] =
+    useState<string | null>(
+      blockFloorGroups[0]?.floors[0]?.floorPlan.key ?? null,
+    );
+  const knownInventoryFloorKeysRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const knownKeys = knownInventoryFloorKeysRef.current;
+    const addedFloor = floorPlans.find(
+      (floorPlan) => !knownKeys.has(floorPlan.key),
+    );
+
+    knownInventoryFloorKeysRef.current = new Set(
+      floorPlans.map((floorPlan) => floorPlan.key),
+    );
+
+    if (addedFloor) {
+      setExpandedInventoryBlockCode(addedFloor.blockCode);
+      setExpandedInventoryFloorKey(addedFloor.key);
+    }
+  }, [floorPlans]);
+
+  useEffect(() => {
+    const activeBlock = blockFloorGroups.find(
+      (group) => group.blockCode === expandedInventoryBlockCode,
+    );
+
+    if (!activeBlock) {
+      const firstBlock = blockFloorGroups[0];
+
+      setExpandedInventoryBlockCode(firstBlock?.blockCode ?? null);
+      setExpandedInventoryFloorKey(
+        firstBlock?.floors[0]?.floorPlan.key ?? null,
+      );
+      return;
+    }
+
+    if (
+      !activeBlock.floors.some(
+        ({ floorPlan }) => floorPlan.key === expandedInventoryFloorKey,
+      )
+    ) {
+      setExpandedInventoryFloorKey(
+        activeBlock.floors[0]?.floorPlan.key ?? null,
+      );
+    }
+  }, [
+    blockFloorGroups,
+    expandedInventoryBlockCode,
+    expandedInventoryFloorKey,
+  ]);
+
+  const revealInventoryFloor = (floorPlan: FloorPlanForm) => {
+    setExpandedInventoryBlockCode(floorPlan.blockCode);
+    setExpandedInventoryFloorKey(floorPlan.key);
+  };
 
   return (
     <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
@@ -4650,6 +4540,13 @@ function ProjectInventoryView({
           </InfoBand>
         )}
       </section>
+
+      <ProjectInventoryNumberingPanel
+        floorPlans={floorPlans}
+        numberingMode={numberingMode}
+        disabled={inventoryLocked || Boolean(busyAction)}
+        onChange={onNumberingModeChange}
+      />
 
       <section
         style={{
@@ -4847,31 +4744,77 @@ function ProjectInventoryView({
       </section>
 
       <div style={{ display: "grid", gap: 10 }}>
-        {floorPlans.map((floorPlan, floorIndex) => {
-          const floorUnitCount = floorPlan.unitGroups.reduce(
-            (total, group) => total + countValue(group.count),
+        {blockFloorGroups.map((blockGroup, blockIndex) => {
+          const blockExpanded =
+            expandedInventoryBlockCode === blockGroup.blockCode;
+          const blockUnitCount = blockGroup.floors.reduce(
+            (total, { floorPlan }) =>
+              total +
+              floorPlan.unitGroups.reduce(
+                (floorTotal, group) =>
+                  floorTotal + countValue(group.count),
+                0,
+              ),
             0,
           );
-          const floorPalette =
-            FLOOR_CARD_PALETTES[floorIndex % FLOOR_CARD_PALETTES.length];
+          const blockSalesCount = blockGroup.floors.reduce(
+            (total, { floorPlan }) =>
+              total +
+              floorPlan.unitGroups.reduce(
+                (floorTotal, group) =>
+                  floorTotal +
+                  (SALES_COMMERCIAL_PURPOSES.has(group.commercialPurpose)
+                    ? countValue(group.count)
+                    : 0),
+                0,
+              ),
+            0,
+          );
+          const blockContentId = `inventory-block-${blockGroup.blockCode}`;
 
           return (
             <section
-              key={floorPlan.key}
+              key={blockGroup.blockCode}
               style={{
                 ...cardStyle,
-                borderColor: floorPalette.border,
-                background: floorPalette.background,
-                padding: 13,
-                boxShadow: "0 12px 30px rgba(15, 23, 42, 0.07)",
+                padding: 0,
+                overflow: "hidden",
+                borderColor: blockExpanded ? "#93C5FD" : "#C7D6E8",
+                background: "#FFFFFF",
+                boxShadow: blockExpanded
+                  ? "0 14px 34px rgba(37, 99, 235, 0.12)"
+                  : cardStyle.boxShadow,
               }}
             >
               <div
+                role="button"
+                tabIndex={0}
+                aria-expanded={blockExpanded}
+                aria-controls={blockContentId}
+                onClick={() => {
+                  setExpandedInventoryBlockCode(blockGroup.blockCode);
+                  setExpandedInventoryFloorKey(
+                    blockGroup.floors[0]?.floorPlan.key ?? null,
+                  );
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setExpandedInventoryBlockCode(blockGroup.blockCode);
+                    setExpandedInventoryFloorKey(
+                      blockGroup.floors[0]?.floorPlan.key ?? null,
+                    );
+                  }
+                }}
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "42px minmax(0, 1fr)",
+                  gridTemplateColumns: "42px minmax(0, 1fr) 42px",
                   alignItems: "center",
                   gap: 9,
+                  padding: 13,
+                  background: blockExpanded ? "#F8FBFF" : "#FFFFFF",
+                  cursor: "pointer",
+                  outline: "none",
                 }}
               >
                 <div
@@ -4881,13 +4824,13 @@ function ProjectInventoryView({
                     display: "grid",
                     placeItems: "center",
                     borderRadius: 13,
-                    background: floorPalette.badgeBackground,
-                    color: floorPalette.badgeColor,
-                    fontSize: 12,
+                    background: "#EAF2FF",
+                    color: "#1557D6",
+                    fontSize: 14,
                     fontWeight: 950,
                   }}
                 >
-                  {floorIndex + 1}
+                  {blockIndex + 1}
                 </div>
 
                 <div style={{ minWidth: 0, textAlign: "center" }}>
@@ -4900,25 +4843,240 @@ function ProjectInventoryView({
                       fontWeight: 950,
                     }}
                   >
-                    {floorPlan.blockName} • {floorPlan.floorLabel}
+                    {blockGroup.blockName ||
+                      `${blockGroup.blockCode} Blok`}
                   </h3>
                   <p
                     style={{
                       margin: "3px 0 0",
                       color: "#64748B",
                       fontSize: 10,
-                      fontWeight: 750,
+                      lineHeight: 1.4,
+                      fontWeight: 800,
                     }}
                   >
-                    {floorUnitCount} bağımsız bölüm
+                    {blockGroup.floors.length} kat • {blockUnitCount} bağımsız
+                    bölüm • {blockSalesCount} satış stoku
                   </p>
                 </div>
 
+                <div
+                  aria-hidden="true"
+                  style={{
+                    width: 42,
+                    height: 42,
+                    border: "1.5px solid #BFDBFE",
+                    borderRadius: 13,
+                    display: "grid",
+                    placeItems: "center",
+                    background: "#EFF6FF",
+                    color: "#1557D6",
+                  }}
+                >
+                  <ChevronDown
+                    size={19}
+                    style={{
+                      transform: blockExpanded
+                        ? "rotate(180deg)"
+                        : "rotate(0deg)",
+                      transition: "transform 180ms ease",
+                    }}
+                  />
+                </div>
               </div>
 
+              {blockExpanded && (
+                <div
+                  id={blockContentId}
+                  style={{
+                    display: "grid",
+                    gap: 9,
+                    padding: "10px 10px 12px",
+                    borderTop: "1px solid #DBEAFE",
+                    background: "#F8FAFC",
+                  }}
+                >
+                  {blockGroup.floors.map(({ floorPlan, floorIndex }) => {
+                    const floorUnitCount = floorPlan.unitGroups.reduce(
+                      (total, group) => total + countValue(group.count),
+                      0,
+                    );
+                    const floorSalesCount = floorPlan.unitGroups.reduce(
+                      (total, group) =>
+                        total +
+                        (SALES_COMMERCIAL_PURPOSES.has(
+                          group.commercialPurpose,
+                        )
+                          ? countValue(group.count)
+                          : 0),
+                      0,
+                    );
+                    const floorPalette =
+                      FLOOR_CARD_PALETTES[
+                        floorIndex % FLOOR_CARD_PALETTES.length
+                      ];
+                    const floorExpanded =
+                      expandedInventoryFloorKey === floorPlan.key;
+                    const floorContentId = `inventory-floor-${floorPlan.key}`;
+
+                    return (
+                      <section
+                        key={floorPlan.key}
+                        style={{
+                          border: `1.5px solid ${floorPalette.border}`,
+                          borderRadius: 16,
+                          overflow: "hidden",
+                          background: floorPalette.background,
+                          boxShadow: floorExpanded
+                            ? "0 10px 24px rgba(15, 23, 42, 0.08)"
+                            : "none",
+                        }}
+                      >
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          aria-expanded={floorExpanded}
+                          aria-controls={floorContentId}
+                          onClick={() => {
+                            setExpandedInventoryBlockCode(
+                              floorPlan.blockCode,
+                            );
+                            setExpandedInventoryFloorKey(floorPlan.key);
+                          }}
+                          onKeyDown={(event) => {
+                            if (
+                              event.key === "Enter" ||
+                              event.key === " "
+                            ) {
+                              event.preventDefault();
+                              setExpandedInventoryBlockCode(
+                                floorPlan.blockCode,
+                              );
+                              setExpandedInventoryFloorKey(floorPlan.key);
+                            }
+                          }}
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns:
+                              "42px minmax(0, 1fr) 42px",
+                            alignItems: "center",
+                            gap: 9,
+                            padding: 11,
+                            background: floorExpanded
+                              ? "#FFFFFF"
+                              : floorPalette.background,
+                            cursor: "pointer",
+                            outline: "none",
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: 42,
+                              height: 42,
+                              display: "grid",
+                              placeItems: "center",
+                              borderRadius: 13,
+                              background: floorPalette.badgeBackground,
+                              color: floorPalette.badgeColor,
+                              fontSize: 12,
+                              fontWeight: 950,
+                            }}
+                          >
+                            {floorIndex + 1}
+                          </div>
+
+                          <div style={{ minWidth: 0, textAlign: "center" }}>
+                            <h4
+                              style={{
+                                margin: 0,
+                                color: "#1F2937",
+                                fontSize: 13,
+                                lineHeight: 1.3,
+                                fontWeight: 950,
+                              }}
+                            >
+                              {floorPlan.floorLabel}
+                            </h4>
+
+                            <div
+                              style={{
+                                display: "flex",
+                                flexWrap: "wrap",
+                                justifyContent: "center",
+                                gap: 5,
+                                marginTop: 5,
+                              }}
+                            >
+                              {[
+                                `${floorUnitCount} bağımsız bölüm`,
+                                `${floorSalesCount} satış stoku`,
+                                `Başlangıç ${
+                                  floorPlan.numberPrefix ||
+                                  defaultNumberPrefix(
+                                    floorPlan.blockCode,
+                                  )
+                                }-${positiveInteger(
+                                  floorPlan.startingSequence,
+                                )}`,
+                              ].map((label) => (
+                                <span
+                                  key={label}
+                                  style={{
+                                    border: "1px solid #D6E2F0",
+                                    borderRadius: 999,
+                                    background: "#FFFFFF",
+                                    color: "#475569",
+                                    padding: "4px 7px",
+                                    fontSize: 9,
+                                    fontWeight: 850,
+                                  }}
+                                >
+                                  {label}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div
+                            aria-hidden="true"
+                            style={{
+                              width: 42,
+                              height: 42,
+                              border: "1.5px solid #D6E2F0",
+                              borderRadius: 13,
+                              display: "grid",
+                              placeItems: "center",
+                              background: "#FFFFFF",
+                              color: "#475569",
+                            }}
+                          >
+                            <ChevronDown
+                              size={18}
+                              style={{
+                                transform: floorExpanded
+                                  ? "rotate(180deg)"
+                                  : "rotate(0deg)",
+                                transition: "transform 180ms ease",
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        {floorExpanded && (
+                          <div
+                            id={floorContentId}
+                            style={{
+                              padding: "0 11px 11px",
+                              borderTop: "1px solid #D6E2F0",
+                              background: "#FFFFFF",
+                            }}
+                          >
               <button 
                 type="button"
-                onClick={() => onCopyToAll(floorPlan.key, copyOptions)}
+                onClick={() => {
+                  revealInventoryFloor(floorPlan);
+                  onCopyToAll(floorPlan.key, copyOptions);
+                }}
                 disabled={
                   inventoryLocked ||
                   Boolean(busyAction) ||
@@ -4984,13 +5142,19 @@ function ProjectInventoryView({
                         event.target.value,
                       )
                     }
-                    disabled={inventoryLocked}
+                    disabled={inventoryLocked || (numberingMode === "CONTINUOUS" && floorPlan.floorLevel>=0 && floorPlans.some(other=>other.blockCode===floorPlan.blockCode&&other.floorLevel>=0&&other.floorLevel<floorPlan.floorLevel&&other.unitGroups.length>0))}
+                    title={
+                      numberingMode === "CONTINUOUS"
+                        ? "Sıralı yöntemde başlangıç numarası önceki kattan otomatik hesaplanır."
+                        : undefined
+                    }
                     style={inputStyle}
                   />
                 </Field>
               </div>
 
               <div style={{ display: "grid", gap: 9, marginTop: 10 }}>
+                {floorPlan.unitGroups.some(group => !isShop(group.type)) && <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:10}}>{['1+0','1+1','2+1','3+1','4+1','5+1','10+4'].map(room=><button key={room} type="button" disabled={inventoryLocked||floorPlan.unitGroups.some(group=>group.roomCount===room)} style={secondaryButtonStyle} onClick={()=>onAddUnitGroup(floorPlan.key,room)}>{room} ekle</button>)}</div>}<p style={{fontSize:11,color:'#64748B'}}>Mağazalar ayrı satırlarda tanımlanır; her mağazanın net/brüt m² alanını ayrı girin. Konutlarda aynı tür ve oda düzenindeki alanlar birlikte güncellenir.</p>
                 {floorPlan.unitGroups.map((group, groupIndex) => (
                   <div
                     key={group.key}
@@ -5088,7 +5252,7 @@ function ProjectInventoryView({
                           disabled={inventoryLocked}
                           style={inputStyle}
                         >
-                          {UNIT_TYPE_OPTIONS.map((option) => (
+                          {UNIT_TYPE_OPTIONS.filter(option=>SIMPLE_UNIT_TYPES.has(option.value)||option.value===group.type).map((option) => (
                             <option
                               key={option.value}
                               value={option.value}
@@ -5118,22 +5282,8 @@ function ProjectInventoryView({
                         />
                       </Field>
 
-                      <Field label="Oda sayısı">
-                        <input
-                          value={group.roomCount}
-                          onChange={(event) =>
-                            onUpdateUnitGroup(
-                              floorPlan.key,
-                              group.key,
-                              "roomCount",
-                              event.target.value,
-                            )
-                          }
-                          disabled={inventoryLocked}
-                          placeholder="Ör. 2+1"
-                          style={inputStyle}
-                        />
-                      </Field>
+                      {!isShop(group.type) && <Field label="Oda sayısı"><select value={group.roomCount} disabled={inventoryLocked} style={inputStyle} onChange={event=>onUpdateUnitGroup(floorPlan.key,group.key,'roomCount',event.target.value)}><option value="">Belirtilmedi</option>{Array.from(new Set([...PROJECT_ROOM_OPTIONS,...(group.roomCount?[group.roomCount]:[])])).map(room=><option key={room} value={room}>{room}</option>)}</select></Field>}
+                      {isShop(group.type) && <Field label="Mağaza özellikleri"><textarea value={group.description || ''} disabled={inventoryLocked} maxLength={2000} placeholder="Vitrin cephesi, tavan yüksekliği, depo, WC, giriş özelliği" style={inputStyle} onChange={event => onUpdateUnitGroup(floorPlan.key,group.key,'description',event.target.value)} /></Field>}
 
                       <Field label="Ticari amaç *">
                         <select
@@ -5196,7 +5346,13 @@ function ProjectInventoryView({
                         />
                       </Field>
 
-                      <Field label="Konsept etiketi">
+                      <Field
+                        label={
+                          group.type === "DIGER"
+                            ? "Diğer türün adı *"
+                            : isShop(group.type) ? "Mağaza adı / kullanım türü" : "Konsept etiketi"
+                        }
+                      >
                         <input
                           value={group.conceptLabel}
                           onChange={(event) =>
@@ -5208,7 +5364,13 @@ function ProjectInventoryView({
                             )
                           }
                           disabled={inventoryLocked}
-                          placeholder="Ör. Bahçe katı"
+                          placeholder={
+                            group.type === "DIGER"
+                              ? project?.plannedOtherUnitTypeName ||
+                                "Ör. Öğrenci apartı"
+                              : "Ör. Bahçe katı"
+                          }
+                          maxLength={80}
                           style={inputStyle}
                         />
                       </Field>
@@ -5291,7 +5453,10 @@ function ProjectInventoryView({
 
               <button 
                 type="button"
-                onClick={() => onAddUnitGroup(floorPlan.key)}
+                onClick={() => {
+                  revealInventoryFloor(floorPlan);
+                  onAddUnitGroup(floorPlan.key);
+                }}
                 disabled={inventoryLocked || Boolean(busyAction)}
                 style={{
                   ...secondaryButtonStyle,
@@ -5302,6 +5467,14 @@ function ProjectInventoryView({
                 <Plus size={17} />
                 Bu Kata Yeni Tür Ekle
               </button>
+
+                          </div>
+                        )}
+                      </section>
+                    );
+                  })}
+                </div>
+              )}
             </section>
           );
         })}
@@ -5513,43 +5686,28 @@ function ProjectInventoryView({
 function ProjectSpacesView({
   project,
   spaces,
-  preview,
   busyAction,
-  onUpdateSpace,
-  onAddSpace,
-  onRemoveSpace,
-  onPreview,
-  onApply,
-  onContinue,
+  onToggleSpace,
+  onSave,
   onStepChange,
 }: {
   project: ProjectSetupResponse;
   spaces: ProjectSpaceForm[];
-  preview: ProjectSpacesPreview | null;
   busyAction: string | null;
-  onUpdateSpace: <K extends keyof ProjectSpaceForm>(
-    key: string,
-    field: K,
-    value: ProjectSpaceForm[K],
-  ) => void;
-  onAddSpace: () => void;
-  onRemoveSpace: (key: string) => void;
-  onPreview: () => void;
-  onApply: () => void;
-  onContinue: () => void;
+  onToggleSpace: (spaceType: string) => void;
+  onSave: () => void;
   onStepChange: (step: WizardStep) => void;
 }) {
-  const previewing = busyAction === "spaces-preview";
-  const applying = busyAction === "spaces-apply";
-  const spacesApplied =
-    project._count.spaces > 0 ||
-    project.wizardStep === "KONTROL" ||
-    project.wizardStep === "TAMAMLANDI" ||
-    project.setupStatus === "KONTROLE_HAZIR" ||
-    project.setupStatus === "TAMAMLANDI";
-  const plannedSpaceCount = spaces.reduce(
-    (total, space) => total + countValue(space.count),
-    0,
+  const saving = busyAction === "spaces-apply";
+
+  const selectedTypes = new Set(
+    spaces
+      .map((space) => space.spaceType)
+      .filter((spaceType) => spaceType !== "DIGER"),
+  );
+
+  const selectableOptions = PROJECT_SPACE_TYPE_OPTIONS.filter(
+    (option) => option.value !== "DIGER",
   );
 
   return (
@@ -5564,546 +5722,137 @@ function ProjectSpacesView({
       <section
         style={{
           ...cardStyle,
-          borderColor: "#B7E4CC",
-          background: "#F4FBF7",
-          padding: 13,
+          borderColor: "#A7F3D0",
+          background: "#F0FDF4",
+          padding: 14,
         }}
       >
         <SectionTitle
           icon={<Landmark size={20} />}
-          title="Sosyal, Ortak ve Teknik Alanlar"
-          subtitle={`${project.name} • Satış stokundan ayrı proje alanları`}
+          title="Proje Alanları"
+          subtitle={`${project.name} • ${selectedTypes.size} alan seçildi`}
         />
 
+        <InfoBand tone="info">
+          Projede bulunan alanların üzerine dokunarak tik atın. Metrekare,
+          blok, kat veya başka ayrıntı girmeniz gerekmez. Bu alanlar yalnızca
+          proje bilgisi ve tanıtımı amacıyla kaydedilir.
+        </InfoBand>
+      </section>
+
+      <section style={{ ...cardStyle, padding: 12 }}>
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
-            gap: 7,
-            marginTop: 12,
+            gridTemplateColumns:
+              "repeat(auto-fit, minmax(min(100%, 155px), 1fr))",
+            gap: 8,
           }}
         >
-          <Metric label="Tanımlanan" value={plannedSpaceCount} />
-          <Metric
-            label="Ortak"
-            value={preview?.summary.commonSpaceCount ?? 0}
-          />
-          <Metric
-            label="Teknik"
-            value={preview?.summary.technicalSpaceCount ?? 0}
-          />
-          <Metric
-            label="Açık/Sosyal"
-            value={preview?.summary.openAmenityCount ?? 0}
-          />
-        </div>
-
-        <InfoBand tone="info">
-          Havuz, otopark, lobi, sığınak, jeneratör odası, bahçe ve benzeri
-          alanlar bağımsız bölüm veya satış stoku değildir. Projede bu
-          alanlardan yoksa listeyi boş bırakıp adımı tamamlayabilirsiniz.
-        </InfoBand>
-
-        {spacesApplied && (
-          <InfoBand tone="warning">
-            Bu projede {project._count.spaces} proje alanı daha önce
-            oluşturulmuş. Güvenlik nedeniyle aynı alanlar ikinci kez
-            oluşturulamaz.
-          </InfoBand>
-        )}
-      </section>
-
-      {spaces.length === 0 ? (
-        <section
-          style={{
-            ...cardStyle,
-            borderStyle: "dashed",
-            padding: 18,
-            textAlign: "center",
-          }}
-        >
-          <Landmark size={26} color="#10B981" />
-          <h3
-            style={{
-              margin: "8px 0 0",
-              color: "#1F2937",
-              fontSize: 14,
-              fontWeight: 950,
-            }}
-          >
-            Henüz proje alanı eklenmedi
-          </h3>
-          <p
-            style={{
-              margin: "6px auto 0",
-              maxWidth: 560,
-              color: "#64748B",
-              fontSize: 11,
-              lineHeight: 1.55,
-              fontWeight: 700,
-            }}
-          >
-            Projede ortak, sosyal veya teknik alan varsa aşağıdaki butonla
-            ekleyin. Alan yoksa doğrudan “Alanları Önizle” butonunu kullanın.
-          </p>
-        </section>
-      ) : (
-        <div style={{ display: "grid", gap: 10 }}>
-          {spaces.map((space, index) => {
-            const selectedBlock = project.blocks.find(
-              (block) => block.code === space.blockCode,
-            );
-            const floorOptions = selectedBlock?.floors || [];
-            const spacePalette =
-              PROJECT_SPACE_CARD_PALETTES[
-                index % PROJECT_SPACE_CARD_PALETTES.length
-              ];
+          {selectableOptions.map((option) => {
+            const selected = selectedTypes.has(option.value);
 
             return (
-              <section
-                key={space.key}
+              <button
+                key={option.value}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => onToggleSpace(option.value)}
+                disabled={Boolean(busyAction)}
                 style={{
-                  ...cardStyle,
-                  borderColor: spacePalette.border,
-                  background: spacePalette.background,
-                  padding: 13,
-                  boxShadow: "0 10px 26px rgba(15, 23, 42, 0.06)",
+                  minHeight: 52,
+                  border: selected
+                    ? "2px solid #10B981"
+                    : "1.5px solid #C7D6E8",
+                  borderRadius: 14,
+                  display: "grid",
+                  gridTemplateColumns: "28px minmax(0, 1fr)",
+                  alignItems: "center",
+                  gap: 9,
+                  padding: "9px 10px",
+                  background: selected ? "#ECFDF5" : "#FFFFFF",
+                  color: selected ? "#047857" : "#334155",
+                  cursor: busyAction ? "not-allowed" : "pointer",
+                  textAlign: "left",
+                  fontSize: 11,
+                  lineHeight: 1.35,
+                  fontWeight: 900,
+                  opacity: busyAction ? 0.65 : 1,
                 }}
               >
-                <div
+                <span
                   style={{
+                    width: 27,
+                    height: 27,
                     display: "grid",
-                    gridTemplateColumns: "42px minmax(0, 1fr) 42px",
-                    alignItems: "center",
-                    gap: 9,
+                    placeItems: "center",
+                    borderRadius: 8,
+                    border: selected
+                      ? "2px solid #059669"
+                      : "2px solid #CBD5E1",
+                    background: selected ? "#059669" : "#F8FAFC",
+                    color: "#FFFFFF",
                   }}
                 >
-                  <div
-                    style={{
-                      width: 42,
-                      height: 42,
-                      display: "grid",
-                      placeItems: "center",
-                      borderRadius: 13,
-                      background: spacePalette.badgeBackground,
-                      color: spacePalette.badgeColor,
-                      fontSize: 12,
-                      fontWeight: 950,
-                    }}
-                  >
-                    {index + 1}
-                  </div>
+                  {selected ? (
+                    <Check size={17} strokeWidth={3} />
+                  ) : null}
+                </span>
 
-                  <div style={{ minWidth: 0, textAlign: "center" }}>
-                    <h3
-                      style={{
-                        margin: 0,
-                        color: "#1F2937",
-                        fontSize: 14,
-                        lineHeight: 1.3,
-                        fontWeight: 950,
-                      }}
-                    >
-                      {space.name || "Yeni Proje Alanı"}
-                    </h3>
-                    <p
-                      style={{
-                        margin: "3px 0 0",
-                        color: "#64748B",
-                        fontSize: 10,
-                        fontWeight: 750,
-                      }}
-                    >
-                      {countValue(space.count)} adet • Satış dışı proje alanı
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => onRemoveSpace(space.key)}
-                    disabled={spacesApplied || Boolean(busyAction)}
-                    aria-label="Proje alanını kaldır"
-                    style={{
-                      width: 42,
-                      height: 42,
-                      border: "1.5px solid #FECACA",
-                      borderRadius: 13,
-                      display: "grid",
-                      placeItems: "center",
-                      background: "#FFF7F7",
-                      color: "#DC2626",
-                      cursor:
-                        spacesApplied || busyAction ? "not-allowed" : "pointer",
-                    }}
-                  >
-                    <Trash2 size={17} />
-                  </button>
-                </div>
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns:
-                      "repeat(auto-fit, minmax(min(100%, 190px), 1fr))",
-                    gap: 9,
-                    marginTop: 12,
-                  }}
-                >
-                  <Field label="Alan türü *">
-                    <select
-                      value={space.spaceType}
-                      onChange={(event) =>
-                        onUpdateSpace(
-                          space.key,
-                          "spaceType",
-                          event.target.value,
-                        )
-                      }
-                      disabled={spacesApplied}
-                      style={inputStyle}
-                    >
-                      {PROJECT_SPACE_TYPE_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-
-                  <Field label="Alan adı *">
-                    <input
-                      value={space.name}
-                      onChange={(event) =>
-                        onUpdateSpace(space.key, "name", event.target.value)
-                      }
-                      disabled={spacesApplied}
-                      placeholder="Ör. Açık Yüzme Havuzu"
-                      style={inputStyle}
-                    />
-                  </Field>
-
-                  <Field label="Adet *">
-                    <input
-                      inputMode="numeric"
-                      value={space.count}
-                      onChange={(event) =>
-                        onUpdateSpace(space.key, "count", event.target.value)
-                      }
-                      disabled={spacesApplied}
-                      placeholder="1"
-                      style={inputStyle}
-                    />
-                  </Field>
-
-                  <Field label="Brüt alan (m²)">
-                    <input
-                      inputMode="decimal"
-                      value={space.grossArea}
-                      onChange={(event) =>
-                        onUpdateSpace(
-                          space.key,
-                          "grossArea",
-                          event.target.value,
-                        )
-                      }
-                      disabled={spacesApplied}
-                      placeholder="Ör. 250"
-                      style={inputStyle}
-                    />
-                  </Field>
-
-                  {space.spaceType === "DIGER" && (
-                    <Field label="Özel alan türü *">
-                      <input
-                        value={space.customTypeName}
-                        onChange={(event) =>
-                          onUpdateSpace(
-                            space.key,
-                            "customTypeName",
-                            event.target.value,
-                          )
-                        }
-                        disabled={spacesApplied}
-                        placeholder="Alan türünü yazın"
-                        style={inputStyle}
-                      />
-                    </Field>
-                  )}
-
-                  <Field label="Bağlı blok">
-                    <select
-                      value={space.blockCode}
-                      onChange={(event) =>
-                        onUpdateSpace(
-                          space.key,
-                          "blockCode",
-                          event.target.value,
-                        )
-                      }
-                      disabled={spacesApplied}
-                      style={inputStyle}
-                    >
-                      <option value="">Proje geneli / Bloksuz</option>
-                      {project.blocks.map((block) => (
-                        <option key={block.id} value={block.code}>
-                          {block.name || `${block.code} Blok`}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-
-                  <Field label="Bağlı kat">
-                    <select
-                      value={space.floorLevel}
-                      onChange={(event) =>
-                        onUpdateSpace(
-                          space.key,
-                          "floorLevel",
-                          event.target.value,
-                        )
-                      }
-                      disabled={spacesApplied || !space.blockCode}
-                      style={inputStyle}
-                    >
-                      <option value="">Kat bağımsız / Belirtilmedi</option>
-                      {floorOptions.map((floor) => (
-                        <option key={floor.id} value={String(floor.level)}>
-                          {floor.label}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-
-                  <Field label="Hukuki sınıf *">
-                    <select
-                      value={space.legalStatus}
-                      onChange={(event) =>
-                        onUpdateSpace(
-                          space.key,
-                          "legalStatus",
-                          event.target.value,
-                        )
-                      }
-                      disabled={spacesApplied}
-                      style={inputStyle}
-                    >
-                      {SPACE_LEGAL_STATUS_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-
-                  <Field label="Kullanım amacı *">
-                    <select
-                      value={space.commercialPurpose}
-                      onChange={(event) =>
-                        onUpdateSpace(
-                          space.key,
-                          "commercialPurpose",
-                          event.target.value,
-                        )
-                      }
-                      disabled={spacesApplied}
-                      style={inputStyle}
-                    >
-                      {SPACE_COMMERCIAL_PURPOSE_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                </div>
-
-                <div style={{ display: "grid", gap: 9, marginTop: 9 }}>
-                  <Field label="Açıklama">
-                    <textarea
-                      value={space.description}
-                      onChange={(event) =>
-                        onUpdateSpace(
-                          space.key,
-                          "description",
-                          event.target.value,
-                        )
-                      }
-                      disabled={spacesApplied}
-                      rows={2}
-                      placeholder="Alanla ilgili kısa açıklama"
-                      style={{ ...inputStyle, resize: "vertical" }}
-                    />
-                  </Field>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onUpdateSpace(
-                        space.key,
-                        "isCustomerVisible",
-                        !space.isCustomerVisible,
-                      )
-                    }
-                    disabled={spacesApplied}
-                    style={{
-                      ...secondaryButtonStyle,
-                      width: "100%",
-                      borderColor: space.isCustomerVisible
-                        ? "#86EFAC"
-                        : "#C7D6E8",
-                      background: space.isCustomerVisible
-                        ? "#F0FDF4"
-                        : "#FFFFFF",
-                      color: space.isCustomerVisible
-                        ? "#047857"
-                        : "#475569",
-                    }}
-                  >
-                    {space.isCustomerVisible ? (
-                      <Check size={17} />
-                    ) : (
-                      <X size={17} />
-                    )}
-                    {space.isCustomerVisible
-                      ? "Müşteriye Görünür"
-                      : "Müşteriye Gizli"}
-                  </button>
-                </div>
-              </section>
+                <span>{option.label}</span>
+              </button>
             );
           })}
         </div>
-      )}
+      </section>
 
-      {!spacesApplied && (
-        <button 
-          type="button"
-          onClick={onAddSpace}
-          disabled={Boolean(busyAction)}
-          style={{
-            ...secondaryButtonStyle,
-            width: "100%",
-            borderColor: "#A7F3D0",
-            background: "#F0FDF4",
-            color: "#047857",
-          }}
-        >
-          <Plus size={18} />
-          Yeni Proje Alanı Ekle
-        </button>
-      )}
-
-      {preview && (
-        <section
-          style={{
-            ...cardStyle,
-            borderColor: "#86EFAC",
-            background: "#F0FDF4",
-            padding: 13,
-            textAlign: "center",
-          }}
-        >
-          <CheckCircle2 size={24} color="#15803D" />
-          <h3
-            style={{
-              margin: "7px 0 0",
-              color: "#1F2937",
-              fontSize: 13,
-              fontWeight: 950,
-            }}
-          >
-            Proje alanları önizlemesi hazır
-          </h3>
-          <p
-            style={{
-              margin: "5px 0 0",
-              color: "#64748B",
-              fontSize: 11,
-              lineHeight: 1.5,
-              fontWeight: 750,
-            }}
-          >
-            {preview.summary.projectSpaceCount} proje alanı doğrulandı.
-            Bunların {preview.summary.customerVisibleCount} adedi müşteriye
-            görünür olacak.
-          </p>
-        </section>
-      )}
-
-      {spacesApplied && (
-        <button 
-          type="button"
-          onClick={onContinue}
-          disabled={Boolean(busyAction)}
-          style={{
-            ...primaryButtonStyle,
-            width: "100%",
-            background: "linear-gradient(135deg, #6D28D9, #8B5CF6)",
-          }}
-        >
-          {busyAction === "completion-load" ? (
-            <Loader2 size={18} className="eph-spin" />
-          ) : (
-            <CheckCircle2 size={18} />
-          )}
-          Son Kontrole Geç
-        </button>
-      )}
-
-      <div
+      <section
         style={{
           ...cardStyle,
           position: "sticky",
           bottom: "calc(8px + env(safe-area-inset-bottom))",
           zIndex: 20,
-          display: "grid",
-          gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-          gap: 8,
           padding: 9,
         }}
       >
-        <button 
+        <button
           type="button"
-          onClick={onPreview}
-          disabled={spacesApplied || previewing || applying}
-          style={{
-            ...secondaryButtonStyle,
-            opacity: spacesApplied ? 0.55 : 1,
-            cursor: spacesApplied ? "not-allowed" : "pointer",
-          }}
-        >
-          {previewing ? (
-            <Loader2 size={18} className="eph-spin" />
-          ) : (
-            <ClipboardList size={18} />
-          )}
-          Alanları Önizle
-        </button>
-
-        <button 
-          type="button"
-          onClick={onApply}
-          disabled={spacesApplied || !preview || previewing || applying}
+          onClick={onSave}
+          disabled={Boolean(busyAction)}
           style={{
             ...primaryButtonStyle,
+            width: "100%",
+            minHeight: 54,
             background: "linear-gradient(135deg, #047857, #10B981)",
-            opacity: spacesApplied || !preview ? 0.55 : 1,
-            cursor:
-              spacesApplied || !preview ? "not-allowed" : "pointer",
+            opacity: busyAction ? 0.65 : 1,
+            cursor: busyAction ? "not-allowed" : "pointer",
           }}
         >
-          {applying ? (
-            <Loader2 size={18} className="eph-spin" />
+          {saving ? (
+            <Loader2 size={19} className="eph-spin" />
           ) : (
-            <CheckCircle2 size={18} />
+            <CheckCircle2 size={19} />
           )}
-          Proje Alanlarını Kaydet
+          Seçimleri Kaydet ve Devam Et
         </button>
-      </div>
+
+        <p
+          style={{
+            margin: "7px 0 0",
+            color: "#64748B",
+            fontSize: 10,
+            lineHeight: 1.45,
+            textAlign: "center",
+            fontWeight: 750,
+          }}
+        >
+          Bu alanlardan hiçbiri projede yoksa seçim yapmadan devam
+          edebilirsiniz.
+        </p>
+      </section>
     </div>
   );
 }
-
 
 function ProjectCompletionView({
   project,
@@ -6137,8 +5886,12 @@ function ProjectCompletionView({
     preview.summary.setupStatus === "TAMAMLANDI" ||
     preview.summary.wizardStep === "TAMAMLANDI";
   const reviewIssue = preview.issues.some((issue) =>
-    issue.code.startsWith("SOFTWARE_TEAM_REVIEW"),
+    isDesignReviewIssue(issue.code),
   );
+  const blockingIssues = preview.issues.filter(
+    (issue) => !isDesignReviewIssue(issue.code),
+  );
+  const completionReady = preview.ready || blockingIssues.length === 0;
   const latestReview = preview.latestDesignReview;
   const openReview = latestReview
     ? ["BEKLIYOR", "INCELEMEDE", "EK_BILGI_BEKLENIYOR"].includes(
@@ -6198,16 +5951,16 @@ function ProjectCompletionView({
           style={{
             marginTop: 10,
             border: `1.5px solid ${
-              completed || preview.ready ? "#86EFAC" : "#FDBA74"
+              completed || completionReady ? "#86EFAC" : "#FDBA74"
             }`,
             borderRadius: 16,
             background:
-              completed || preview.ready ? "#F0FDF4" : "#FFF7ED",
+              completed || completionReady ? "#F0FDF4" : "#FFF7ED",
             padding: 12,
             textAlign: "center",
           }}
         >
-          {completed || preview.ready ? (
+          {completed || completionReady ? (
             <CheckCircle2 size={25} color="#15803D" />
           ) : (
             <AlertTriangle size={25} color="#C2410C" />
@@ -6223,7 +5976,7 @@ function ProjectCompletionView({
           >
             {completed
               ? "Proje kurulumu tamamlandı"
-              : preview.ready
+              : completionReady
                 ? "Proje tamamlanmaya hazır"
                 : "Tamamlanması gereken kontroller var"}
           </h3>
@@ -6239,14 +5992,14 @@ function ProjectCompletionView({
           >
             {completed
               ? "Projenin tüm kurulum adımları başarıyla tamamlandı."
-              : preview.ready
+              : completionReady
                 ? "Beyan edilen ve oluşturulan tüm değerler birbiriyle uyumlu."
-                : `${preview.issues.length} kontrol maddesi tamamlanmayı bekliyor.`}
+                : `${blockingIssues.length} kontrol maddesi tamamlanmayı bekliyor.`}
           </p>
         </div>
       </section>
 
-      {preview.issues.length > 0 && (
+      {blockingIssues.length > 0 && (
         <section style={{ ...cardStyle, padding: 13 }}>
           <SectionTitle
             icon={<AlertTriangle size={20} />}
@@ -6255,7 +6008,7 @@ function ProjectCompletionView({
           />
 
           <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
-            {preview.issues.map((issue, index) => (
+            {blockingIssues.map((issue, index) => (
               <div
                 key={`${issue.code}-${index}`}
                 style={{
@@ -6315,12 +6068,12 @@ function ProjectCompletionView({
         </section>
       )}
 
-      {(reviewIssue || latestReview) && (
+      {reviewIssue && (
         <section style={{ ...cardStyle, padding: 13 }}>
           <SectionTitle
             icon={<Sparkles size={20} />}
-            title="Yazılım Ekibi İncelemesi"
-            subtitle="Karmaşık geometriler standart şablon dışında ayrıca kontrol edilir."
+            title="İsteğe Bağlı Yazılım Ekibi İncelemesi"
+            subtitle="Özel geometri veya yerleşim desteği gerektiğinde ayrıca inceleme isteyebilirsiniz."
           />
 
           {latestReview ? (
@@ -6406,8 +6159,9 @@ function ProjectCompletionView({
           )}
 
           {openReview && (
-            <InfoBand tone="warning">
-              İnceleme talebi sonuçlanmadan proje kurulumu tamamlanamaz.
+            <InfoBand tone="info">
+              Teknik inceleme talebi açık. Diğer proje kontrolleri uygunsa
+              kurulumun tamamlanmasına engel değildir.
             </InfoBand>
           )}
         </section>
@@ -6458,12 +6212,12 @@ function ProjectCompletionView({
             <button 
               type="button"
               onClick={onComplete}
-              disabled={!preview.ready || refreshing || completing}
+              disabled={!completionReady || refreshing || completing}
               style={{
                 ...primaryButtonStyle,
                 background: "linear-gradient(135deg, #047857, #10B981)",
-                opacity: preview.ready ? 1 : 0.55,
-                cursor: preview.ready ? "pointer" : "not-allowed",
+                opacity: completionReady ? 1 : 0.55,
+                cursor: completionReady ? "pointer" : "not-allowed",
               }}
             >
               {completing ? (
@@ -6702,7 +6456,7 @@ function UnitTypeMultiSelect({
                 fontWeight: 900,
               }}
             >
-              {option.label}
+              {option.value==='PENTHOUSE'?'Çatı Katı':option.value==='DUBLEKS'?'Dubleks Daire':option.label}
             </span>
           ))}
         </div>
@@ -6733,7 +6487,7 @@ function UnitTypeMultiSelect({
               gap: 6,
             }}
           >
-            {UNIT_TYPE_OPTIONS.map((option) => {
+            {UNIT_TYPE_OPTIONS.filter(option=>SIMPLE_UNIT_TYPES.has(option.value)||selected.includes(option.value)).map((option) => {
               const active = selected.includes(option.value);
 
               return (
@@ -6776,7 +6530,7 @@ function UnitTypeMultiSelect({
                   >
                     {active && <Check size={14} strokeWidth={3} />}
                   </span>
-                  <span>{option.label}</span>
+                  <span>{option.value==='PENTHOUSE'?'Çatı Katı':option.value==='DUBLEKS'?'Dubleks Daire':option.label}</span>
                 </button>
               );
             })}

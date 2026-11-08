@@ -6,7 +6,22 @@ export const PORTFOLIO_METADATA_KEYS = [
   "buildingAge",
   "openArea",
   "closedArea",
+  "netArea",
+  "grossArea",
+  "gardenArea",
+  "landArea",
+  "unitCount",
   "bedCount",
+  "bathroomCount",
+  "heatingType",
+  "parkingType",
+  "front",
+  "view",
+  "elevator",
+  "usageStatus",
+  "serviceType",
+  "seasonUsage",
+  "restorationStatus",
   "villaType",
   "layoutType",
   "poolType",
@@ -35,6 +50,9 @@ export const PORTFOLIO_METADATA_KEYS = [
   "campType",
   "resortType",
   "periodType",
+  "infrastructure",
+  "road",
+  "commercialValue",
 ] as const;
 
 export type PortfolioMetadataKey = (typeof PORTFOLIO_METADATA_KEYS)[number];
@@ -188,7 +206,32 @@ export const FEATURE_LABELS: Record<string, string> = {
 };
 
 export function getFeatureLabel(code: string) {
-  return FEATURE_LABELS[code] || code;
+  const raw = cleanValue(code);
+  const separatorIndex = raw.indexOf(":");
+
+  if (separatorIndex > 0) {
+    const group = raw.slice(0, separatorIndex).trim().toLocaleLowerCase("tr-TR");
+    const allowedGroups = new Set([
+      "interior",
+      "exterior",
+      "location",
+      "transport",
+      "front",
+      "view",
+      "accessibility",
+      "zoning",
+      "landinfrastructure",
+      "commercial",
+      "tourism",
+      "luxury",
+    ]);
+
+    if (allowedGroups.has(group)) {
+      return raw.slice(separatorIndex + 1).trim() || raw;
+    }
+  }
+
+  return FEATURE_LABELS[raw] || raw;
 }
 
 export function getFeatureLabels(features?: unknown): string[] {
@@ -199,7 +242,22 @@ export const METADATA_KEY_LABELS: Record<string, string> = {
   buildingAge: "Bina Yaşı",
   openArea: "Açık Alan",
   closedArea: "Kapalı Alan",
+  netArea: "Net Alan",
+  grossArea: "Brüt Alan",
+  gardenArea: "Bahçe Alanı",
+  landArea: "Arsa Alanı",
+  unitCount: "Bağımsız Bölüm Sayısı",
   bedCount: "Yatak Sayısı",
+  bathroomCount: "Banyo Sayısı",
+  heatingType: "Isınma Türü",
+  parkingType: "Otopark",
+  front: "Cephe",
+  view: "Manzara",
+  elevator: "Asansör",
+  usageStatus: "Kullanım Durumu",
+  serviceType: "Hizmet Tipi",
+  seasonUsage: "Kullanım Şekli",
+  restorationStatus: "Restorasyon Durumu",
   villaType: "Villa Tipi",
   layoutType: "Yerleşim Tipi",
   poolType: "Havuz Tipi",
@@ -228,6 +286,9 @@ export const METADATA_KEY_LABELS: Record<string, string> = {
   campType: "Kamp Tipi",
   resortType: "Tatil Köyü Tipi",
   periodType: "Dönem Tipi",
+  infrastructure: "Altyapı Özeti",
+  road: "Yol Durumu",
+  commercialValue: "Ticari Değer",
 };
 
 export function getMetadataLabel(key: string) {

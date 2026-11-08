@@ -16,6 +16,7 @@ export function notificationCategory(type: string, url: string) {
   )
     return 'forum';
   if (
+    type === 'CRM_TASK_DUE' ||
     type === 'CONTACT_UNLOCKED' ||
     type === 'PROJECT_POOL_ACCEPTED' ||
     url.startsWith('/havuz') ||
