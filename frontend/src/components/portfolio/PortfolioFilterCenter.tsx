@@ -519,14 +519,30 @@ export function applyPortfolioFilters<T extends PortfolioFilterUnit>(
       return false;
 
     if (query) {
+      const rawPortfolioId = String(unit.id || "")
+        .replace(/[^a-zA-Z0-9]/g, "");
+
+      const portfolioNo = rawPortfolioId
+        ? `EPH-${rawPortfolioId
+            .slice(0, 4)
+            .toLocaleUpperCase("tr-TR")}-${rawPortfolioId
+            .slice(-4)
+            .toLocaleUpperCase("tr-TR")}`
+        : "";
+
       const haystack = normalize(
         [
+          unit.id,
+          rawPortfolioId,
+          portfolioNo,
           unit.project?.name,
           unit.project?.city,
           unit.project?.district,
           unit.project?.address,
           typeLabel(type),
           statusLabel(status),
+          approvalLabel(approvalStatus),
+          pool ? "Havuzda" : "Havuz Dışında",
           unit.roomCount,
           unit.description,
           advisorLabel(advisor),

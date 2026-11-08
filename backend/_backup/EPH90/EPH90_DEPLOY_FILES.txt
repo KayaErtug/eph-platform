@@ -1,0 +1,16 @@
+src/coordination/coordination-recalculation.service.ts
+src/coordination/coordination.module.ts
+src/coordination/commercial-match-scan.service.ts
+src/matching/eph-match-engine.service.ts
+src/crm/crm.service.ts
+src/lina/actions/lina-confirmation-gate.service.ts
+src/lina/actions/lina-action-engine.service.ts
+src/lina/draft/lina-draft-flow.service.ts
+src/lina/dto/lina-chat.dto.ts
+src/lina/lina.controller.ts
+src/lina/lina.module.ts
+src/lina/lina.service.ts
+src/lina/openai-tools/lina-openai-live-gateway.service.ts
+src/lina/openai-tools/lina-openai-client.service.ts
+src/lina/lina-chat-budget.service.ts
+prisma/migrations/20261031120000_eph90_lina_chat_budget/migration.sql

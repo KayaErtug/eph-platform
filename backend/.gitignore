@@ -3,3 +3,12 @@ node_modules
 .env
 
 /generated/prisma
+
+# Sir koruma (WEB-1B)
+.env*
+!.env.example
+*.p8
+*.pem
+*.key
+*.jks
+*.keystore

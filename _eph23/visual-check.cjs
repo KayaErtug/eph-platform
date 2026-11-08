@@ -1,0 +1,56 @@
+const { chromium } = require('../frontend/node_modules/@playwright/test');
+const fs = require('node:fs');
+const assert = require('node:assert/strict');
+(async () => {
+  const temp = __dirname + '/browser-temp';
+  fs.mkdirSync(temp, { recursive: true });
+  process.env.TEMP = temp;
+  process.env.TMP = temp;
+  const browser = await chromium.launch({ headless: true, executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe' });
+  const context = await browser.newContext({ serviceWorkers: 'block' });
+  const page = await context.newPage();
+  const fixture = JSON.parse(fs.readFileSync(__dirname + '/paket/presentation-fixture.json', 'utf8'));
+  const asset = 'D:/Projects/SM/frontend/public/talep-merkezi/portfoy-ariyorum.jpg';
+  await page.route('**/*', async route => {
+    const url = new URL(route.request().url());
+    if (url.pathname.includes('/project-presentation-share/')) return route.fulfill({ json: fixture });
+    if (url.hostname === 'example.test') return route.fulfill({ path: asset, contentType: 'image/jpeg' });
+    if (url.hostname !== 'localhost') return route.fulfill({ status: 204, body: '' });
+    if (url.pathname.startsWith('/api/')) return route.fulfill({ status: 204, body: '' });
+    return route.continue();
+  });
+  const results = [];
+  for (const width of [390, 1280, 320]) {
+    await page.setViewportSize({ width, height: 850 });
+    await page.goto('http://localhost:3123/proje-sunum/fixture', { waitUntil: 'networkidle' });
+    await page.getByRole('heading', { name: 'Örnek Yaşam Projesi' }).waitFor();
+    assert(page.url().includes('/proje-sunum/'));
+    const metrics = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth, minFont: Math.min(...[...document.querySelectorAll('main *')].filter(e => e.textContent.trim() && !['svg', 'path'].includes(e.tagName)).map(e => parseFloat(getComputedStyle(e).fontSize))) }));
+    assert(metrics.scroll <= metrics.width, `page overflow at ${width}: ${JSON.stringify(metrics)}`);
+    assert(metrics.minFont >= 16.66, `font smaller than 12.5pt at ${width}: ${metrics.minFont}`);
+    assert.equal(await page.getByRole('link', { name: 'Ara', exact: true }).getAttribute('href'), 'tel:+905551112233');
+    assert.equal(await page.getByRole('link', { name: 'WhatsApp' }).count(), 1);
+    await page.screenshot({ path: __dirname + `/paket/sunum-${width}.png`, fullPage: true });
+    await page.getByRole('button', { name: '1. proje fotoğrafını tam ekran aç', exact: true }).click();
+    await page.getByRole('dialog').waitFor({ state: 'visible' });
+    await page.keyboard.press('Escape');
+    await page.getByRole('dialog').waitFor({ state: 'hidden' });
+    results.push(`PASS ${width}px: oturumsuz açılış, taşma yok, min 12.5pt, Ara/WhatsApp, galeri + Escape`);
+  }
+  fixture.presentation.presenter = null;
+  fixture.presentation.coverUrl = null;
+  fixture.presentation.gallery = [];
+  fixture.presentation.amenities = [];
+  await page.reload({ waitUntil: 'networkidle' });
+  assert.equal(await page.getByRole('heading', { name: 'Sunumu Hazırlayan' }).count(), 0);
+  await page.getByText('Proje görselleri yakında').waitFor();
+  results.push('PASS eksik görsel ve eski bağlantı durumları');
+  await page.unroute('**/*');
+  await page.route('**/*', route => route.request().url().includes('project-presentation-share') ? route.fulfill({ status: 404, json: {} }) : new URL(route.request().url()).hostname === 'localhost' ? route.continue() : route.fulfill({ status: 204, body: '' }));
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.getByRole('heading', { name: 'Sunum görüntülenemiyor' }).waitFor();
+  results.push('PASS süresi dolmuş bağlantı hata durumu');
+  console.log(results.join('\n'));
+  fs.writeFileSync(__dirname + '/paket/visual-check.txt', results.join('\n'));
+  await browser.close();
+})().catch(error => { console.error(error); process.exit(1); });

@@ -24,11 +24,13 @@ export function serializePoolOfficeInfo(unit: any, visible: boolean) {
 export function serializePoolPrivateInfo(
   unit: any,
   privateUnlocked: boolean,
-  _phoneUnlocked = false,
-  _whatsappUnlocked = false,
+  _phoneUnlocked: boolean | undefined = false,
+  _whatsappUnlocked: boolean | undefined = false,
+  isSuperAdmin = false,
 ) {
+  const effectiveUnlocked = privateUnlocked || isSuperAdmin;
   const features = Array.isArray(unit.features)
-    ? unit.features.filter((item: unknown) => {
+    ? unit.features.filter((item) => {
         const raw = String(item || '');
         if (!raw.startsWith('__EPH_META__:')) return true;
 
@@ -45,69 +47,71 @@ export function serializePoolPrivateInfo(
         );
       })
     : [];
-  const safeFeatures = features.map((item: string) =>
-    item.startsWith('__EPH_META__:') ? item : redactPoolDeedOwnerText(unit, item),
-  );
+  const safeFeatures = isSuperAdmin
+    ? features
+    : features.map((item) =>
+        item.startsWith('__EPH_META__:') ? item : redactPoolDeedOwnerText(unit, item),
+      );
 
   const phoneCallAllowed = Boolean(
-    unit.allowPhoneCall && String(unit.contactPhone || '').trim(),
+    isSuperAdmin || (unit.allowPhoneCall && String(unit.contactPhone || '').trim()),
   );
 
   const whatsappAllowed = Boolean(
-    unit.allowWhatsapp && String(unit.whatsappPhone || '').trim(),
+    isSuperAdmin || (unit.allowWhatsapp && String(unit.whatsappPhone || '').trim()),
   );
 
-      const officeOwner = unit.project?.owner?.office?.owner;
-    const hasOfficeOwner = Boolean(officeOwner && officeOwner.phone);
+  const officeOwner = unit.project?.owner?.office?.owner;
+  const hasOfficeOwner = Boolean(officeOwner && officeOwner.phone);
 
-    return {
-      features: safeFeatures,
-      description: redactPoolDeedOwnerText(unit, unit.description),
+  return {
+    features: safeFeatures,
+    description: isSuperAdmin ? unit.description : redactPoolDeedOwnerText(unit, unit.description),
 
-      number: privateUnlocked ? unit.number ?? null : null,
-      adaNo: privateUnlocked ? unit.adaNo ?? null : null,
-      parselNo: privateUnlocked ? unit.parselNo ?? null : null,
+    number: effectiveUnlocked ? unit.number ?? null : null,
+    adaNo: effectiveUnlocked ? unit.adaNo ?? null : null,
+    parselNo: effectiveUnlocked ? unit.parselNo ?? null : null,
 
-      availableCreditAmount: privateUnlocked
-        ? unit.availableCreditAmount ?? null
+    availableCreditAmount: effectiveUnlocked
+      ? unit.availableCreditAmount ?? null
+      : null,
+
+    doorAccessInfo: effectiveUnlocked
+      ? unit.doorAccessInfo ?? null
+      : null,
+
+    deedOwnerFullName: isSuperAdmin ? unit.deedOwnerFullName ?? null : null,
+    deedOwnerPhone: isSuperAdmin ? unit.deedOwnerPhone ?? null : null,
+    deedOwnerEmail: isSuperAdmin ? unit.deedOwnerEmail ?? null : null,
+
+    listingOwnerName: effectiveUnlocked
+      ? unit.project?.owner?.role === 'SUPER_ADMIN'
+        ? 'Yazılım Ekibi'
+        : hasOfficeOwner
+          ? [officeOwner.firstName, officeOwner.lastName].filter(Boolean).join(' ') || unit.project?.owner?.office?.name || 'Ofis Yetkilisi'
+          : [unit.project?.owner?.firstName, unit.project?.owner?.lastName].filter(Boolean).join(' ') || null
+      : null,
+
+    listingOfficeName: effectiveUnlocked && unit.project?.owner?.role !== 'SUPER_ADMIN'
+      ? unit.project?.owner?.companyName?.trim() || unit.project?.owner?.office?.name || null
+      : null,
+
+    contactPhone:
+      effectiveUnlocked && phoneCallAllowed
+        ? (unit.contactPhone ?? (hasOfficeOwner ? officeOwner.phone : null))
         : null,
 
-      doorAccessInfo: privateUnlocked
-        ? unit.doorAccessInfo ?? null
+    whatsappPhone:
+      effectiveUnlocked && whatsappAllowed
+        ? (unit.whatsappPhone ?? (hasOfficeOwner ? officeOwner.phone : null))
         : null,
 
-      deedOwnerFullName: null,
-      deedOwnerPhone: null,
-      deedOwnerEmail: null,
+    ...serializePoolOfficeInfo(unit, effectiveUnlocked),
 
-      listingOwnerName: privateUnlocked
-        ? unit.project?.owner?.role === 'SUPER_ADMIN'
-          ? 'Yazılım Ekibi'
-          : hasOfficeOwner
-            ? [officeOwner.firstName, officeOwner.lastName].filter(Boolean).join(' ') || unit.project?.owner?.office?.name || 'Ofis Yetkilisi'
-            : [unit.project?.owner?.firstName, unit.project?.owner?.lastName].filter(Boolean).join(' ') || null
-        : null,
-
-      listingOfficeName: privateUnlocked && unit.project?.owner?.role !== 'SUPER_ADMIN'
-        ? unit.project?.owner?.companyName?.trim() || unit.project?.owner?.office?.name || null
-        : null,
-
-      contactPhone:
-        privateUnlocked && phoneCallAllowed
-          ? hasOfficeOwner ? officeOwner.phone : (unit.contactPhone ?? null)
-          : null,
-
-      whatsappPhone:
-        privateUnlocked && whatsappAllowed
-          ? hasOfficeOwner ? officeOwner.phone : (unit.whatsappPhone ?? null)
-          : null,
-
-    ...serializePoolOfficeInfo(unit, privateUnlocked),
-
-    privateInfoUnlocked: privateUnlocked,
+    privateInfoUnlocked: effectiveUnlocked,
 
     // Geçiş dönemi mobil uyumluluğu.
-    phoneUnlocked: privateUnlocked,
-    whatsappUnlocked: privateUnlocked,
+    phoneUnlocked: effectiveUnlocked,
+    whatsappUnlocked: effectiveUnlocked,
   };
 }

@@ -1,0 +1,187 @@
+"use client";
+
+import PaymentTrustBand from "@/components/payments/PaymentTrustBand";
+
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { ArrowLeft, CheckCircle2, CreditCard, History, Loader2, PackageCheck, RefreshCw, ShieldCheck, WalletCards } from "lucide-react";
+import api from "@/lib/api";
+import { useAuthStore } from "@/store/auth.store";
+
+type Product = { id?: string; code?: string; paketKodu?: string; paketAdi?: string; name?: string; fiyat?: number | null; price?: string; credits?: number; aylikPaketPk?: number; aktifPortfoyLimiti?: number; aciklama?: string; paraBirimi?: string };
+type Catalog = { enabled: boolean; mode: string; termsVersion: string; membershipPackages: Product[]; pkProducts: Product[] };
+type Order = { channel?: string; amountPending?: boolean; id: string; number: string; purpose: string; status: string; amount: string; currency: string; settled: boolean; mode: string; createdAt: string; product: Product; refunds: { id: string; status: string; reason: string }[]; checkoutUrl?: string | null };
+type Billing = { firstName: string; lastName: string; email: string; phone: string; identityNumber: string; address: string; city: string };
+const inputClass = "min-h-12 w-full rounded-2xl border border-[#C7D6E8] bg-[#EEF3F8] px-4 py-3 text-sm text-[#1F2937] outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100";
+const buttonClass = "inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#2563EB] px-5 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50";
+const statuses: Record<string, string> = { CREATED: "Oluşturuldu", PENDING: "Doğrulama bekleniyor", PAID: "Ödendi", FAILED: "Başarısız", CANCELLED: "İptal edildi", EXPIRED: "Süresi doldu", PARTIALLY_REFUNDED: "Kısmen iade edildi", REFUNDED: "İade edildi" };
+function formatMoney(amount: string | number, currency = "TRY") { return new Intl.NumberFormat("tr-TR", { style: "currency", currency }).format(Number(amount)); }
+function errorMessage(error: unknown) { const e = error as { response?: { data?: { message?: string } } }; return e.response?.data?.message || "İşlem tamamlanamadı. Tekrar ödeme yapmadan durumunu kontrol edin."; }
+
+export default function PaymentShop({ initialTab = "MEMBERSHIP" }: { initialTab?: "MEMBERSHIP" | "PK" | "HISTORY" }) {
+  const { user, token, hasHydrated } = useAuthStore();
+  const [tab, setTab] = useState(initialTab);
+  const [catalog, setCatalog] = useState<Catalog | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [selected, setSelected] = useState<Product | null>(null);
+  const [billing, setBilling] = useState<Billing>({ firstName: "", lastName: "", email: "", phone: "", identityNumber: "", address: "", city: "" });
+  const [accepted, setAccepted] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+  const [refundOrder, setRefundOrder] = useState("");
+  const [reason, setReason] = useState("");
+  const [focusOrder, setFocusOrder] = useState("");
+  const keyRef = useRef("");
+  const submitting = useRef(false);
+
+  const load = useCallback(async () => {
+    if (!token) return;
+    try {
+      const [products, history] = await Promise.all([api.get<Catalog>("/payments/catalog"), api.get<Order[]>("/payments/orders")]);
+      setCatalog(products.data); setOrders(history.data); setMessage("");
+    } catch (error) { setMessage(errorMessage(error)); }
+    finally { setLoading(false); }
+  }, [token]);
+
+  useEffect(() => {
+    if (!hasHydrated) return;
+    if (!token) { setLoading(false); return; }
+    setBilling((old) => ({ ...old, firstName: user?.firstName || "", lastName: user?.lastName || "", email: user?.email || "" }));
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("order")) { setTab("HISTORY"); setFocusOrder(params.get("order") || ""); }
+    if (params.get("tab") === "pk") setTab("PK");
+    void load();
+  }, [hasHydrated, token, user?.firstName, user?.lastName, user?.email, load]);
+
+  useEffect(() => {
+    if (!focusOrder || !token) return;
+    let count = 0; let cancelled = false;
+    const timer = setInterval(async () => {
+      if (++count > 10) { clearInterval(timer); return; }
+      try {
+        const response = await api.post<Order>(`/payments/orders/${encodeURIComponent(focusOrder)}/refresh`);
+        if (!cancelled) setOrders((old) => old.map((row) => row.id === response.data.id ? response.data : row));
+        if (response.data.settled || ["FAILED", "REFUNDED", "CANCELLED"].includes(response.data.status)) clearInterval(timer);
+      } catch { clearInterval(timer); }
+    }, 7000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [focusOrder, token]);
+
+  const chooseTab = (value: typeof tab) => { setTab(value); setSelected(null); setAccepted(false); keyRef.current = ""; setMessage(""); };
+  const chooseProduct = (product: Product) => { setSelected(product); setAccepted(false); keyRef.current = ""; setMessage(""); };
+
+  async function checkout(event: FormEvent) {
+    event.preventDefault();
+    if (!selected || !catalog || submitting.current) return;
+    submitting.current = true; setBusy(true); setMessage("");
+    keyRef.current ||= crypto.randomUUID();
+    try {
+      const response = await api.post<{ checkoutUrl: string | null; orderId: string }>("/payments/checkout", {
+        kind: tab, productCode: selected.paketKodu || selected.code, termsVersion: catalog.termsVersion,
+        acceptedTerms: accepted, billing,
+      }, { headers: { "Idempotency-Key": keyRef.current } });
+      if (response.data.checkoutUrl) {
+        const target = new URL(response.data.checkoutUrl);
+        const host = catalog.mode === "live" ? "iyzico.com" : "sandbox-iyzico.com";
+        if (target.protocol !== "https:" || !(target.hostname === host || target.hostname.endsWith(`.${host}`))) throw new Error();
+        window.location.assign(target.toString());
+      } else {
+        setTab("HISTORY"); setSelected(null); setFocusOrder(response.data.orderId); await load();
+      }
+    } catch (error) { setMessage(errorMessage(error)); }
+    finally { submitting.current = false; setBusy(false); }
+  }
+
+  async function refresh(id: string) {
+    if (busy) return; setBusy(true); setMessage("");
+    try {
+      const response = await api.post<Order>(`/payments/orders/${encodeURIComponent(id)}/refresh`);
+      setOrders((old) => old.map((row) => row.id === id ? response.data : row));
+    } catch (error) { setMessage(errorMessage(error)); }
+    finally { setBusy(false); }
+  }
+
+  async function requestRefund(event: FormEvent) {
+    event.preventDefault(); if (busy) return; setBusy(true);
+    try {
+      await api.post(`/payments/orders/${encodeURIComponent(refundOrder)}/refund-request`, { reason });
+      setRefundOrder(""); setReason(""); await load(); setMessage("İade talebiniz incelemeye alındı. Bu işlem henüz karta iade yapmaz.");
+    } catch (error) { setMessage(errorMessage(error)); }
+    finally { setBusy(false); }
+  }
+
+  const products = tab === "PK" ? catalog?.pkProducts || [] : catalog?.membershipPackages || [];
+  const price = selected?.fiyat ?? selected?.price ?? 0;
+
+  return <main className="min-h-screen bg-[#F4F8FF] px-4 pb-28 pt-5 text-[#1F2937] sm:px-6">
+    <div className="mx-auto max-w-5xl space-y-5">
+      <header className="flex items-center justify-between gap-3">
+        <Link href="/dashboard" className="inline-flex min-h-11 items-center gap-2 rounded-2xl border border-[#C7D6E8] bg-white px-4 text-sm font-bold"><ArrowLeft size={17} /> Geri</Link>
+        <Link href="/kontor" className="inline-flex min-h-11 items-center gap-2 text-sm font-bold text-blue-700"><WalletCards size={18} /> Cüzdanım</Link>
+      </header>
+      <section className="rounded-3xl bg-[#0F2445] px-5 py-7 text-center text-white sm:px-8">
+        <CreditCard className="mx-auto text-blue-300" size={30} />
+        <h1 className="mt-3 text-2xl font-black sm:text-3xl">İşinizi büyüten haklar</h1>
+        <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-blue-100">Üyelik paketinizi seçin veya PK bakiyenizi artırın. Satın aldığınız hakları ve ödemelerinizi tek yerden takip edin.</p>
+      </section>
+      {loading ? <div role="status" className="flex justify-center p-10"><Loader2 className="animate-spin" /></div> : !token ?
+        <section className="rounded-3xl border border-[#C7D6E8] bg-white p-6 text-center"><p>Satın alma ve ödeme geçmişi için hesabınıza giriş yapın.</p><Link href="/giris" className={`${buttonClass} mt-4`}>Giriş yap</Link></section> : <>
+        <nav aria-label="Ödeme bölümleri" className="grid grid-cols-3 gap-2 rounded-3xl border border-[#C7D6E8] bg-white p-2">
+          {([["MEMBERSHIP", "Üyelik", PackageCheck], ["PK", "PK Satın Al", WalletCards], ["HISTORY", "Ödemelerim", History]] as const).map(([value, label, Icon]) =>
+            <button type="button" key={value} onClick={() => chooseTab(value)} aria-pressed={tab === value} className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl px-1 text-xs font-bold sm:flex-row sm:gap-2 sm:text-sm ${tab === value ? "bg-blue-600 text-white" : "text-slate-600"}`}><Icon size={18} />{label}</button>)}
+        </nav>
+        {catalog?.mode === "sandbox" && <p className="rounded-2xl bg-amber-100 p-4 text-center text-sm font-bold text-amber-900">Test ortamı · Gerçek tahsilat yapılmaz. Yalnız TEST hesapları kullanabilir.</p>}
+        {catalog && !catalog.enabled && tab !== "HISTORY" && <p className="rounded-2xl border border-[#C7D6E8] bg-white p-4 text-center text-sm leading-6">Kartlı ödeme henüz etkinleştirilmedi. Paketleri inceleyebilirsiniz; bu aşamada tahsilat yapılmaz.</p>}
+        {tab !== "HISTORY" && <>
+          <section className="flex flex-wrap justify-center gap-4">
+            {products.map((product) => {
+              const amount = product.fiyat ?? product.price; const purchasable = Number(amount) > 0;
+              return <article key={product.id || product.code} className={`flex w-full flex-col rounded-3xl border bg-white p-5 shadow-sm sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.667rem)] ${selected === product ? "border-blue-600 ring-2 ring-blue-100" : "border-[#C7D6E8]"}`}>
+                <h2 className="text-center text-lg font-black">{product.paketAdi || product.name}</h2>
+                <p className="my-4 text-center text-3xl font-black text-blue-700">{amount === null || amount === undefined ? "Fiyat tanımlanmadı" : formatMoney(amount, product.paraBirimi || "TRY")}</p>
+                <p className="text-center text-xs text-slate-500">{tab === "MEMBERSHIP" ? "Bir aylık dönem · vergi dahil" : "Tek seferlik satın alma · vergi dahil"}</p>
+                <div className="my-5 space-y-2 text-sm leading-6">
+                  <p className="flex items-start gap-2"><CheckCircle2 size={17} className="mt-1 shrink-0 text-blue-600" />{(product.credits ?? product.aylikPaketPk ?? 0).toLocaleString("tr-TR")} PK</p>
+                  {product.aktifPortfoyLimiti !== undefined && <p className="flex items-start gap-2"><CheckCircle2 size={17} className="mt-1 shrink-0 text-blue-600" />{product.aktifPortfoyLimiti} aktif portföy</p>}
+                  {product.aciklama && <p className="text-slate-600">{product.aciklama}</p>}
+                </div>
+                <button className={`${buttonClass} mt-auto w-full`} disabled={!catalog?.enabled || !purchasable || product.paketKodu === "DENEME" || busy} onClick={() => chooseProduct(product)}>{product.paketKodu === "DENEME" ? "Deneme paketi" : "Paketi seç"}</button>
+              </article>;
+            })}
+            {!products.length && <p className="rounded-3xl border border-[#C7D6E8] bg-white p-6 text-center text-sm sm:col-span-2 lg:col-span-3">Bu hesap için satışa açık paket bulunmuyor.</p>}
+          </section>
+          {selected && <form onSubmit={checkout} className="rounded-3xl border border-[#C7D6E8] bg-white p-5 sm:p-7">
+            <h2 className="text-xl font-black">Fatura bilgileri</h2><p className="mt-2 text-sm leading-6 text-slate-600">Kart bilgilerinizi sonraki adımda iyzico sayfasına gireceksiniz. Otomatik yenileme başlatılmaz.</p>
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              {([{ key: "firstName", label: "Ad", auto: "given-name", max: 80 }, { key: "lastName", label: "Soyad", auto: "family-name", max: 80 }, { key: "email", label: "E-posta", type: "email", auto: "email", max: 160 }, { key: "phone", label: "Telefon (+905XXXXXXXXX)", type: "tel", auto: "tel", max: 13 }, { key: "identityNumber", label: "T.C. kimlik numarası", auto: "off", max: 11 }, { key: "city", label: "İl", auto: "address-level1", max: 80 }, { key: "address", label: "Fatura adresi", auto: "street-address", max: 300 }] as const).map((field) =>
+                <label key={field.key} className={`space-y-2 text-sm font-bold ${field.key === "address" ? "sm:col-span-2" : ""}`}>{field.label}
+                  <input required minLength={field.key === "address" ? 10 : 2} maxLength={field.max} type={"type" in field ? field.type : "text"} autoComplete={field.auto}
+                    pattern={field.key === "phone" ? "\\+90[0-9]{10}" : field.key === "identityNumber" ? "[1-9][0-9]{10}" : undefined}
+                    value={billing[field.key]} disabled={busy} className={inputClass} onChange={(e) => { keyRef.current = ""; setBilling((old) => ({ ...old, [field.key]: e.target.value })); }} />
+                </label>)}
+            </div>
+            <label className="mt-5 flex items-start gap-3 rounded-2xl bg-[#F8FAFC] p-4 text-sm leading-6"><input type="checkbox" required checked={accepted} disabled={busy} onChange={(e) => setAccepted(e.target.checked)} className="mt-1 h-5 w-5 shrink-0" /><span><Link href="/odeme/kosullar" target="_blank" className="font-bold text-blue-700 underline">Ön bilgilendirme, satış, teslimat ve iade koşullarını</Link> okudum ve kabul ediyorum. <Link href="/gizlilik-politikasi" target="_blank" className="text-blue-700 underline">Gizlilik politikasını</Link> inceledim.</span></label>
+            <div className="mt-5 flex flex-col items-center justify-between gap-4 sm:flex-row"><div className="text-center sm:text-left"><p className="text-sm font-bold">{selected.paketAdi || selected.name}</p><p className="mt-1 text-2xl font-black">{formatMoney(price)}</p><p className="mt-1 text-xs text-slate-500">Vergi dahil toplam · tek çekim</p></div><button disabled={busy || !accepted || !catalog?.enabled} className={`${buttonClass} w-full sm:w-auto`}>{busy ? <Loader2 size={18} className="animate-spin" /> : <ShieldCheck size={18} />}iyzico ile ödemeye geç</button></div>
+          </form>}
+        </>}
+        {tab === "HISTORY" && <section className="space-y-3">
+          <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-black">Son 100 ödeme</h2><button onClick={() => void load()} className="inline-flex min-h-11 items-center gap-2 text-sm font-bold text-blue-700"><RefreshCw size={16} /> Yenile</button></div>
+          {orders.map((order) => <article key={order.id} className={`rounded-3xl border bg-white p-5 ${focusOrder === order.id ? "border-blue-600" : "border-[#C7D6E8]"}`}>
+            <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-black">{order.product?.paketAdi || order.product?.name || "EPH paketi"}</h3><p className="mt-1 text-xs text-slate-500">{new Date(order.createdAt).toLocaleString("tr-TR")}</p></div><strong className="text-lg">{order.amountPending ? "Mağaza tutarı bekleniyor" : formatMoney(order.amount, order.currency)}</strong></div>
+            <p className="mt-3 text-sm font-bold text-blue-700">{statuses[order.status] || order.status}{order.status === "PAID" && (order.settled ? " · Haklar tanımlandı" : " · Hak tanımlaması bekleniyor")}</p>
+            <p className="mt-2 break-all text-xs text-slate-500">Sipariş: {order.number}{order.mode === "sandbox" ? " · TEST" : ""}</p>
+            {["CREATED", "PENDING", "PAID"].includes(order.status) && <button disabled={busy} onClick={() => void refresh(order.id)} className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-bold text-blue-700"><RefreshCw size={16} /> Durumu kontrol et</button>}
+            {["APPLE", "GOOGLE"].includes(order.channel || "") && <p className="mt-2 text-sm text-slate-600">Bu işlem {order.channel === "APPLE" ? "Apple App Store" : "Google Play"} üzerinden yapıldı. İadeyi ilgili mağaza yönetir.</p>}
+            {order.checkoutUrl && <a href={order.checkoutUrl} className={`${buttonClass} mt-3`}>Ödeme sayfasına dön</a>}
+            {order.refunds?.length > 0 ? <p className="mt-3 rounded-2xl bg-blue-50 p-3 text-sm">İade talebi: {order.refunds[0].status === "SUCCEEDED" ? "Tamamlandı" : "İnceleniyor"}</p> : order.status === "PAID" && !["APPLE", "GOOGLE"].includes(order.channel || "") && <button onClick={() => { setRefundOrder(order.id); setReason(""); }} className="mt-3 block min-h-11 text-sm font-bold text-slate-600 underline">İade talebi oluştur</button>}
+            {refundOrder === order.id && <form onSubmit={requestRefund} className="mt-3 space-y-3"><label className="block text-sm font-bold">İade gerekçesi<textarea required minLength={10} maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} className={`${inputClass} mt-2 min-h-24`} /></label><button disabled={busy} className={buttonClass}>Talebi gönder</button></form>}
+          </article>)}
+          {!orders.length && <p className="rounded-3xl border border-[#C7D6E8] bg-white p-6 text-center text-sm">Henüz ödeme kaydınız yok.</p>}
+        </section>}
+      </>}
+      {message && <div role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">{message}</div>}
+      <PaymentTrustBand />
+    </div>
+  </main>;
+}

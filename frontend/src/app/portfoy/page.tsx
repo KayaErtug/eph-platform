@@ -33,6 +33,7 @@ import {
   mergePortfolioFeatureMetadata,
 } from "@/components/stok/portfolioFeatureMetadata";
 import PortfolioShareModal from "@/components/portfolio/PortfolioShareModal";
+import { buildEphPremiumCardData } from "@/components/portfolio/ephPremiumCardStandard";
 import type { PortfolioShareData } from "@/components/portfolio/PortfolioShareCard";
 import PortfolioFilterCenter, {
   applyPortfolioFilters,
@@ -42,6 +43,7 @@ import PortfolioFilterCenter, {
   removePortfolioFilterChip,
   type PortfolioFilterState,
 } from "@/components/portfolio/PortfolioFilterCenter";
+import PortfolioSmartQuickFilters from "@/components/portfolio/PortfolioSmartQuickFilters";
 import type {
   LocalPortfolioImage,
   Project,
@@ -285,6 +287,34 @@ function getPortfolioNo(unit: Unit) {
   return `EPH-${raw.slice(0, 4).toLocaleUpperCase("tr-TR") || "PORT"}-${raw.slice(-4).toLocaleUpperCase("tr-TR") || "0001"}`;
 }
 
+
+function calculatePortfolioScore(unit?: Unit | null) {
+  if (!unit) return 0;
+
+  let score = 0;
+  const imageCount = getUnitImages(unit).length;
+
+  if (unit.project?.name) score += 14;
+  if (unit.project?.city && unit.project?.district) score += 14;
+  if (unit.price) score += 14;
+  if (unit.area) score += 12;
+  if (unit.roomCount) score += 10;
+  if (unit.description) score += 12;
+  if (unit.tapuVerified) score += 7;
+  if (unit.photoVerified || imageCount > 0) score += 7;
+  if (unit.yetkiVerified || unit.isVerified) score += 10;
+
+  return Math.min(score, 100);
+}
+
+function getPortfolioScoreLabel(score: number) {
+  if (score >= 90) return "Pekiyi";
+  if (score >= 80) return "Çok İyi";
+  if (score >= 70) return "İyi";
+  if (score >= 60) return "Geliştirilebilir";
+  return "Eksik";
+}
+
 function getShareUrl(unit: Unit) {
   if (typeof window === "undefined") return "";
   return `${window.location.origin}/portfoy/${unit.id}`;
@@ -338,6 +368,7 @@ function StokPageInner() {
   const [poolActionUnitId, setPoolActionUnitId] = useState("");
   const [editingUnit, setEditingUnit] = useState<MapUnit | null>(null);
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const [consultantPhone, setConsultantPhone] = useState("");
 
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [projectForm, setProjectForm] = useState<ProjectFormState>({
@@ -363,6 +394,10 @@ function StokPageInner() {
     deedOwnerFullName: "",
     deedOwnerPhone: "",
     deedOwnerEmail: "",
+    allowPhoneCall: false,
+    contactPhone: "",
+    allowWhatsapp: false,
+    whatsappPhone: "",
     features: [],
     availableCreditAmount: "",
     doorAccessInfo: "",
@@ -429,15 +464,25 @@ function StokPageInner() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [projectRes, unitRes, crmRes, conversationsRes] = await Promise.all([
+      const [
+        projectRes,
+        unitRes,
+        crmRes,
+        conversationsRes,
+        profileRes,
+      ] = await Promise.all([
         api.get("/projects/my"),
         api.get("/units"),
         api.get("/crm/customers").catch(() => ({ data: [] })),
-        user?.id ? api.get(`/conversations?userId=${user.id}`).catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
+        user?.id
+          ? api.get(`/conversations?userId=${user.id}`).catch(() => ({ data: [] }))
+          : Promise.resolve({ data: [] }),
+        api.get("/profile").catch(() => ({ data: null })),
       ]);
       setProjects(projectRes.data || []);
       setUnits(unitRes.data || []);
       setCrmCustomers(Array.isArray(crmRes.data) ? crmRes.data : []);
+      setConsultantPhone(String(profileRes.data?.phone || "").trim());
 
       const conversations = Array.isArray(conversationsRes.data)
         ? (conversationsRes.data as Conversation[])
@@ -498,14 +543,7 @@ function StokPageInner() {
       ).length,
     [units],
   );
-  const averageValue = useMemo(() => {
-    if (!units.length) return 0;
-    return Math.round(
-      units.reduce((sum, unit) => sum + (Number(unit.price) || 0), 0) /
-        units.length,
-    );
-  }, [units]);
-  const makeExistingGalleryImages = (unit: MapUnit): LocalPortfolioImage[] => {
+const makeExistingGalleryImages = (unit: MapUnit): LocalPortfolioImage[] => {
     return getUnitImages(unit as Unit).map((image, index) => ({
       id: `existing-${image.id}`,
       previewUrl: image.displayUrl,
@@ -552,6 +590,10 @@ function StokPageInner() {
       deedOwnerFullName: "",
       deedOwnerPhone: "",
       deedOwnerEmail: "",
+      allowPhoneCall: false,
+      contactPhone: "",
+      allowWhatsapp: false,
+      whatsappPhone: "",
       features: [],
       availableCreditAmount: "",
       doorAccessInfo: "",
@@ -564,17 +606,7 @@ function StokPageInner() {
   };
 
   const openCreateModal = () => {
-    const currentRole = String(user?.role || "").toUpperCase();
-
-    if (currentRole === "ADMIN") {
-      window.alert("Rolünüz Admin olduğu için portföy girişi yapamazsınız.");
-      return;
-    }
-
-    if (!canAddUnit) {
-      window.alert("Bu kullanıcı rolüyle portföy girişi yapamazsınız.");
-      return;
-    }
+    if (!canAddUnit) return;
 
     resetForm();
     setShowModal(true);
@@ -622,6 +654,10 @@ function StokPageInner() {
       deedOwnerFullName: (unit as any).deedOwnerFullName || "",
       deedOwnerPhone: (unit as any).deedOwnerPhone || "",
       deedOwnerEmail: (unit as any).deedOwnerEmail || "",
+      allowPhoneCall: Boolean((unit as any).allowPhoneCall),
+      contactPhone: (unit as any).contactPhone || "",
+      allowWhatsapp: Boolean((unit as any).allowWhatsapp),
+      whatsappPhone: (unit as any).whatsappPhone || "",
       ...metadataState,
       features: storedFeatures,
       availableCreditAmount:
@@ -766,6 +802,12 @@ function StokPageInner() {
           String((unitForm as any).deedOwnerPhone || '').trim() || undefined,
         deedOwnerEmail:
           String((unitForm as any).deedOwnerEmail || '').trim() || undefined,
+        allowPhoneCall: Boolean((unitForm as any).allowPhoneCall),
+        contactPhone:
+          String((unitForm as any).contactPhone || '').trim() || null,
+        allowWhatsapp: Boolean((unitForm as any).allowWhatsapp),
+        whatsappPhone:
+          String((unitForm as any).whatsappPhone || '').trim() || null,
         availableCreditAmount: numericAvailableCreditAmount || undefined,
         doorAccessInfo:
           String((unitForm as any).doorAccessInfo || '').trim() || undefined,
@@ -773,6 +815,21 @@ function StokPageInner() {
       };
 
       if (editingUnit) {
+        const editingProjectId = editingUnit.project?.id || selectedProjectId;
+
+        if (editingProjectId) {
+          await api.patch(`/projects/${editingProjectId}`, {
+            name: String(projectForm.name || '').trim() || undefined,
+            city: String(projectForm.city || '').trim(),
+            district: String(projectForm.district || '').trim(),
+            address: String(projectForm.address || '').trim(),
+            latitude: (projectForm as any).latitude ?? null,
+            longitude: (projectForm as any).longitude ?? null,
+            mapAddress: (projectForm as any).mapAddress ?? null,
+            placeId: (projectForm as any).placeId ?? null,
+          });
+        }
+
         await api.patch(`/units/${editingUnit.id}`, unitPayload);
 
         const selectedCoverImage = coverImage || galleryImages[0] || null;
@@ -928,11 +985,13 @@ function StokPageInner() {
       [unit.project?.city, unit.project?.district, unit.project?.address]
         .filter(Boolean)
         .join(" / ") || "Konum bilgisi yok";
+    const score = calculatePortfolioScore(unit);
 
     return {
       id: unit.id,
       title,
       location,
+      status: statusLabels[unit.status] || unit.status || "Portföy",
       price: unit.price
         ? formatPrice(unit.price, unit.priceCurrency)
         : "Fiyat bilgisi yok",
@@ -945,10 +1004,10 @@ function StokPageInner() {
       consultantName:
         [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
         "EPH Üyesi",
-      consultantPhone: "Telefon bilgisi",
+      consultantPhone: consultantPhone || "Telefon paylaşılmadı",
       portfolioNo: getPortfolioNo(unit),
-      score: 86,
-      scoreLabel: "Çok İyi",
+      score,
+      scoreLabel: getPortfolioScoreLabel(score),
       shortDescription:
         unit.description ||
         "Yetkili portföy statüsünde paylaşım için hazır gayrimenkul kaydı.",
@@ -963,7 +1022,7 @@ function StokPageInner() {
               ? "Yetkili Portföy"
               : "Yetki Kontrol",
         },
-        { icon: "smart", label: "Lina Kartı" },
+        { icon: "smart", label: "Dijital Portföy Kartı" },
         { icon: "car", label: "Portföy Kaydı" },
         {
           icon: "pool",
@@ -992,35 +1051,48 @@ function StokPageInner() {
     }
   };
 
-  const handleSendToPool = async (unit: MapUnit) => {
-    if ((unit as any).approvalStatus !== "ONAYLANDI") {
-      alert("Sadece onaylanmış portföyler havuza gönderilebilir.");
-      return;
-    }
+  const handleDirectPublish = async (unit: MapUnit) => {
+    const confirmed = window.confirm(
+      "Bu portföy doğrudan EPH Havuzunda yayınlanacak. Devam etmek istiyor musunuz?",
+    );
+
+    if (!confirmed) return;
 
     try {
       setPoolActionUnitId(unit.id);
-      await api.post(`/units/${unit.id}/send-to-pool`);
+      await api.post(`/units/${unit.id}/submit-approval`);
       await fetchData();
-      alert("Portföy havuza gönderildi.");
+      window.alert("Portföy başarıyla EPH Havuzunda yayınlandı.");
     } catch (error: any) {
-      alert(error?.response?.data?.message || "Portföy havuza gönderilemedi.");
+      window.alert(
+        error?.response?.data?.message ||
+          "Portföy havuzda yayınlanamadı. Lütfen üyelik ve portföy durumunu kontrol ediniz.",
+      );
     } finally {
       setPoolActionUnitId("");
     }
   };
 
   const handleRemoveFromPool = async (unit: MapUnit) => {
+    const isDirectPublishRole =
+      user?.role === "MUTEAHHIT" || user?.role === "INSAAT_FIRMASI";
+    const republishMessage = isDirectPublishRole
+      ? "Güncelleme tamamlandıktan sonra Doğrudan Havuza Gönder düğmesini kullanabilirsiniz."
+      : "Tekrar yayınlanması için yeniden EPH onayı gerekecek.";
+    const confirmed = window.confirm(
+      `İlan havuzdan kaldırılacak ve Taslak durumuna dönecek.\n\nFiyat, açıklama, fotoğraf ve belgeleri güncelleyebilirsiniz.\n\n${republishMessage}`,
+    );
+
+    if (!confirmed) return;
+
     try {
       setPoolActionUnitId(unit.id);
       await api.post(`/units/${unit.id}/remove-from-pool`);
       await fetchData();
-      alert(
-        "Portföy havuzdan kaldırıldı. Onaylı durumda kalır, istediğiniz zaman tekrar havuza gönderebilirsiniz.",
-      );
+      router.push(`/portfoy?edit=${unit.id}`);
     } catch (error: any) {
-      alert(
-        error?.response?.data?.message || "Portföy havuzdan kaldırılamadı.",
+      window.alert(
+        error?.response?.data?.message || "İlan havuzdan geri çekilemedi.",
       );
     } finally {
       setPoolActionUnitId("");
@@ -1104,6 +1176,12 @@ function StokPageInner() {
             </button>
           </div>
 
+          <PortfolioSmartQuickFilters
+            units={units}
+            filters={portfolioFilters}
+            onChange={setPortfolioFilters}
+          />
+
           {activeFilterChips.length > 0 && (
             <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1">
               {activeFilterChips.slice(0, 12).map((chip) => (
@@ -1150,13 +1228,8 @@ function StokPageInner() {
             </strong>
           </div>
 
-          <div className="mt-3 grid grid-cols-4 overflow-hidden rounded-[18px] border border-[#EDE9FE] bg-white text-center">
+          <div className="mt-3 grid grid-cols-3 overflow-hidden rounded-[18px] border border-[#EDE9FE] bg-white text-center">
             <MiniMetric label="Portföy" value={units.length} />
-            <MiniMetric
-              label="Ort. Fiyat"
-              value={averageValue ? formatCompactPrice(averageValue) : "0"}
-              tone="green"
-            />
             <MiniMetric label="Satılık" value={saleCount} tone="blue" />
             <MiniMetric label="Kiralık" value={rentCount} tone="orange" />
           </div>
@@ -1298,14 +1371,15 @@ function StokPageInner() {
               {filteredUnits.length} portföy listeleniyor
             </p>
             <div className="flex shrink-0 items-center gap-2">
-              <button
-                type="button"
-                onClick={openCreateModal}
-                disabled={!canAddUnit && user?.role !== "ADMIN"}
-                className="inline-flex h-10 shrink-0 items-center gap-1 rounded-[18px] bg-[linear-gradient(135deg,#7C3AED_0%,#5B21B6_100%)] px-3 text-[12px] font-black text-white shadow-[0_10px_24px_rgba(124,58,237,0.24)] disabled:opacity-50"
-              >
-                <Plus size={17} /> Yeni Portföy
-              </button>
+              {canAddUnit && (
+                <button
+                  type="button"
+                  onClick={openCreateModal}
+                  className="inline-flex h-10 shrink-0 items-center gap-1 rounded-[18px] bg-[linear-gradient(135deg,#7C3AED_0%,#5B21B6_100%)] px-3 text-[12px] font-black text-white shadow-[0_10px_24px_rgba(124,58,237,0.24)]"
+                >
+                  <Plus size={17} /> Yeni Portföy
+                </button>
+              )}
             </div>
           </div>
 
@@ -1328,11 +1402,13 @@ function StokPageInner() {
                 selected={mapSelectedUnitId === unit.id}
                 deleting={deletingUnitId === unit.id}
                 poolBusy={poolActionUnitId === unit.id}
+                currentUserId={String(user?.id || "")}
+                currentUserRole={String(user?.role || "")}
                 onOpen={() => router.push(`/portfoy/${unit.id}`)}
                 onUpdate={() => openEditModal(unit)}
                 onShare={() => handlePortfolioShare(unit)}
                 onDelete={() => handleDeleteUnit(unit)}
-                onSendToPool={() => handleSendToPool(unit)}
+                onDirectPublish={() => handleDirectPublish(unit)}
                 onRemoveFromPool={() => handleRemoveFromPool(unit)}
                 onWhatsappLocation={() => handleWhatsappLocation(unit)}
               />
@@ -1632,11 +1708,13 @@ function CompactPortfolioCard({
   selected,
   deleting,
   poolBusy,
+  currentUserId,
+  currentUserRole,
   onOpen,
   onUpdate,
   onShare,
   onDelete,
-  onSendToPool,
+  onDirectPublish,
   onRemoveFromPool,
   onWhatsappLocation,
 }: {
@@ -1645,11 +1723,13 @@ function CompactPortfolioCard({
   selected: boolean;
   deleting: boolean;
   poolBusy: boolean;
+  currentUserId: string;
+  currentUserRole: string;
   onOpen: () => void;
   onUpdate: () => void;
   onShare: () => void;
   onDelete: () => void;
-  onSendToPool: () => void;
+  onDirectPublish: () => void;
   onRemoveFromPool: () => void;
   onWhatsappLocation: () => void;
 }) {
@@ -1674,9 +1754,48 @@ function CompactPortfolioCard({
   const isPoolVisible = Boolean(
     (unit as any).isPoolVisible || approvalStatus === "HAVUZDA",
   );
-  const canSendToPool = approvalStatus === "ONAYLANDI" && !isPoolVisible;
-  const canRemoveFromPool = approvalStatus === "HAVUZDA" || isPoolVisible;
+  const isDirectPublishRole =
+    currentUserRole === "MUTEAHHIT" ||
+    currentUserRole === "INSAAT_FIRMASI";
+  const possibleOwnerIds = [
+    (unit as any)?.userId,
+    (unit as any)?.ownerId,
+    (unit as any)?.createdById,
+    (unit as any)?.project?.userId,
+    (unit as any)?.project?.ownerId,
+    (unit as any)?.project?.createdById,
+    (unit as any)?.project?.owner?.id,
+  ]
+    .filter(Boolean)
+    .map((value) => String(value));
+  const isPortfolioOwner = possibleOwnerIds.includes(currentUserId);
+  const canDirectPublish =
+    isPortfolioOwner && isDirectPublishRole && !isPoolVisible;
+  const canRemoveFromPool =
+    isPortfolioOwner &&
+    (approvalStatus === "HAVUZDA" || isPoolVisible);
   const isVerified = isUnitVerified(unit);
+  const approvalBadgeLabel = isPoolVisible
+    ? "Havuzda"
+    : isDirectPublishRole
+      ? "Havuza Hazır"
+      : isVerified
+        ? "EPH Onaylı"
+        : "Onay Bekliyor";
+  const approvalBadgeClass = isPoolVisible
+    ? "bg-emerald-600/90"
+    : isDirectPublishRole
+      ? "bg-sky-600/90"
+      : isVerified
+        ? "bg-emerald-600/90"
+        : "bg-amber-500/90";
+  const verificationLabel = isPoolVisible
+    ? "Havuzda"
+    : isDirectPublishRole
+      ? "Doğrudan Yayın"
+      : isVerified
+        ? "Yetkili"
+        : "Kontrol";
   const text = [unit.type, unit.description, unit.project?.name]
     .join(" ")
     .toLocaleLowerCase("tr-TR");
@@ -1724,101 +1843,53 @@ function CompactPortfolioCard({
     });
   };
 
-  const quickSpecs = isLand
-    ? [
-        {
-          icon: "□",
-          label: unit.area
-            ? `${Number(unit.area).toLocaleString("tr-TR")} m²`
-            : "Alan",
-        },
-        {
-          icon: "⌗",
-          label:
-            (unit as any).adaNo || (unit as any).parselNo
-              ? "Ada / Parsel"
-              : "Parsel Bilgisi",
-        },
-        {
-          icon: "⌖",
-          label: hasLocation ? "Konumlu" : "Konumsuz",
-        },
-        {
-          icon: "✓",
-          label: isVerified ? "Yetkili" : "Kontrol",
-        },
-      ]
-    : [
-        {
-          icon: "▦",
-          label: unit.roomCount || "Oda",
-        },
-        {
-          icon: "↕",
-          label: formatFloorInfo(unit),
-        },
-        {
-          icon: "□",
-          label: unit.area
-            ? `${Number(unit.area).toLocaleString("tr-TR")} m²`
-            : "Alan",
-        },
-        {
-          icon: "✓",
-          label: isVerified ? "Yetkili" : "Kontrol",
-        },
-      ];
+  const summarySpecs = specs.slice(0, 3);
+  const premiumCardData = buildEphPremiumCardData(unit);
+  const description = String(unit.description || "").trim();
 
-  const detailSpecs = isLand
-    ? [
-        { label: "Durum", value: status },
-        {
-          label: "Ada / Parsel",
-          value:
-            [(unit as any).adaNo, (unit as any).parselNo]
-              .filter(Boolean)
-              .join(" / ") || "Belirtilmedi",
-        },
-        {
-          label: "Tapu",
-          value:
-            unit.tapuVerified || unit.isVerified ? "Doğrulandı" : "Kontrol",
-        },
-        {
-          label: "Fotoğraf",
-          value: `${imageCount} adet`,
-        },
-        {
-          label: "Havuz",
-          value: isPoolVisible ? "Havuzda" : "Havuz Dışı",
-        },
-      ]
-    : [
-        { label: "Durum", value: status },
-        { label: "Kat", value: formatFloorInfo(unit) },
-        {
-          label: "Tapu",
-          value:
-            unit.tapuVerified || unit.isVerified ? "Doğrulandı" : "Kontrol",
-        },
-        { label: "Fotoğraf", value: `${imageCount} adet` },
-        {
-          label: "Kredi",
-          value: (unit as any).availableCreditAmount
-            ? formatCompactPrice(
+  const expandedInfoCards = [
+    ...premiumCardData.facts
+      .filter(
+        (item) =>
+          ![
+            "roomCount",
+            "netArea",
+            "area",
+            "floor",
+            "status",
+          ].includes(item.key),
+      )
+      .filter(
+        (item) =>
+          Boolean(String(item.value || "").trim()) &&
+          String(item.value || "").trim() !== "—",
+      )
+      .slice(0, 6),
+    {
+      key: "photoCount",
+      label: "Fotoğraf",
+      value: `${imageCount} adet`,
+    },
+    ...(
+      Number((unit as any).availableCreditAmount || 0) > 0
+        ? [
+            {
+              key: "credit",
+              label: "Kredi",
+              value: formatCompactPrice(
                 (unit as any).availableCreditAmount,
                 unit.priceCurrency,
-              )
-            : "Belirtilmedi",
-        },
-        {
-          label: "Havuz",
-          value: isPoolVisible ? "Havuzda" : "Havuz Dışı",
-        },
-      ];
-
-  const summarySpecs = specs.slice(0, 3);
-  const description = String(unit.description || "").trim();
+              ),
+            },
+          ]
+        : []
+    ),
+    {
+      key: "mapLocation",
+      label: "Harita",
+      value: hasLocation ? "Konumlu" : "Konumsuz",
+    },
+  ].slice(0, 8);
 
   return (
     <article
@@ -1870,11 +1941,9 @@ function CompactPortfolioCard({
 
           <div className="absolute left-2.5 right-2.5 top-2.5 flex items-start justify-between gap-2">
             <span
-              className={`rounded-full border border-white/80 px-2.5 py-1 text-[10px] font-extrabold text-white shadow-[0_6px_16px_rgba(15,23,42,0.22)] backdrop-blur-md ${
-                isVerified ? "bg-emerald-600/90" : "bg-amber-500/90"
-              }`}
+              className={`rounded-full border border-white/80 px-2.5 py-1 text-[10px] font-extrabold text-white shadow-[0_6px_16px_rgba(15,23,42,0.22)] backdrop-blur-md ${approvalBadgeClass}`}
             >
-              {isVerified ? "EPH Onaylı" : "Onay Bekliyor"}
+              {approvalBadgeLabel}
             </span>
 
             <span className="rounded-full border border-white/80 bg-slate-950/60 px-2.5 py-1 text-[10px] font-extrabold text-white shadow-[0_6px_16px_rgba(15,23,42,0.22)] backdrop-blur-md">
@@ -1957,12 +2026,16 @@ function CompactPortfolioCard({
 
             <span
               className={`shrink-0 rounded-full px-2.5 py-1 text-[10.5px] font-extrabold ${
-                isVerified
+                isPoolVisible
                   ? "bg-emerald-50 text-emerald-700"
-                  : "bg-amber-50 text-amber-700"
+                  : isDirectPublishRole
+                    ? "bg-sky-50 text-sky-700"
+                    : isVerified
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-amber-50 text-amber-700"
               }`}
             >
-              {isVerified ? "Yetkili" : "Kontrol"}
+              {verificationLabel}
             </span>
           </div>
 
@@ -2032,6 +2105,24 @@ function CompactPortfolioCard({
         </button>
       </div>
 
+      {canDirectPublish && (
+        <div className="border-t border-emerald-100 bg-emerald-50 p-2">
+          <button
+            type="button"
+            onClick={onDirectPublish}
+            disabled={poolBusy}
+            className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[13px] bg-emerald-600 px-3 text-center text-[12px] font-extrabold leading-4 text-white shadow-[0_10px_24px_rgba(5,150,105,0.22)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {poolBusy ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Send size={16} />
+            )}
+            Doğrudan Havuza Gönder
+          </button>
+        </div>
+      )}
+
       {menuOpen && (
         <div className="grid grid-cols-3 gap-2 border-t border-[#EDE9FE] bg-white p-2.5">
           <button
@@ -2079,89 +2170,92 @@ function CompactPortfolioCard({
 
       {expanded && (
         <div className="border-t border-[#EDE9FE] bg-white p-3">
-          <div className="grid grid-cols-4 gap-1.5">
-            {quickSpecs.map((item) => (
-              <div
-                key={`${item.icon}-${item.label}`}
-                className="flex min-h-[58px] min-w-0 flex-col items-center justify-center rounded-[12px] bg-[#F8FAFC] px-1.5 text-center"
-              >
-                <span
-                  className="text-[14px] font-extrabold leading-none"
-                  style={{ color: visualTheme.typeColor }}
-                >
-                  {item.icon}
-                </span>
-                <span className="mt-1.5 line-clamp-2 min-w-0 text-[10px] font-extrabold leading-[1.15] text-[#334155] [overflow-wrap:anywhere]">
-                  {item.label}
-                </span>
-              </div>
-            ))}
+          <div className="flex items-center justify-between gap-2 rounded-[16px] border border-[#E2E8F0] bg-[#F8FAFC] px-3 py-2.5">
+            <div className="min-w-0">
+              <p className="text-[9px] font-black uppercase tracking-[0.1em] text-[#64748B]">
+                Portföy Özeti
+              </p>
+
+              <p className="mt-0.5 line-clamp-1 text-[11px] font-extrabold text-[#1F2937]">
+                {premiumCardData.propertyType} için tamamlayıcı bilgiler
+              </p>
+            </div>
+
+            <span
+              className="shrink-0 rounded-[10px] border px-2 py-1.5 text-[8px] font-black"
+              style={{
+                backgroundColor: visualTheme.typeSoft,
+                borderColor: visualTheme.typeBorder,
+                color: visualTheme.typeColor,
+              }}
+            >
+              {premiumCardData.portfolioNo}
+            </span>
           </div>
 
           <div className="mt-2 grid grid-cols-3 gap-1.5">
-            {detailSpecs.map((item) => (
+            {expandedInfoCards.map((item) => (
               <div
-                key={item.label}
-                className="flex min-h-[64px] min-w-0 flex-col items-center justify-center rounded-[12px] border border-[#EDE9FE] bg-[#FBFAFF] px-1.5 py-1.5 text-center"
+                key={item.key}
+                className="flex min-h-[62px] min-w-0 flex-col items-center justify-center rounded-[13px] border border-[#E2E8F0] bg-[linear-gradient(180deg,#FFFFFF,#F8FAFC)] px-1.5 py-2 text-center shadow-[0_5px_12px_rgba(15,23,42,0.035)]"
               >
-                <span className="text-[9px] font-extrabold uppercase tracking-[0.05em] text-[#64748B]">
+                <span className="line-clamp-2 min-w-0 text-[7.5px] font-black uppercase leading-[10px] tracking-[0.06em] text-[#64748B]">
                   {item.label}
                 </span>
-                <span className="mt-1 line-clamp-2 min-w-0 text-[10.5px] font-extrabold leading-[1.15] text-[#1F2937] [overflow-wrap:anywhere]">
-                  {item.value}
+
+                <span
+                  className="mt-1 line-clamp-2 min-w-0 text-[9.5px] font-black leading-[12px] [overflow-wrap:anywhere]"
+                  style={{ color: visualTheme.typeColor }}
+                >
+                  {item.value || "—"}
                 </span>
               </div>
             ))}
           </div>
 
           {description && (
-            <p className="mt-2 rounded-[12px] bg-[#F8FAFC] px-3 py-2.5 text-[11.5px] font-semibold leading-[1.55] text-[#475569]">
-              {description}
-            </p>
+            <div className="mt-2 rounded-[14px] border border-[#E2E8F0] bg-[#F8FAFC] px-3 py-2.5">
+              <p className="text-[8px] font-black uppercase tracking-[0.08em] text-[#64748B]">
+                Portföy Açıklaması
+              </p>
+
+              <p className="mt-1 text-[11px] font-semibold leading-[1.5] text-[#475569]">
+                {description}
+              </p>
+            </div>
           )}
 
-          <div
-            className="mt-2 flex min-h-[38px] items-center justify-center rounded-[12px] border px-3 text-center text-[11px] font-extrabold"
+          <button
+            type="button"
+            onClick={onOpen}
+            className="mt-2 flex min-h-[42px] w-full items-center justify-center gap-2 rounded-[12px] border px-3 text-center text-[11px] font-extrabold active:scale-[0.98]"
             style={{
               backgroundColor: visualTheme.typeSoft,
               borderColor: visualTheme.typeBorder,
               color: visualTheme.typeColor,
             }}
+            aria-label={`${unit.project?.name || "Portföy"} detayını aç`}
           >
-            ✦ {highlight}
-          </div>
+            <Eye size={15} />
+            Portföy Detayını Aç
+            {highlight !== "Portföy Detayı" ? ` · ${highlight}` : ""}
+          </button>
 
-          {(canSendToPool || canRemoveFromPool) && (
+          {canRemoveFromPool && (
             <div className="mt-2.5">
-              {canSendToPool ? (
-                <button
-                  type="button"
-                  onClick={onSendToPool}
-                  disabled={poolBusy}
-                  className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[13px] bg-emerald-600 px-3 text-[12px] font-extrabold text-white shadow-[0_8px_18px_rgba(5,150,105,0.16)] disabled:opacity-60"
-                >
-                  {poolBusy ? (
-                    <Loader2 size={15} className="animate-spin" />
-                  ) : (
-                    <Send size={15} />
-                  )}
-                  Havuza Gönder
-                </button>
-              ) : null}
-
               {canRemoveFromPool ? (
                 <button
                   type="button"
                   onClick={onRemoveFromPool}
                   disabled={poolBusy}
-                  className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[13px] border border-amber-200 bg-amber-50 px-3 text-[12px] font-extrabold text-amber-800 disabled:opacity-60"
+                  className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[13px] border border-amber-200 bg-amber-50 px-3 text-center text-[11px] font-extrabold leading-4 text-amber-800 disabled:opacity-60"
                 >
                   {poolBusy ? (
                     <Loader2 size={15} className="animate-spin" />
                   ) : (
                     <X size={15} />
                   )}
-                  Havuzdan Kaldır
+                  İlanı Havuzdan Geri Çek
                 </button>
               ) : null}
             </div>

@@ -221,6 +221,7 @@ function KayitForm() {
     defaultValues: {
       role: undefined,
       registrationType: undefined,
+      email: "",
     },
   });
 
@@ -327,7 +328,7 @@ function KayitForm() {
     setServerError("");
 
     try {
-      const normalizedEmail = data.email.trim().toLowerCase();
+      const normalizedEmail = data.email && data.email.trim() ? data.email.trim().toLowerCase() : undefined;
       const resolvedRole = detectedRole || data.role;
       const resolvedRegistrationType = referralValid
         ? getRegistrationTypeFromRole(resolvedRole)
@@ -351,10 +352,15 @@ function KayitForm() {
         const params = new URLSearchParams({
           pending: String(res.data.pendingRegistrationId),
           phone: String(res.data.phone || payload.phone),
-          email: normalizedEmail,
+          ...(normalizedEmail ? { email: normalizedEmail } : {}),
         });
 
         router.push(`/kayit/dogrula?${params.toString()}`);
+        return;
+      }
+
+      if (res.data?.success) {
+        router.push("/giris");
         return;
       }
 
@@ -391,7 +397,7 @@ function KayitForm() {
         .feature{margin-top:12px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.08);padding:14px 16px;border-radius:18px;font-weight:850;line-height:1.45}
         .trust-box{margin-top:16px;border:1px solid #BFDBFE;background:linear-gradient(135deg,#EFF6FF,#F8FBFF);border-radius:20px;padding:15px 16px;text-align:center;color:#1E3A8A;font-size:12px;font-weight:850;line-height:1.6;box-shadow:0 10px 24px rgba(37,99,235,.08)}
         .trust-title{display:flex;align-items:center;justify-content:center;gap:7px;margin-bottom:5px;color:#1557D6;font-size:13px;font-weight:950}
-        .verification-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:14px}
+        .verification-steps{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:14px}
         .verification-step{border:1px solid #DBEAFE;background:#FFFFFF;border-radius:15px;padding:10px 7px;text-align:center;color:#475569;font-size:10px;font-weight:900;line-height:1.35}
         .verification-step strong{display:block;margin-bottom:3px;color:#1557D6;font-size:12px}
         .right{display:flex;align-items:center;justify-content:center;padding:42px;background:#FAFCFF}
@@ -435,7 +441,7 @@ function KayitForm() {
           .row-label{font-size:11px}
           .input{font-size:14px}
           .requirements-grid{grid-template-columns:96px 1fr}
-          .verification-steps{grid-template-columns:repeat(3,minmax(0,1fr))}
+          .verification-steps{grid-template-columns:repeat(2,minmax(0,1fr))}
           .trust-box{margin-top:14px;padding:14px 12px;font-size:11px}
         }
       `}</style>
@@ -466,7 +472,7 @@ function KayitForm() {
               </p>
 
               <div className="feature">
-                ✓ Telefon ve e-posta doğrulamalı güvenli kayıt
+                ✓ Telefon merkezli hızlı ve güvenli kayıt
               </div>
               <div className="feature">
                 ✓ Mesleki belge doğrulama ve yönetici onayı
@@ -486,8 +492,7 @@ function KayitForm() {
               <div className="title">Hesap oluştur</div>
 
               <div className="subtitle">
-                Bilgilerinizi tamamlayın. Telefonunuza SMS doğrulama kodu,
-                e-posta adresinize 6 haneli doğrulama kodu gönderilecektir.
+                Bilgilerinizi tamamlayın. Cep telefonu numaranız ana hesap kimliğiniz olarak tanımlanacaktır.
               </div>
 
               <div className="verification-steps">
@@ -497,10 +502,6 @@ function KayitForm() {
                 </div>
                 <div className="verification-step">
                   <strong>2</strong>
-                  E-posta doğrulama
-                </div>
-                <div className="verification-step">
-                  <strong>3</strong>
                   Belge inceleme
                 </div>
               </div>
@@ -534,7 +535,7 @@ function KayitForm() {
                           {ROLE_LABELS[detectedRole]} referans kaydı bulundu.
                         </div>
                         <div className="hint">
-                          Referans bilgileriniz doğrulandı. Telefon ve e-posta
+                          Referans bilgileriniz doğrulandı. Telefon
                           doğrulamasını tamamladıktan sonra başvurunuz mesleki
                           belge inceleme sürecine alınacaktır.
                         </div>
@@ -574,24 +575,7 @@ function KayitForm() {
                     <div className="error">{errors.lastName.message}</div>
                   )}
 
-                  <FormRow
-                    icon={<Mail size={18} />}
-                    label="E-posta"
-                    locked={referralValid}
-                  >
-                    <input
-                      {...register("email")}
-                      readOnly={referralValid}
-                      type="email"
-                      placeholder="mail@example.com"
-                      className="input"
-                    />
-                  </FormRow>
-                  {errors.email && (
-                    <div className="error">{errors.email.message}</div>
-                  )}
-
-                  <FormRow icon={<Phone size={18} />} label="Telefon">
+                  <FormRow icon={<Phone size={18} />} label="Cep Telefonu">
                     <input
                       {...register("phone")}
                       value={phoneValue}
@@ -611,11 +595,27 @@ function KayitForm() {
                     />
                   </FormRow>
                   <div className="hint">
-                    Nasıl yazarsanız yazın sistem +90 532 282 88 75
-                    formatına çevirir.
+                    Nasıl yazarsanız yazın sistem +90 532 282 88 75 formatına çevirir.
                   </div>
                   {errors.phone && (
                     <div className="error">{errors.phone.message}</div>
+                  )}
+
+                  <FormRow
+                    icon={<Mail size={18} />}
+                    label="E-posta (İsteğe bağlı)"
+                    locked={referralValid}
+                  >
+                    <input
+                      {...register("email")}
+                      readOnly={referralValid}
+                      type="email"
+                      placeholder="mail@example.com"
+                      className="input"
+                    />
+                  </FormRow>
+                  {errors.email && (
+                    <div className="error">{errors.email.message}</div>
                   )}
 
                   <FormRow
@@ -644,6 +644,7 @@ function KayitForm() {
                       <>
                         <input type="hidden" {...register("role")} />
                         <select
+                          aria-label="Üyelik Türü"
                           value={selectedRegistrationType || ""}
                           onChange={(event) =>
                             onRegistrationTypeChange(
@@ -698,6 +699,7 @@ function KayitForm() {
 
                   <FormRow icon={<MapPin size={18} />} label="Şehir">
                     <select
+                      aria-label="Şehir"
                       {...register("city")}
                       className="input"
                       defaultValue=""
@@ -760,8 +762,8 @@ function KayitForm() {
                   disabled={loading}
                 >
                   {loading
-                    ? "Doğrulama hazırlanıyor..."
-                    : "Doğrulamaya Devam Et"}
+                    ? "Kayıt yapılıyor..."
+                    : "Üye Ol"}
                 </button>
               </form>
 

@@ -15,6 +15,7 @@ import {
   Home,
   Lightbulb,
   LogOut,
+  Mail,
   Menu,
   MessageSquare,
   Settings,
@@ -45,10 +46,14 @@ const MAIN_ROUTES = [
 ];
 
 function getTitle(pathname: string) {
+  if (pathname.startsWith("/ofisim")) return "OFİSİM";
+  if (pathname.startsWith("/uyelik")) return "ÜYELİK";
+  if (pathname.startsWith("/odeme")) return "ÖDEMELER";
+  if (pathname.startsWith("/kontor")) return "PK CÜZDANIM";
   if (pathname.startsWith("/crm")) return "CRM";
   if (pathname.startsWith("/portfoy")) return "PORTFÖY";
   if (pathname.startsWith("/forum") || pathname.startsWith("/network")) {
-    return "FORUM";
+    return "TALEP MERKEZİ";
   }
   if (pathname.startsWith("/havuz")) return "HAVUZ";
   if (pathname.startsWith("/messages")) return "MESAJLAR";
@@ -56,6 +61,7 @@ function getTitle(pathname: string) {
   if (pathname.startsWith("/notification-settings")) return "BİLDİRİMLER";
   if (pathname.startsWith("/admin")) return "ADMİN";
   if (pathname.startsWith("/market")) return "MARKET";
+  if (pathname.startsWith("/lina-firsatlari")) return "LİNA FIRSATLARI";
   if (pathname.startsWith("/lina")) return "LİNA";
   if (pathname.startsWith("/proje-satis-sablonu")) return "PROJE SATIŞ";
 
@@ -63,6 +69,7 @@ function getTitle(pathname: string) {
 }
 
 function shouldShowShell(pathname: string) {
+  if (["/hakkimizda", "/odeme/kosullar", "/teslimat-ve-iade", "/mesafeli-satis-sozlesmesi"].some((route) => pathname === route || pathname.startsWith(`${route}/`))) return false;
   if (pathname === "/") return false;
   if (pathname.startsWith("/giris")) return false;
   if (pathname.startsWith("/kayit")) return false;
@@ -74,6 +81,9 @@ function shouldShowShell(pathname: string) {
   if (pathname.startsWith("/paylasim")) return false;
   if (pathname.startsWith("/talep-paylasim")) return false;
   if (pathname.startsWith("/portfoy-paylasim")) return false;
+  if (pathname.startsWith("/proje-sunum")) return false;
+  if (["/mobil-uygulama", "/ucretlendirme", "/sifremi-unuttum"].includes(pathname)) return false;
+  if (pathname.startsWith("/verify-authority/")) return false;
 
   return true;
 }
@@ -152,6 +162,12 @@ function canUseProjectSales(role?: string | null) {
   );
 }
 
+function canUseAdminTools(role?: string | null) {
+  const normalized = String(role || "").toLocaleUpperCase("tr-TR");
+
+  return normalized === "ADMIN" || normalized === "SUPER_ADMIN";
+}
+
 function readConversations(payload: unknown): Conversation[] {
   if (Array.isArray(payload)) {
     return payload as Conversation[];
@@ -190,7 +206,6 @@ export function EPHMobileShell({
   const { user, logout, hasHydrated } = useAuthStore();
 
   const [menuOpen, setMenuOpen] = useState(false);
-  const [showLinaFab, setShowLinaFab] = useState(true);
   const [unreadMessages, setUnreadMessages] = useState(0);
 
   const showShell = shouldShowShell(pathname);
@@ -237,21 +252,6 @@ export function EPHMobileShell({
       window.visualViewport?.removeEventListener("scroll", setViewportVars);
     };
   }, []);
-
-  useEffect(() => {
-    if (pathname.startsWith("/lina")) {
-      setShowLinaFab(false);
-      return;
-    }
-
-    setShowLinaFab(true);
-
-    const timer = window.setTimeout(() => {
-      setShowLinaFab(false);
-    }, 5000);
-
-    return () => window.clearTimeout(timer);
-  }, [pathname]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -365,10 +365,6 @@ export function EPHMobileShell({
     )}`;
   };
 
-  const comingSoon = (message: string) => {
-    alert(message);
-  };
-
   const handleLogout = () => {
     setMenuOpen(false);
     logout();
@@ -404,7 +400,7 @@ export function EPHMobileShell({
             }
             onClick={() => router.push("/messages")}
           >
-            <Bell size={24} strokeWidth={2.35} />
+            <Mail size={24} strokeWidth={2.35} />
             {unreadBadge && <span>{unreadBadge}</span>}
           </button>
 
@@ -485,7 +481,7 @@ export function EPHMobileShell({
                 />
                 <MenuRow
                   icon={<MessageSquare size={17} />}
-                  label="Forum"
+                  label="Talep Merkezi"
                   onClick={() => go("/network")}
                 />
                 <MenuRow
@@ -499,6 +495,14 @@ export function EPHMobileShell({
                   badge={unreadBadge}
                   onClick={() => go("/messages")}
                 />
+
+                {canUseAdminTools(user?.role) && (
+                  <MenuRow
+                    icon={<Settings size={17} />}
+                    label="Yönetim Paneli"
+                    onClick={() => go("/admin")}
+                  />
+                )}
               </MenuSection>
 
               <MenuSection title="Lina">
@@ -510,11 +514,7 @@ export function EPHMobileShell({
                 <MenuRow
                   icon={<Sparkles size={17} />}
                   label="Lina Fırsatları"
-                  onClick={() =>
-                    comingSoon(
-                      "Lina Fırsatları ekranını sıradaki adımda açacağız.",
-                    )
-                  }
+                  onClick={() => go("/lina-firsatlari")}
                 />
               </MenuSection>
 
@@ -536,13 +536,13 @@ export function EPHMobileShell({
                   label="Market"
                   onClick={() => go("/ucretlendirme")}
                 />
-                <MenuRow
-                  icon={<Star size={17} />}
-                  label="Duyurular"
-                  onClick={() =>
-                    comingSoon("Duyurular bölümü yakında aktif olacak.")
-                  }
-                />
+                {canUseAdminTools(user?.role) && (
+                  <MenuRow
+                    icon={<Star size={17} />}
+                    label="Duyurular"
+                    onClick={() => go("/admin/announcements")}
+                  />
+                )}
               </MenuSection>
 
               <MenuSection title="Geri Bildirim">
@@ -551,11 +551,13 @@ export function EPHMobileShell({
                   label="Öneri Gönder"
                   onClick={() => feedbackMail("EPH Öneri")}
                 />
-                <MenuRow
-                  icon={<UsersRound size={17} />}
-                  label="Davet Et ve Kazan"
-                  onClick={() => go("/admin/referrals")}
-                />
+                {canUseAdminTools(user?.role) && (
+                  <MenuRow
+                    icon={<UsersRound size={17} />}
+                    label="Referans Kodları"
+                    onClick={() => go("/admin/referrals")}
+                  />
+                )}
                 <MenuRow
                   icon={<AlertTriangle size={17} />}
                   label="Sorun Bildir / Şikayet"
@@ -564,6 +566,11 @@ export function EPHMobileShell({
               </MenuSection>
 
               <MenuSection title="Hesap">
+                <MenuRow
+                  icon={<Building2 size={17} />}
+                  label="Ofisim"
+                  onClick={() => go("/ofisim")}
+                />
                 <MenuRow
                   icon={<User size={17} />}
                   label="Profil"
@@ -600,18 +607,6 @@ export function EPHMobileShell({
       >
         {children}
       </main>
-
-      {!pathname.startsWith("/lina") && showLinaFab && (
-        <button
-          type="button"
-          className="eph-mobile-lina-fab"
-          onClick={openLina}
-          aria-label="Lina"
-        >
-          <span className="eph-mobile-lina-star">✦</span>
-          <span>Lina</span>
-        </button>
-      )}
 
       {showBottomNav && <EPHMobileBottomNav pathname={pathname} />}
     </div>
@@ -697,7 +692,7 @@ function EPHMobileBottomNav({ pathname }: { pathname: string }) {
           pathname.startsWith("/forum")
         }
         icon={<MessageSquare size={25} strokeWidth={2.35} />}
-        label="Forum"
+        label="Talep Merkezi"
       />
       <BottomItem
         href="/havuz"

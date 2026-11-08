@@ -30,6 +30,10 @@ datasource db {
 }
 
 model User {
+  ofisDenemeKayitlari OfisDenemeKaydi[] @relation("OfisDenemeSahibi")
+  contractsCreated DigitalContract[] @relation("ContractCreator")
+  viewingRequests SisterViewingRequest[] @relation("ViewingRequester")
+  viewingDecisions SisterViewingRequest[] @relation("ViewingDecider")
   id                             String                          @id @default(uuid())
   email                          String?                         @unique
   phone                          String                          @unique
@@ -66,11 +70,13 @@ model User {
   city                           String?
   cityPlateCode                  String?
   district                       String?
+  neighborhood                   String?
   taxNumber                      String?
   taxOffice                      String?
   companyName                    String?
   professionalDocumentNumber     String?
   hesapTuru                      KullaniciHesapTuru              @default(GERCEK)
+  storeAccountToken              String?                         @unique
   pilotKullaniciMi               Boolean                         @default(false)
   officeId                       String?
   activities                     Activity[]
@@ -135,6 +141,9 @@ model User {
   portfolioCreditLots PortfolioCreditLot[]
   paymentOrders       PaymentOrder[]
   paymentSettlements  PaymentSettlement[]
+  storeSubscriptions  StoreSubscription[]
+  potentialUnitsCreated PotentialUnit[] @relation("PotentialUnitCreator")
+  potentialUnitsAssigned PotentialUnit[] @relation("PotentialUnitAssignee")
 
   @@index([officeId])
 }
@@ -187,8 +196,16 @@ model Office {
   users        User[]   @relation("OfficeUsers")
   sisterLinksA        OfficeSisterLink[]         @relation("SisterLinkA")
   sisterLinksB        OfficeSisterLink[]         @relation("SisterLinkB")
+  viewingRequestsOwned SisterViewingRequest[] @relation("ViewingOwnerOffice")
+  contracts           DigitalContract[]
+  viewingRequestsMade SisterViewingRequest[] @relation("ViewingRequesterOffice")
   sisterRequestsOwned SisterPrivateInfoRequest[] @relation("SisterRequestOwner")
   sisterRequestsMade  SisterPrivateInfoRequest[] @relation("SisterRequestRequester")
+  potentialUnits      PotentialUnit[]
+  ofisAbonelikleri    OfisAbonelik[]
+  ofisEklentileri     OfisEklenti[]
+  ofisHakDonemleri    OfisHakDonemi[]
+  ofisDenemeKaydi     OfisDenemeKaydi?
 
   @@index([ownerUserId])
   @@index([city, district])
@@ -823,6 +840,8 @@ model Unit {
   parselNo               String?
   hiddenFromOffice       Boolean                      @default(false)
   sharedWithSisters      Boolean                      @default(false)
+  contracts              DigitalContract[]
+  viewingRequests        SisterViewingRequest[]
   sisterRequests         SisterPrivateInfoRequest[]
   customerProperties     CustomerProperty[]
   authorityLetters       EPHAuthorityLetter[]
@@ -836,6 +855,7 @@ model Unit {
   batchItems             ProjectInventoryBatchItem[]
   images                 UnitImage[]
   poolAudience           PoolAudienceUnit?
+  potentialUnits         PotentialUnit[]
 
   @@unique([projectId, inventoryCode])
   @@unique([projectId, externalRef])
@@ -1373,13 +1393,14 @@ model Task {
 }
 
 model UserVisit {
-  id        String   @id @default(uuid())
-  userId    String?
-  page      String
-  ip        String?
-  userAgent String?
-  createdAt DateTime @default(now())
-  user      User?    @relation(fields: [userId], references: [id])
+  id              String   @id @default(uuid())
+  userId          String?
+  page            String
+  durationSeconds Int      @default(0)
+  ip              String?
+  userAgent       String?
+  createdAt       DateTime @default(now())
+  user            User?    @relation(fields: [userId], references: [id])
 }
 
 model Conversation {
@@ -1387,6 +1408,10 @@ model Conversation {
   postId                  String?
   title                   String
   status                  ConversationStatus        @default(ACTIVE)
+  subjectType             String?
+  subjectId               String?
+  subjectTitle            String?
+  dealStatus              String?                   @default("ACTIVE")
   createdAt               DateTime                  @default(now())
   updatedAt               DateTime
   NetworkPost             NetworkPost?              @relation(fields: [postId], references: [id])
@@ -1647,6 +1672,7 @@ model UyelikPaketi {
   guncellenmeTarihi DateTime @updatedAt
 
   paymentOrders PaymentOrder[]
+  storeProducts StoreProduct[]
 
   @@unique([paketKodu, segment])
   @@index([paketKodu])
@@ -1663,12 +1689,15 @@ model KullaniciUyelikPaketi {
   bitisTarihi       DateTime?
   pilotPaketMi      Boolean      @default(false)
   testPaketiMi      Boolean      @default(false)
+  kaynakKanal       PaymentChannel?
+  otomatikYenileme  Boolean?
   notlar            String?
   olusturulmaTarihi DateTime     @default(now())
   guncellenmeTarihi DateTime     @updatedAt
 
   portfolioCreditLots PortfolioCreditLot[]
   paymentSettlements  PaymentSettlement[]
+  storeSubscriptions  StoreSubscription[]
 
   @@index([kullaniciId])
   @@index([paketId])
@@ -3203,6 +3232,7 @@ enum ProfessionalVerificationStatus {
 enum Role {
   ADAY
   EMLAKCI
+  OFIS_BOY
   MUTEAHHIT
   INSAAT_FIRMASI
   ADMIN
@@ -3796,6 +3826,7 @@ enum UyelikPaketKodu {
   ALTIN
   PLATINUM
   UCRETSIZ
+  SOLO
 }
 
 enum UyelikDurumu {
@@ -4058,6 +4089,24 @@ enum UyelikPaketSegmenti {
   MUTEAHHIT
 }
 
+/// EPH-70B1F/D5: bir harcama hareketinin hangi lottan kaç PK aldığı (iade bu kayıttan geri alınır).
+model PortfolioCreditLotTuketim {
+  id                String   @id @default(uuid())
+  kullaniciId       String
+  hareketId         String
+  lotId             String
+  miktar            Int
+  iadeEdilen        Int      @default(0)
+  olusturulmaTarihi DateTime @default(now())
+
+  lot PortfolioCreditLot @relation(fields: [lotId], references: [id], onDelete: Cascade)
+
+  @@unique([hareketId, lotId])
+  @@index([kullaniciId])
+  @@index([hareketId])
+  @@index([lotId])
+}
+
 enum PortfolioCreditLotTuru {
   PAKET
   DEVIR
@@ -4073,6 +4122,8 @@ enum PaymentOrderPurpose {
   MEMBERSHIP_RENEWAL
   MEMBERSHIP_UPGRADE
   PK_PURCHASE
+  OFFICE_PACKAGE
+  OFFICE_ADDON
 }
 
 enum PaymentOrderStatus {
@@ -4141,6 +4192,7 @@ model PortfolioCreditLot {
   uyelik       KullaniciUyelikPaketi? @relation(fields: [uyelikId], references: [id], onDelete: SetNull)
   paymentOrder PaymentOrder?          @relation(fields: [paymentOrderId], references: [id], onDelete: SetNull)
   settlements  PaymentSettlement[]
+  tuketimler   PortfolioCreditLotTuketim[]
 
   @@index([kullaniciId])
   @@index([lotTuru])
@@ -4184,6 +4236,13 @@ model PaymentOrder {
   metadata          Json?
   expiresAt         DateTime?
   paidAt            DateTime?
+  kanal             PaymentChannel      @default(IYZICO)
+  ortam             PaymentEnvironment  @default(LIVE)
+  // EPH-70B2: ofis paketi/eklenti siparişi hedefi (nullable; eski siparişler etkilenmez)
+  hedefOfficeId     String?
+  hakSahibiUserId   String?
+  hedefOfisPaketKodu String?
+  hedefEklenti      Json?
   olusturulmaTarihi DateTime            @default(now())
   guncellenmeTarihi DateTime            @updatedAt
 
@@ -4194,11 +4253,14 @@ model PaymentOrder {
   refunds      PaymentRefund[]
   creditLots   PortfolioCreditLot[]
   settlement   PaymentSettlement?
+  storeGrants  StoreEntitlementGrant[]
 
   @@index([kullaniciId])
   @@index([amac])
   @@index([durum])
   @@index([hedefPaketId])
+  @@index([kanal])
+  @@index([ortam])
   @@index([olusturulmaTarihi])
 }
 
@@ -4249,6 +4311,7 @@ model PaymentTransaction {
   @@index([attemptId])
   @@index([providerId])
   @@index([providerTransactionId])
+  @@unique([providerId, providerTransactionId, islemTuru])
   @@index([durum])
 }
 
@@ -4318,6 +4381,131 @@ model PaymentSettlement {
   @@index([portfolioCreditLotId])
 }
 
+// ============================================================
+// ODM-2: MAĞAZA ÖDEMELERİ (App Store / Google Play)
+// ============================================================
+
+enum PaymentChannel {
+  IYZICO
+  APPLE
+  GOOGLE
+  ADMIN
+  DENEME
+}
+
+enum PaymentEnvironment {
+  LIVE
+  TEST
+}
+
+enum StorePlatform {
+  APPLE
+  GOOGLE
+}
+
+enum StoreProductKind {
+  UYELIK
+  EK_KULLANICI
+  OFIS_BOY
+  PK
+}
+
+enum StoreProductSegment {
+  OFFICE
+  MUTEAHHIT
+}
+
+enum StoreSubscriptionStatus {
+  ACTIVE
+  GRACE
+  BILLING_RETRY
+  ON_HOLD
+  EXPIRED
+  CANCELED
+  REVOKED
+}
+
+// Paket <-> mağaza ürün kimliği eşlemesi (ODM-2R: paket modeli EPH_ODEME_SISTEMI.md §12-§13).
+// Kimlik bir kez açılınca değişmez; paket değişirse yeni satır (surum+1), eskisi aktifMi=false.
+// UYELIK: segment (OFFICE|MUTEAHHIT) + paketKodu. OFFICE paketKodu = OFFICE_MEMBERSHIP_PACKAGES ayarındaki
+// kod (SOLO dahil; bu yüzden enum değil metin). MUTEAHHIT paketKodu = UyelikPaketKodu değeri.
+// EK_KULLANICI: kisiSayisi. OFIS_BOY: ek alan yok. PK: pkUrunKodu (EPH_PAYMENT_SETTINGS_V1.pkProducts[].code).
+// Ek kısıtlar migration'daki CHECK'lerdedir.
+model StoreProduct {
+  id                  String               @id @default(uuid())
+  platform            StorePlatform
+  urunTuru            StoreProductKind
+  segment             StoreProductSegment?
+  paketKodu           String?
+  uyelikPaketiId      String?
+  kisiSayisi          Int?
+  pkUrunKodu          String?
+  urunAnahtari        String
+  surum               Int                  @default(1)
+  magazaUrunKimligi   String
+  googleBasePlanKimligi String?
+  aktifMi             Boolean              @default(true)
+  olusturulmaTarihi   DateTime             @default(now())
+  guncellenmeTarihi   DateTime             @updatedAt
+
+  uyelikPaketi UyelikPaketi? @relation(fields: [uyelikPaketiId], references: [id], onDelete: Restrict)
+
+  @@unique([platform, magazaUrunKimligi])
+  @@unique([platform, urunAnahtari, surum])
+  @@index([urunTuru])
+  @@index([uyelikPaketiId])
+  @@index([aktifMi])
+}
+
+// Mağaza hak verme anahtarı (ODM-2R2). Bir mağaza işlemi (Apple transactionId / Google orderId) EN FAZLA BİR KEZ hak verir.
+// magazaIslemKimligi zorunlu (NOT NULL) ve (platform, magazaIslemKimligi) tekil. NULL'a izin yoktur.
+// Servis kuralı (ODM-3/4'te kodlanır): anahtar satırı eklenmesi (INSERT; tekillik ihlali = zaten işlendi) ile hak yazımı
+// AYNI veritabanı transaction'ında yapılır; biri başarısızsa ikisi de geri alınır.
+// PaymentTransaction tekilliği (providerId, providerTransactionId, islemTuru) iyzico için kalır; mağaza hakkının koruması bu tablodadır.
+model StoreEntitlementGrant {
+  id                String        @id @default(uuid())
+  platform          StorePlatform
+  magazaIslemKimligi String
+  orderId           String
+  abonelikKimligi   String?
+  olusturulmaTarihi DateTime      @default(now())
+
+  order PaymentOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@unique([platform, magazaIslemKimligi])
+  @@index([orderId])
+  @@index([abonelikKimligi])
+}
+
+// Mağaza abonelik durumu. abonelikKimligi: Apple originalTransactionId / Google purchaseToken.
+model StoreSubscription {
+  id                  String                  @id @default(uuid())
+  platform            StorePlatform
+  abonelikKimligi     String
+  kullaniciId         String
+  uyelikId            String?
+  magazaUrunKimligi   String
+  durum               StoreSubscriptionStatus @default(ACTIVE)
+  otomatikYenileme    Boolean                 @default(true)
+  bitisTarihi         DateTime?
+  graceBitis          DateTime?
+  sonBildirimAt       DateTime?
+  ortam               PaymentEnvironment      @default(LIVE)
+  oncekiAbonelikKimligi String?
+  olusturulmaTarihi   DateTime                @default(now())
+  guncellenmeTarihi   DateTime                @updatedAt
+
+  kullanici User                   @relation(fields: [kullaniciId], references: [id], onDelete: Restrict)
+  uyelik    KullaniciUyelikPaketi? @relation(fields: [uyelikId], references: [id], onDelete: SetNull)
+
+  @@unique([platform, abonelikKimligi])
+  @@index([kullaniciId])
+  @@index([uyelikId])
+  @@index([durum])
+  @@index([bitisTarihi])
+}
+
+
 
 model AdminEmailSetting {
   id        String   @id @default("main")
@@ -4368,4 +4556,268 @@ model LinaTaslak {
 
   @@index([kullaniciId, durum])
   @@index([gecerlilikTarihi])
+}
+
+model SisterViewingRequest {
+  id                String              @id @default(uuid())
+  unitId            String
+  ownerOfficeId     String
+  requesterOfficeId String
+  requesterUserId   String
+  scheduledAt       DateTime
+  note              String              @default("")
+  status            SisterRequestStatus @default(BEKLIYOR)
+  decidedByUserId   String?
+  decidedAt         DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  unit              Unit                @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  ownerOffice       Office              @relation("ViewingOwnerOffice", fields: [ownerOfficeId], references: [id], onDelete: Cascade)
+  requesterOffice   Office              @relation("ViewingRequesterOffice", fields: [requesterOfficeId], references: [id], onDelete: Cascade)
+  requester         User                @relation("ViewingRequester", fields: [requesterUserId], references: [id], onDelete: Cascade)
+  decidedBy         User?               @relation("ViewingDecider", fields: [decidedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([unitId, requesterUserId, scheduledAt])
+  @@index([ownerOfficeId, status, createdAt])
+  @@index([requesterOfficeId, createdAt])
+  @@index([requesterUserId])
+  @@index([decidedByUserId])
+}
+
+
+enum DigitalContractType {
+  YER_GOSTERME
+  REFERRAL_PASLASMA
+}
+
+enum DigitalContractStatus {
+  TASLAK
+  ONAYA_GONDERILDI
+  SMS_ONAYLANDI
+  E_IMZALANDI
+  ONAYLANDI
+  ARSIVLENDI
+  UYUSMAZLIK
+  IPTAL
+}
+
+model DigitalContract {
+  id                    String                @id @default(uuid())
+  officeId              String?
+  contractType          DigitalContractType
+  status                DigitalContractStatus @default(TASLAK)
+  title                 String
+  unitId                String?
+  demandId              String?
+  createdById           String
+  secondPartyUserId     String?
+  secondPartyOfficeId   String?
+  clientFullName        String?
+  clientPhone           String?
+  clientTcNo           String?
+  commissionSplitRatio  String?               @default("%50 - %50")
+  termsNote             String?
+  smsOtpCode            String?
+  smsSentAt             DateTime?
+  smsVerifiedAt         DateTime?
+  signedAt              DateTime?
+  disputeNote           String?
+  version               Int                   @default(1)
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  createdBy             User                  @relation("ContractCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  unit                  Unit?                 @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  office                Office?               @relation(fields: [officeId], references: [id], onDelete: SetNull)
+
+  @@index([officeId, status])
+  @@index([createdById])
+  @@index([unitId])
+  @@index([contractType, status])
+}
+
+
+enum PotentialUnitType {
+  SATILIK
+  KIRALIK
+}
+
+enum PotentialUnitSource {
+  SAHIBINDEN
+  EMLAKCI
+  DIGER
+}
+
+enum PotentialUnitStatus {
+  YENI
+  ARANDI_ULASILAMADI
+  TAKIPTE
+  YETKI_ALINDI
+  IPTAL_PASIF
+  DONUSTURULDU
+}
+
+model PotentialUnit {
+  id               String               @id @default(uuid())
+  officeId         String
+  createdById      String
+  assignedUserId   String?
+  convertedUnitId  String?
+  type             PotentialUnitType    @default(SATILIK)
+  sourceType       PotentialUnitSource  @default(SAHIBINDEN)
+  contactPhone     String?
+  contactName      String?
+  photos           String[]             @default([])
+  latitude         Float
+  longitude        Float
+  city             String?
+  district         String?
+  neighborhood     String?
+  street           String?
+  buildingNo       String?
+  formattedAddress String?
+  addressNotes     String?
+  description      String?
+  status           PotentialUnitStatus  @default(YENI)
+  statusNote       String?
+  hunterPoints     Int                  @default(10)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  office           Office               @relation(fields: [officeId], references: [id], onDelete: Cascade)
+  createdBy        User                 @relation("PotentialUnitCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  assignedUser     User?                @relation("PotentialUnitAssignee", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  convertedUnit    Unit?                @relation(fields: [convertedUnitId], references: [id], onDelete: SetNull)
+
+  @@index([officeId, status])
+  @@index([createdById])
+  @@index([assignedUserId])
+  @@index([city, district])
+  @@index([createdAt])
+}
+
+
+// ============================================================
+// EPH-70B2: OFİS PAKET MODELİ (EPH_ODEME_SISTEMI.md §12-13, plan v2 B3) — ÇALIŞTIRILMADI
+// Kısmi UNIQUE indeksler ve CHECK'ler Prisma ifade edemez; yalnız migration SQL'indedir
+// (20261109000100_eph70b2_b_ofis_paket_modeli, 20261109000200+_idx_*).
+// ============================================================
+
+enum OfisAbonelikDurumu {
+  AKTIF
+  GRACE
+  SURESI_DOLDU
+  IPTAL
+}
+
+enum OfisEklentiTuru {
+  EK_KULLANICI
+  OFIS_BOY
+}
+
+enum OfisSureTuru {
+  DONEMLI
+  SURESIZ_OZEL
+}
+
+model OfisAbonelik {
+  id                     String             @id @default(uuid())
+  officeId               String
+  paketKodu              String
+  durum                  OfisAbonelikDurumu @default(AKTIF)
+  sureTuru               OfisSureTuru       @default(DONEMLI)
+  baslangicTarihi        DateTime
+  bitisTarihi            DateTime?
+  kaynakKanal            PaymentChannel?
+  kaynakAbonelikAnahtari String?
+  storeSubscriptionId    String?
+  paymentOrderId         String?
+  uyelikId               String?
+  otomatikYenileme       Boolean?
+  hakSnapshot            Json?
+  snapshotBitis          DateTime?
+  ayarSurumu             String?
+  metadata               Json?
+  olusturulmaTarihi      DateTime           @default(now())
+  guncellenmeTarihi      DateTime           @updatedAt
+
+  office   Office        @relation(fields: [officeId], references: [id], onDelete: Restrict)
+  eklentiler OfisEklenti[]
+
+  @@unique([officeId, id])
+  @@index([officeId])
+}
+
+model OfisEklenti {
+  id                     String             @id @default(uuid())
+  officeId               String
+  ofisAboneligiId        String
+  tur                    OfisEklentiTuru
+  adet                   Int
+  durum                  OfisAbonelikDurumu @default(AKTIF)
+  kaynakKanal            PaymentChannel
+  kaynakAbonelikAnahtari String
+  storeSubscriptionId    String?
+  paymentOrderId         String?
+  magazaUrunKimligi      String?
+  baslangicTarihi        DateTime
+  bitisTarihi            DateTime
+  olusturulmaTarihi      DateTime           @default(now())
+
+  office  Office       @relation(fields: [officeId], references: [id], onDelete: Restrict)
+  abonelik OfisAbonelik @relation(fields: [officeId, ofisAboneligiId], references: [officeId, id], onDelete: Cascade)
+
+  @@unique([kaynakKanal, kaynakAbonelikAnahtari])
+  @@index([ofisAboneligiId])
+}
+
+model OfisHakDonemi {
+  id                   String   @id @default(uuid())
+  officeId             String
+  kaynakTur            String
+  kaynakId             String
+  hakTuru              String
+  donemBaslangic       DateTime
+  donemBitis           DateTime
+  verilenPk            Int
+  portfolioCreditLotId String?
+  paymentSettlementId  String?
+  iptalTarihi          DateTime?
+
+  office Office @relation(fields: [officeId], references: [id], onDelete: Restrict)
+
+  @@unique([kaynakTur, kaynakId, hakTuru, donemBaslangic])
+  @@index([officeId, kaynakId])
+}
+
+model OfisDenemeKaydi {
+  id             String    @id @default(uuid())
+  officeId       String    @unique
+  ownerUserId    String
+  telefonHash    String?   @unique
+  kaynak         String    @default("YENI")
+  baslangicTarihi DateTime
+  bitisTarihi    DateTime
+  verilenPk      Int
+  silinenPk      Int?
+  sonlandiTarihi DateTime?
+
+  office Office @relation(fields: [officeId], references: [id], onDelete: Restrict)
+  owner  User   @relation("OfisDenemeSahibi", fields: [ownerUserId], references: [id], onDelete: Restrict)
+}
+
+model OfisGecisDefteri {
+  id                String   @id @default(uuid())
+  kaynakAnahtar     String   @unique
+  officeId          String?
+  kullaniciId       String?
+  eskiKod           String?
+  eskiSnapshot      Json?
+  eskiBitis         DateTime?
+  hedefKod          String?
+  durum             String
+  neden             String?
+  olusturulmaTarihi DateTime @default(now())
+
+  @@index([officeId])
 }

@@ -660,7 +660,7 @@ export default function ForumAdvancedFilter<
   return (
     <AdvancedFilterCenter
       open={open}
-      title="Forum Gelişmiş Filtre"
+      title="Talep Merkezi Gelişmiş Filtre"
       subtitle="Talepleri konum, bütçe, aciliyet ve yayın bilgilerine göre süzün."
       sections={sections}
       value={value}

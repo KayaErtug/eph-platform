@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { OFFICE_SETTINGS_FIXTURE } from '../office/office-entitlement.fixture';
 import { Role, PortfolioApprovalStatus } from '@prisma/client';
 import { RolesGuard } from './guards/roles.guard';
 import { ProjectsService } from '../projects/projects.service';
@@ -137,28 +138,60 @@ describe('Team and office dashboard selection', () => {
 });
 
 describe('Office trial accounting', () => {
+  // EPH-70B2: deneme artık OfisDenemeKaydi (ofis + telefon HMAC tekil) + süreli PAKET lotu; ayarlar OFFICE_TRIAL_CONFIG'ten.
+  beforeAll(() => { process.env.TELEFON_HASH_ANAHTARI = 'test-anahtar-en-az-16-karakter'; });
   function setup(owner: string | null = 'owner') {
-    let granted = false;
-    const tx = { $executeRaw: jest.fn().mockResolvedValue(1), systemSetting: { findUnique: jest.fn().mockResolvedValue(null), upsert: jest.fn().mockResolvedValue({}), update: jest.fn().mockResolvedValue({}) }, kontorHareketi: { findFirst: jest.fn(async () => granted ? { id: 'prior' } : null), create: jest.fn(async ({ data }) => { granted = true; return { id: 'movement', ...data }; }) }, kontorCuzdani: { findUnique: jest.fn().mockResolvedValue({ bakiye: 100 }), update: jest.fn().mockResolvedValue({ bakiye: 5100 }) } };
-    const db = { userBlock: { findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]) }, office: { findUnique: jest.fn().mockResolvedValue({ id: 'office', ownerUserId: owner, isActive: true }), findMany: jest.fn().mockResolvedValue([]) }, $transaction: jest.fn(async fn => fn(tx)), systemSetting: { findUnique: jest.fn().mockResolvedValue({ valueJson: [{ code: 'DENEME', monthlyPk: 5000, trialDays: 30 }] }) } };
+    const records: any[] = [];
+    const settings = Object.entries(OFFICE_SETTINGS_FIXTURE).map(([key, valueJson]) => ({ key, valueJson }));
+    const tx = {
+      $executeRaw: jest.fn().mockResolvedValue(1), $queryRaw: jest.fn().mockResolvedValue([{ id: 'w' }]),
+      office: { findUnique: jest.fn().mockResolvedValue({ id: 'office', ownerUserId: owner, isActive: true, name: 'Ofis' }) },
+      systemSetting: { findMany: jest.fn().mockResolvedValue(settings), findUnique: jest.fn().mockResolvedValue(null), upsert: jest.fn().mockResolvedValue({}) },
+      ofisDenemeKaydi: { findUnique: jest.fn(async ({ where }: any) => records.find((r) => (where.officeId ? r.officeId === where.officeId : r.telefonHash === where.telefonHash)) ?? null),
+        create: jest.fn(async ({ data }: any) => { const r = { id: 'trial', ...data }; records.push(r); return r; }) },
+      ofisAbonelik: { findFirst: jest.fn().mockResolvedValue(null) }, ofisEklenti: { findMany: jest.fn().mockResolvedValue([]) },
+      kontorHareketi: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn(async ({ data }: any) => ({ id: 'movement', ...data })) },
+      portfolioCreditLot: { findMany: jest.fn().mockResolvedValue([]), create: jest.fn(async ({ data }: any) => ({ id: 'lot', ...data })) },
+      kontorCuzdani: { upsert: jest.fn().mockResolvedValue({}), findUnique: jest.fn().mockResolvedValue({ id: 'w', bakiye: 100, aktifMi: true }), update: jest.fn().mockResolvedValue({ bakiye: 600 }) },
+    };
+    const db = { userBlock: { findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]) },
+      office: { findUnique: jest.fn().mockResolvedValue({ id: 'office', ownerUserId: owner, isActive: true }), findMany: jest.fn().mockResolvedValue([]) },
+      user: { findUnique: jest.fn().mockResolvedValue({ phone: '+90 532 111 22 33' }) }, $transaction: jest.fn(async (fn: any) => fn(tx)) };
     return { tx, db, service: new OfficeService(db as any) };
   }
-  it('Super credits office owner and records the actual actor', async () => {
+  it('Super credits office owner (Gümüş düzeyi, 500 PK süreli lot) and the actual actor is the caller', async () => {
     const { service, tx } = setup(); const result = await service.startOfficeTrial('super', 'office', Role.SUPER_ADMIN);
-    expect(result).toMatchObject({ beneficiaryUserId: 'owner', balance: 5100, grantedPk: 5000 });
-    expect(tx.kontorHareketi.create.mock.calls[0][0].data).toMatchObject({ kullaniciId: 'owner', olusturanId: 'super', miktar: 5000 });
-    expect(tx.kontorCuzdani.update.mock.calls[0][0].where).toEqual({ kullaniciId: 'owner' });
-    expect(tx.$executeRaw.mock.calls[0][1]).toBe('office-trial:owner');
-    await expect(service.startOfficeTrial('super', 'office', Role.SUPER_ADMIN)).rejects.toThrow(BadRequestException); expect(tx.kontorHareketi.create).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({ beneficiaryUserId: 'owner', balance: 600, grantedPk: 500, trialDays: 14, portfolioCapacity: 300 });
+    expect(tx.ofisDenemeKaydi.create.mock.calls[0][0].data).toMatchObject({ officeId: 'office', ownerUserId: 'owner', kaynak: 'YENI', verilenPk: 500 });
+    expect(tx.ofisDenemeKaydi.create.mock.calls[0][0].data.telefonHash).toMatch(/^[0-9a-f]{64}$/); // ham telefon saklanmaz
+    expect(tx.portfolioCreditLot.create.mock.calls[0][0].data).toMatchObject({ kullaniciId: 'owner', lotTuru: 'PAKET', ilkMiktar: 500, kaynakKayitTuru: 'OFFICE_TRIAL' });
+    expect(tx.portfolioCreditLot.create.mock.calls[0][0].data.sonKullanmaTarihi).toBeInstanceOf(Date);
+    expect(tx.kontorHareketi.create.mock.calls[0][0].data).toMatchObject({ kullaniciId: 'owner', miktar: 500 });
+    expect(tx.kontorCuzdani.update.mock.calls[0][0].where).toEqual({ id: 'w' });
+    await expect(service.startOfficeTrial('super', 'office', Role.SUPER_ADMIN)).rejects.toThrow(); // ofis ikinci deneme alamaz
+    expect(tx.ofisDenemeKaydi.create).toHaveBeenCalledTimes(1);
   });
-  it('normal office owner retains their own trial flow', async () => {
-    const { service, tx } = setup(); await service.startOfficeTrial('owner', 'office', Role.EMLAKCI); expect(tx.kontorHareketi.create.mock.calls[0][0].data).toMatchObject({ kullaniciId: 'owner', olusturanId: 'owner' });
+  it('aynı telefonla başka ofis ikinci deneme alamaz', async () => {
+    const { service, tx } = setup(); await service.startOfficeTrial('owner', 'office', Role.EMLAKCI);
+    tx.ofisDenemeKaydi.findUnique.mockImplementation(async ({ where }: any) => (where.telefonHash ? { id: 'prior' } : null));
+    await expect(service.startOfficeTrial('owner', 'office', Role.EMLAKCI)).rejects.toThrow();
+  });
+  it('TELEFON_HASH_ANAHTARI yoksa deneme açılmaz (sessiz fallback yok)', async () => {
+    const saved = process.env.TELEFON_HASH_ANAHTARI; delete process.env.TELEFON_HASH_ANAHTARI;
+    try { const { service, db } = setup(); await expect(service.startOfficeTrial('owner', 'office', Role.EMLAKCI)).rejects.toThrow(BadRequestException); expect(db.$transaction).not.toHaveBeenCalled(); }
+    finally { process.env.TELEFON_HASH_ANAHTARI = saved; }
   });
   it('outsider, missing actor or unassigned owner cannot receive trial credit', async () => {
     const { service, db } = setup();
     await expect(service.startOfficeTrial('outsider', 'office', Role.EMLAKCI)).rejects.toThrow(ForbiddenException);
     await expect(service.startOfficeTrial('', 'office', Role.SUPER_ADMIN)).rejects.toThrow(ForbiddenException); expect(db.$transaction).not.toHaveBeenCalled();
     const unowned = setup(null); await expect(unowned.service.startOfficeTrial('super', 'office', Role.SUPER_ADMIN)).rejects.toThrow(BadRequestException); expect(unowned.db.$transaction).not.toHaveBeenCalled();
+  });
+  it('purchaseOfficePackage yalnız ADMIN/SÜPER ADMIN (karar 18g); ofis sahibi veya gerekçesiz çağrı reddedilir', async () => {
+    const { service, db } = setup();
+    await expect(service.purchaseOfficePackage('owner', 'office', 'BRONZ', Role.EMLAKCI, 'x')).rejects.toThrow(ForbiddenException);
+    await expect(service.purchaseOfficePackage('admin', 'office', 'BRONZ', Role.ADMIN, '  ')).rejects.toThrow(BadRequestException);
+    expect(db.$transaction).not.toHaveBeenCalled();
   });
   it('Super office list has no actor ownership restriction', async () => {
     const { service, db } = setup(); await service.getMyOffices('super', Role.SUPER_ADMIN); expect(db.office.findMany.mock.calls[0][0].where).toEqual({ isActive: true });

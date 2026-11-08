@@ -249,7 +249,7 @@ export class PoolExperienceService {
               mapAddress: true,
               placeId: true,
               ownerId: true,
-              owner: { select: { role: true, firstName: true, lastName: true, companyName: true, office: { select: { name: true, ownerUserId: true } } } },
+              owner: { select: { id: true, role: true, firstName: true, lastName: true, companyName: true, officeId: true, office: { select: { id: true, name: true, ownerUserId: true } } } },
             },
           },
           images: {
@@ -340,16 +340,23 @@ export class PoolExperienceService {
         ...serializePoolPrivateInfo(
           unit,
           privateInfoUnlocked,
+          false,
+          false,
+          this.isSuperAdmin(user),
         ),
-        privateInfoCost,
+        privateInfoCost: this.isSuperAdmin(user) ? 0 : privateInfoCost,
         price: unit.price,
         priceCurrency: unit.priceCurrency,
-        description: redactPoolDeedOwnerText(unit, unit.description),
+        description: this.isSuperAdmin(user)
+          ? unit.description
+          : redactPoolDeedOwnerText(unit, unit.description),
         phoneCallAllowed: Boolean(
-          unit.allowPhoneCall && String(unit.contactPhone || '').trim(),
+          this.isSuperAdmin(user) ||
+          (unit.allowPhoneCall && String(unit.contactPhone || '').trim()),
         ),
         whatsappAllowed: Boolean(
-          unit.allowWhatsapp && String(unit.whatsappPhone || '').trim(),
+          this.isSuperAdmin(user) ||
+          (unit.allowWhatsapp && String(unit.whatsappPhone || '').trim()),
         ),
         isVerified: unit.isVerified,
         isPoolVisible: unit.isPoolVisible,
@@ -362,18 +369,20 @@ export class PoolExperienceService {
         images: unit.images,
         project: {
           id: unit.project.id,
-          name: redactPoolDeedOwnerText(unit, unit.project.name),
+          name: this.isSuperAdmin(user)
+            ? unit.project.name
+            : redactPoolDeedOwnerText(unit, unit.project.name),
           city: unit.project.city,
           district: unit.project.district,
           neighborhood: unit.project.neighborhood,
-          ...projectLocationFields(unit.project, canSeeProjectPrivate),
-          placeId: canSeeProjectPrivate ? unit.project.placeId : null,
+          ...projectLocationFields(unit.project, canSeeProjectPrivate || this.isSuperAdmin(user)),
+          placeId: (canSeeProjectPrivate || this.isSuperAdmin(user)) ? unit.project.placeId : null,
           ownerRole: unit.project.owner.role,
-          isOwnPortfolio,
+          isOwnPortfolio: isOwnPortfolio || this.isSuperAdmin(user),
           hasLocation,
-          locationUnlocked: canSeeProjectPrivate,
+          locationUnlocked: canSeeProjectPrivate || this.isSuperAdmin(user),
           locationPrecision: hasLocation
-            ? canSeeProjectPrivate
+            ? (canSeeProjectPrivate || this.isSuperAdmin(user))
               ? 'EXACT'
               : 'APPROXIMATE'
             : 'NONE',

@@ -55,7 +55,11 @@ export class UnitsController {
     @Query('type') type?: UnitType,
     @Query('city') city?: string,
     @Query('isOffMarket') isOffMarket?: string,
+    @Query('ownerOnly') ownerOnlyParam?: string,
+    @Query('officeId') officeId?: string,
+    @Query('advisorId') advisorId?: string,
   ) {
+    const isSuper = user?.role === Role.SUPER_ADMIN || user?.role === 'SUPER_ADMIN';
     return this.unitsService.findAll(user, {
       status,
       type,
@@ -66,7 +70,9 @@ export class UnitsController {
           : isOffMarket === 'false'
             ? false
             : undefined,
-      ownerOnly: true,
+      ownerOnly: isSuper ? (ownerOnlyParam === 'true') : true,
+      officeId,
+      advisorId,
     });
   }
 

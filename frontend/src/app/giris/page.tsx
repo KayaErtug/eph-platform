@@ -9,56 +9,74 @@ import {
   Building2,
   CheckCircle2,
   LockKeyhole,
-  Mail,
+  Smartphone,
   ShieldCheck,
   UsersRound,
 } from "lucide-react";
 
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
-import { loginSchema, LoginFormData } from "@/schemas/auth.schema";
+import { paymentReturnPath } from "@/lib/payment-return";
+import { loginSchema, LoginFormData, normalizePhoneForSystem } from "@/schemas/auth.schema";
 
 export default function GirisPage() {
   const router = useRouter();
   const setAuth = useAuthStore((s) => s.setAuth);
   const [serverError, setServerError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [rememberEmail, setRememberEmail] = useState(true);
+  const [rememberLogin, setRememberLogin] = useState(true);
 
   const {
     register,
     handleSubmit,
     setValue,
+    watch,
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
   });
 
-  useEffect(() => {
-    const rememberedEmail = window.localStorage.getItem("eph_remembered_email");
+  const phoneOrEmailValue = watch("phoneOrEmail") || "";
 
-    if (rememberedEmail) {
-      setValue("email", rememberedEmail);
-      setRememberEmail(true);
+  useEffect(() => {
+    const remembered = window.localStorage.getItem("eph_remembered_identifier");
+
+    if (remembered) {
+      setValue("phoneOrEmail", remembered);
+      setRememberLogin(true);
     }
   }, [setValue]);
+
+  const handleIdentifierChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    // Kullanıcı rakamla başlıyorsa telefon formatına dönüştürmeyi dene
+    if (/^\d/.test(val) || val.startsWith("+")) {
+      const normalized = normalizePhoneForSystem(val);
+      setValue("phoneOrEmail", normalized, { shouldValidate: true });
+    } else {
+      setValue("phoneOrEmail", val, { shouldValidate: true });
+    }
+  };
 
   const onSubmit = async (data: LoginFormData) => {
     setLoading(true);
     setServerError("");
 
     try {
-      const response = await api.post("/auth/login", data);
+      const response = await api.post("/auth/login", {
+        phoneOrEmail: data.phoneOrEmail,
+        password: data.password,
+      });
       const result = response.data;
 
-      if (rememberEmail) {
-        window.localStorage.setItem("eph_remembered_email", data.email);
+      if (rememberLogin) {
+        window.localStorage.setItem("eph_remembered_identifier", data.phoneOrEmail);
       } else {
-        window.localStorage.removeItem("eph_remembered_email");
+        window.localStorage.removeItem("eph_remembered_identifier");
       }
 
       setAuth(result.user, result.token);
-      router.push("/dashboard");
+      router.push(paymentReturnPath(new URLSearchParams(window.location.search).get("next")));
     } catch (err: any) {
       const message =
         err?.response?.data?.message ||
@@ -106,7 +124,7 @@ export default function GirisPage() {
           background: #FFFFFF;
         }
         .login-info {
-          background: #0B1F44;
+          background: linear-gradient(145deg, #1E40AF 0%, #1D4ED8 55%, #2563EB 100%);
           color: #FFFFFF;
           padding: 42px;
           display: flex;
@@ -129,7 +147,8 @@ export default function GirisPage() {
         .login-brand-sub {
           margin-top: 2px;
           font-size: 13px;
-          color: rgba(255,255,255,.62);
+          color: #FFFFFF;
+          opacity: 0.95;
         }
         .login-copy { max-width: 480px; }
         .login-label {
@@ -137,12 +156,13 @@ export default function GirisPage() {
           align-items: center;
           gap: 8px;
           margin-bottom: 18px;
-          border: 1px solid rgba(255,255,255,.18);
           border-radius: 999px;
-          padding: 8px 12px;
-          color: rgba(255,255,255,.76);
+          padding: 8px 14px;
+          color: #1E40AF;
+          background: #FFFFFF;
           font-size: 13px;
-          font-weight: 700;
+          font-weight: 900;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.08);
         }
         .login-copy h1 {
           margin: 0;
@@ -150,25 +170,25 @@ export default function GirisPage() {
           line-height: 1.04;
           letter-spacing: -0.055em;
           font-weight: 900;
+          color: #FFFFFF;
         }
         .login-copy p {
           margin: 18px 0 0;
           max-width: 430px;
-          color: rgba(255,255,255,.68);
+          color: #FFFFFF;
           font-size: 16px;
           line-height: 1.65;
         }
         .login-feature-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 12px;
+          gap: 16px;
           margin-top: 32px;
         }
         .login-feature {
-          border: 1px solid rgba(255,255,255,.13);
-          border-radius: 20px;
-          padding: 16px;
-          background: rgba(255,255,255,.05);
+          border: none;
+          padding: 8px 0;
+          background: transparent;
         }
         .login-feature-icon {
           width: 38px;
@@ -177,19 +197,20 @@ export default function GirisPage() {
           align-items: center;
           justify-content: center;
           border-radius: 14px;
-          background: rgba(255,255,255,.10);
+          background: rgba(255,255,255,.22);
           margin-bottom: 12px;
         }
         .login-feature strong {
           display: block;
           font-size: 15px;
           font-weight: 800;
+          color: #FFFFFF;
         }
         .login-feature span {
           display: block;
           margin-top: 5px;
           font-size: 13px;
-          color: rgba(255,255,255,.58);
+          color: #FFFFFF;
           line-height: 1.45;
         }
         .login-footer {
@@ -197,7 +218,7 @@ export default function GirisPage() {
           align-items: center;
           justify-content: space-between;
           gap: 16px;
-          color: rgba(255,255,255,.45);
+          color: #FFFFFF;
           font-size: 13px;
         }
         .login-form-side {
@@ -224,17 +245,19 @@ export default function GirisPage() {
         }
         .login-form-title {
           margin: 0;
-          color: #0B1F44;
+          color: #1E3A8A;
           font-size: 31px;
           line-height: 1.1;
           letter-spacing: -0.04em;
           font-weight: 900;
+          text-align: center;
         }
         .login-form-sub {
           margin: 9px 0 28px;
           color: #64748B;
           font-size: 15px;
           line-height: 1.55;
+          text-align: center;
         }
         .login-field { margin-bottom: 18px; }
         .login-field label {
@@ -266,12 +289,6 @@ export default function GirisPage() {
           width: 17px;
           height: 17px;
           accent-color: #1D4ED8;
-        }
-        .login-remember-hint {
-          color: #94A3B8;
-          font-size: 12px;
-          font-weight: 700;
-          white-space: nowrap;
         }
         .login-forgot-link {
           color: #1D4ED8;
@@ -306,7 +323,7 @@ export default function GirisPage() {
           box-shadow: 0 0 0 4px rgba(29,78,216,.10);
         }
         .login-input::placeholder {
-          color: #94A3B8;
+          color: #64748B;
           font-weight: 500;
         }
         .login-error {
@@ -482,25 +499,27 @@ export default function GirisPage() {
 
               <form onSubmit={handleSubmit(onSubmit)} autoComplete="on">
                 <div className="login-field">
-                  <label htmlFor="email">E-posta adresi</label>
+                  <label htmlFor="phoneOrEmail">Cep Telefonu Numarası veya E-posta</label>
                   <div className="login-input-wrap">
-                    <Mail className="login-input-icon" size={18} />
+                    <Smartphone className="login-input-icon" size={18} />
                     <input
-                      {...register("email")}
-                      id="email"
-                      name="email"
-                      type="email"
-                      inputMode="email"
+                      {...register("phoneOrEmail")}
+                      id="phoneOrEmail"
+                      name="phoneOrEmail"
+                      value={phoneOrEmailValue}
+                      onChange={handleIdentifierChange}
+                      type="text"
+                      inputMode="text"
                       autoComplete="username"
                       autoCapitalize="none"
                       autoCorrect="off"
                       spellCheck={false}
-                      placeholder="ornek@email.com"
+                      placeholder="05XX XXX XX XX veya ornek@email.com"
                       className="login-input"
                     />
                   </div>
-                  {errors.email && (
-                    <p className="login-error">{errors.email.message}</p>
+                  {errors.phoneOrEmail && (
+                    <p className="login-error">{errors.phoneOrEmail.message}</p>
                   )}
                 </div>
 
@@ -526,17 +545,17 @@ export default function GirisPage() {
                 <div className="login-remember-row">
                   <label
                     className="login-remember-label"
-                    htmlFor="rememberEmail"
+                    htmlFor="rememberLogin"
                   >
                     <input
-                      id="rememberEmail"
+                      id="rememberLogin"
                       type="checkbox"
-                      checked={rememberEmail}
+                      checked={rememberLogin}
                       onChange={(event) =>
-                        setRememberEmail(event.target.checked)
+                        setRememberLogin(event.target.checked)
                       }
                     />
-                    E-posta adresimi hatırla
+                    Beni hatırla
                   </label>
                   <Link
                     href="/sifremi-unuttum"

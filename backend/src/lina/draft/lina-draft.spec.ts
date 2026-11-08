@@ -181,17 +181,21 @@ describe("LinaDraftFlowService (kalıcı taslak)", () => {
       Object.entries(where).every(([k, v]) => {
         if (v && typeof v === "object" && "in" in v) return v.in.includes(row[k]);
         if (v && typeof v === "object" && "gt" in v) return row[k] > v.gt;
+        if (v && typeof v === "object" && "equals" in v) return JSON.stringify(row[k]) === JSON.stringify(v.equals);
         return row[k] === v;
       });
-    return {
+    const db: any = {
       rows,
       linaTaslak: {
+        updateMany: async ({ where, data }: any) => { const selected = rows.filter(r => match(r, where)); selected.forEach(r => Object.assign(r, data)); return { count: selected.length }; },
         findFirst: async ({ where }: any) => rows.filter((r) => match(r, where)).slice(-1)[0] ?? null,
         create: async ({ data }: any) => { const r = { id: `t${++n}`, sonSonuc: null, ...data }; rows.push(r); return r; },
         update: async ({ where, data }: any) => { const r = rows.find((x) => x.id === where.id)!; Object.assign(r, data); return r; },
       },
       customer: { findFirst: async () => null },
     };
+    db.$transaction = async (work: any) => { const snapshot = structuredClone(rows); try { return await work(db); } catch (error) { rows.splice(0, rows.length, ...snapshot); throw error; } };
+    return db;
   };
 
   const build = (db: ReturnType<typeof makeDb>, extractions: HamCikarim[], crm: any = {}) => {
@@ -208,7 +212,7 @@ describe("LinaDraftFlowService (kalıcı taslak)", () => {
         }),
       } as never,
       { checkModuleAccess: () => ({ allowed: true }) } as never,
-      crm as never,
+      { refreshInterestMatches: async () => undefined, ...crm } as never,
     );
   };
   const user = { id: "u1", role: "EMLAKCI" };

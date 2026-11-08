@@ -18,6 +18,7 @@ import {
 
 import { CrmService } from '../crm/crm.service';
 import { NetworkService } from '../network/network.service';
+import { lockWalletsOrdered, restoreLots } from '../kontor/wallet-lots';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CoordinationLinkRepository,
@@ -667,9 +668,8 @@ export class CoordinationService {
         orderBy: { olusturulmaTarihi: 'asc' },
       });
 
-      for (const payerId of [...new Set(movements.map(m => m.kullaniciId))].sort()) {
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`wallet:${payerId}`}))`;
-      }
+      // EPH-70B1G/F3: ortak cüzdan kilidi (artan sıra) + atomik dönem sonu kapanışı
+      await lockWalletsOrdered(tx, movements.map(m => m.kullaniciId));
 
         for (const movement of movements) {
         const marker =
@@ -695,14 +695,17 @@ export class CoordinationService {
           continue;
         }
 
+        // EPH-70B1G/F3: yalnız bu hareketin tahsis kayıtlarından geri al; geri yazılamayan pay bakiyeye eklenmez
+        const restore = await restoreLots(tx, movement.kullaniciId, movement.id, movement.miktar);
+        const credit = restore.credit;
         const nextBalance =
-          wallet.bakiye + movement.miktar;
+          wallet.bakiye + credit;
 
         await tx.kontorCuzdani.update({
           where: { kullaniciId: movement.kullaniciId },
           data: {
             bakiye: {
-                increment: movement.miktar,
+                increment: credit,
               },
             toplamHarcama: Math.max(
               0,
@@ -716,11 +719,11 @@ export class CoordinationService {
             kullaniciId: movement.kullaniciId,
             hareketTuru: KontorHareketTuru.IADE,
             islemTuru: movement.islemTuru,
-            miktar: movement.miktar,
+            miktar: credit,
             oncekiBakiye: wallet.bakiye,
             sonrakiBakiye: nextBalance,
             aciklama:
-              `Başarısız koordinasyon işlemi için kontör iadesi. ${marker}`,
+              `Başarısız koordinasyon işlemi için kontör iadesi. ${marker}` + (restore.lost > 0 ? ` (${restore.lost} PK süresi dolmuş/kapanmış lota ait olduğu için geri yazılmadı.)` : ''),
             ilgiliKayitTuru: 'NETWORK_POST',
             ilgiliKayitId: postId,
             olusturanId: userId,

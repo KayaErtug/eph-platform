@@ -137,50 +137,29 @@ const HAVUZ_FEES = [
   },
 ];
 
-const TRIAL_PACKAGES = [
-  {
-    title: "Deneme Paketi",
-    amount: "500 kontör",
-    desc: "Yeni üyeler için platform deneme bakiyesi.",
-    badge: "Hediye",
-  },
-  {
-    title: "Büyüme Paketi",
-    amount: "1.000 kontör",
-    desc: "Aktif havuz kullanımı için talep oluştur.",
-    badge: "Talep",
-  },
-  {
-    title: "Ofis Paketi",
-    amount: "5.000 kontör",
-    desc: "Ekip ve ofis kullanımı için talep oluştur.",
-    badge: "Talep",
-  },
-];
-
 const KATEGORI_LABELS: Record<string, string> = {
   HAVUZ_MESAJ: "Havuz Mesaj",
   HAVUZ_ILGILENIYORUM: "İlgileniyorum",
   HAVUZ_MUSTERIM_VAR: "Müşterim Var",
-  FORUM_ISLEMLERI: "Forum İşlemleri",
-  FORUM_MESAJ: "Forum Mesajı",
-  FORUM_ILGILENIYORUM: "Forum İlgileniyorum",
-  FORUM_YARDIMCI_OLABILIRIM: "Forum Yardımcı Olabilirim",
+  FORUM_ISLEMLERI: "Talep Merkezi İşlemleri",
+  FORUM_MESAJ: "Talep Merkezi Mesajı",
+  FORUM_ILGILENIYORUM: "Talep Merkezi İlgileniyorum",
+  FORUM_YARDIMCI_OLABILIRIM: "Talep Merkezi Yardımcı Olabilirim",
   PORTFOY_ONE_CIKARMA: "Portföy Öne Çıkarma",
   LINA_ISLEMLERI: "Lina İşlemleri",
   DIGER: "Diğer",
 };
 
 const ISLEM_LABELS: Record<string, string> = {
-  FORUM_ACIL_ETIKETI: "Forum Acil Etiketi",
-  FORUM_SABITLEME: "Forum Sabitleme",
-  FORUM_VITRIN: "Forum Vitrin",
+  FORUM_ACIL_ETIKETI: "Talep Merkezi Acil Etiketi",
+  FORUM_SABITLEME: "Talep Merkezi Sabitleme",
+  FORUM_VITRIN: "Talep Merkezi Vitrin",
   HAVUZ_MESAJ: "Havuz Mesaj",
   HAVUZ_ILGILENIYORUM: "İlgileniyorum",
   HAVUZ_ESLESEN_MUSTERIM_VAR: "Müşterim Var",
-  FORUM_MESAJ: "Forum Mesajı",
-  FORUM_ILGILENIYORUM: "Forum İlgileniyorum",
-  FORUM_YARDIMCI_OLABILIRIM: "Forum Yardımcı Olabilirim",
+  FORUM_MESAJ: "Talep Merkezi Mesajı",
+  FORUM_ILGILENIYORUM: "Talep Merkezi İlgileniyorum",
+  FORUM_YARDIMCI_OLABILIRIM: "Talep Merkezi Yardımcı Olabilirim",
   PORTFOY_ONE_CIKARMA: "Portföy Öne Çıkarma",
   LINA_ILAN_ACIKLAMASI: "Lina İlan Açıklaması",
   LINA_ILAN_DUZENLEME: "Lina İlan Düzenleme",
@@ -513,7 +492,7 @@ export default function KontorPage() {
                 <PackageCheck className="mx-auto text-[#2563EB]" size={26} />
                 <h3 className="mt-2 text-[15px] font-black text-[#1F2937]">Aktif paket bulunamadı</h3>
                 <p className="mt-1 text-[12px] font-bold leading-5 text-slate-500">
-                  Paket talebi oluşturabilirsiniz. Ödeme alınmaz, talep Yazılım Ekibi tarafından incelenir.
+                  Üyelik paketlerini ve güncel fiyatlarını Üyelik ekranından inceleyebilirsiniz.
                 </p>
               </div>
             )}
@@ -611,34 +590,10 @@ export default function KontorPage() {
             </div>
           </Panel>
 
-          <Panel title="Paket Talebi" actionText="Ödeme yok">
-            <div className="grid gap-2">
-              {TRIAL_PACKAGES.map((item) => (
-                <article key={item.title} className="rounded-3xl border border-[#C7D6E8] bg-[#F8FAFC] p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <span className="inline-flex rounded-full bg-blue-50 px-2 py-1 text-[10px] font-black text-blue-700">
-                        {item.badge}
-                      </span>
-                      <h3 className="mt-2 text-[14px] font-black text-[#1F2937]">{item.title}</h3>
-                      <p className="mt-1 text-[12px] font-bold leading-5 text-slate-500">{item.desc}</p>
-                    </div>
-                    <span className="shrink-0 rounded-2xl bg-white px-3 py-2 text-center shadow-sm">
-                      <span className="block text-[14px] font-black text-[#2563EB]">{item.amount}</span>
-                    </span>
-                  </div>
-                </article>
-              ))}
-            </div>
-            <Link
-              href="/messages"
-              className="mt-3 flex min-h-[46px] w-full items-center justify-center gap-2 rounded-2xl bg-[#2563EB] px-4 text-[13px] font-black text-white shadow-sm active:scale-[0.98]"
-            >
-              <MessageCircle size={18} /> Paket Talebi Oluştur
-            </Link>
-            <p className="mt-2 text-center text-[11px] font-bold leading-5 text-slate-500">
-              Bu buton ödeme almaz. Talep için mesajlar ekranına yönlendirir.
-            </p>
+          <Panel title="PK Satın Al" actionText="Kartlı ödeme">
+            <p className="text-sm leading-6 text-slate-600">PK paketlerini ve güncel fiyatlarını inceleyin. Ödemeniz doğrulandığında PK bakiyeniz hesabınıza tanımlanır.</p>
+            <Link href="/odeme?tab=pk" className="mt-4 flex min-h-[46px] items-center justify-center gap-2 rounded-2xl bg-[#2563EB] px-4 text-sm font-bold text-white"><WalletCards size={18} /> PK paketlerini incele</Link>
+            <Link href="/odeme" className="mt-3 flex min-h-[44px] items-center justify-center text-sm font-bold text-blue-700">Ödemelerim ve iade taleplerim</Link>
           </Panel>
         </section>
 

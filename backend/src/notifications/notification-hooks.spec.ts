@@ -4,11 +4,12 @@ import { OfficeManagementService } from '../office/office-management.service';
 import { ProjectSalesLaunchService } from '../project-sales/project-sales-launch.service';
 
 function officeFixture() {
+  // ODM-7F-D/N5: hedef alıcılı davet şeması (güncel davet kaydı + hash arama kaydı) gerçek invite() çıktısıyla aynı biçimde kurulur.
+  const inviteHash = createHash('sha256').update('ABCDEF123456').digest('hex');
+  const inviteExpiresAt = new Date(Date.now() + 60000).toISOString();
   let state: Record<string, any> = {
-    EPH_OFFICE_INVITE_office: {
-      hash: createHash('sha256').update('ABCDEF123456').digest('hex'),
-      expiresAt: new Date(Date.now() + 60000).toISOString(),
-    },
+    EPH_OFFICE_INVITE_office_applicant: { hash: inviteHash, expiresAt: inviteExpiresAt, recipientUserId: 'applicant' },
+    [`EPH_OFFICE_CODE_${inviteHash}`]: { officeId: 'office', expiresAt: inviteExpiresAt, recipientUserId: 'applicant' },
   };
   const users: any = {
     applicant: { id: 'applicant', role: Role.EMLAKCI, officeId: null },
@@ -36,6 +37,7 @@ function officeFixture() {
           isActive: true,
           name: 'Ofis',
         }),
+      findFirst: jest.fn().mockResolvedValue(null), // doğrudan ofis kodu/ID eşleşmesi yok -> davet kodu yolu
       count: jest.fn().mockResolvedValue(0),
     },
     team: { findMany: jest.fn().mockResolvedValue([]) },

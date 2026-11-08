@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Res,
   UploadedFile,
   UseGuards,
@@ -17,7 +18,7 @@ import { Response } from 'express';
 import { CrmService } from './crm.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { ActivityType, CustomerPropertyRelation, CustomerStatus } from '@prisma/client';
+import { ActivityType, CustomerPropertyRelation, CustomerStatus, Role } from '@prisma/client';
 
 @Controller('crm')
 @UseGuards(JwtAuthGuard)
@@ -37,13 +38,19 @@ export class CrmController {
   }
 
   @Get('customers')
-  getCustomers(@CurrentUser() user: any) {
-    return this.crmService.getCustomers(user.id, user.role);
+  getCustomers(
+    @CurrentUser() user: any,
+    @Query('officeId') officeId?: string,
+    @Query('advisorId') advisorId?: string,
+  ) {
+    return this.crmService.getCustomers(user.id, user.role, { officeId, advisorId });
   }
 
   @Post('customers')
   createCustomer(@CurrentUser() user: any, @Body() body: any) {
-    return this.crmService.createCustomer(user.id, body);
+    const isSuper = user.role === Role.SUPER_ADMIN || user.role === 'SUPER_ADMIN';
+    const targetUserId = (isSuper && body.ownerId) ? body.ownerId : user.id;
+    return this.crmService.createCustomer(targetUserId, body);
   }
 
   @Get('customers/:id')

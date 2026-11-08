@@ -27,7 +27,8 @@ export class PrivateFilesController {
     @Query('sig') sig: string,
     @Res() res: Response,
   ) {
-    const local = this.storage.local;
+    // Aktif sürücü local değilse (supabase), kota yedeğiyle yerel yazılmış gizli dosyalar için yedek sürücü kullanılır.
+    const local = this.storage.local ?? this.storage.localFallback;
 
     if (!local) {
       throw new NotFoundException();
