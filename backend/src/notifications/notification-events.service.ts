@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { parseCostValue } from '../pricing/commercial-costs';
+import { parseTrialConfig } from '../office/office-entitlement.rules';
 import {
   NotificationInput,
   NotificationsService,
@@ -157,6 +158,17 @@ export class NotificationEventsService {
           OR s."targetType" = 'SEHIRLER' AND (u.city = ANY(s."targetCities") OR u."cityPlateCode" = ANY(s."targetCityPlateCodes"))
           OR s."targetType" = 'SEHIRLER_VE_ROLLER' AND u.role::text = ANY(s."targetRoles")
             AND (u.city = ANY(s."targetCities") OR u."cityPlateCode" = ANY(s."targetCityPlateCodes")))`,
+      Prisma.sql`
+        SELECT t."userId", 'CRM_TASK_DUE' AS type, 'ONEMLI' AS priority,
+          'CRM hatırlatıcınızın zamanı geldi' AS title, t.title AS body,
+          '/crm?customerId=' || t."customerId" AS "actionUrl",
+          'crm-task-due:' || t.id || ':' || t."dueDate"::text AS "eventKey"
+        FROM "Task" t
+        JOIN "Customer" c ON c.id = t."customerId"
+        JOIN "User" u ON u.id = t."userId"
+        WHERE t.status = 'BEKLIYOR' AND t."dueDate" >= ${since}
+          AND t."dueDate" <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+          AND btrim(t.title) <> ''`,
     ];
   }
 
@@ -181,16 +193,27 @@ export class NotificationEventsService {
     while ((await this.publish(source)) === 100) {
       /* Drain all today's recipients in bounded pages. */
     }
-    const offices = Prisma.sql`
-      SELECT o."ownerUserId" AS "userId", 'MEMBERSHIP_EXPIRING' AS type, 'ONEMLI' AS priority,
-        'Ofis üyeliğinizin / denemenizin bitmesine 3 gün kaldı' AS title,
-        'Ofis üyelik durumunuzu uygulamadan kontrol edebilirsiniz.' AS body, '/office' AS "actionUrl",
-        'office-expiry:' || s.key || ':' || (s."valueJson"->>'expiresAt') AS "eventKey"
-      FROM "SystemSetting" s JOIN "Office" o ON o.id = s."valueJson"->>'officeId'
-      WHERE s.key LIKE 'OFFICE_SUBSCRIPTION_%' AND o."isActive" = true AND o."ownerUserId" IS NOT NULL
-        AND s."valueJson"->>'expiresAt' >= ${from.toISOString()} AND s."valueJson"->>'expiresAt' < ${until.toISOString()}`;
-    while ((await this.publish(offices)) === 100) {
-      /* Office packages use SystemSetting, not individual memberships. */
+    // ODM-7G-D: ofis paketi/deneme hatırlatma günleri OFFICE_TRIAL_CONFIG.hatirlatmaGunleri'nden (kodda 3 gün yok); ayar yoksa/bozuksa ofis hatırlatması atlanır (fail-closed).
+    let reminderDays: number[] = [];
+    try {
+      const cfg = await this.prisma.systemSetting.findUnique({ where: { key: 'OFFICE_TRIAL_CONFIG' }, select: { valueJson: true } });
+      reminderDays = parseTrialConfig(cfg?.valueJson).hatirlatmaGunleri;
+    } catch { this.logger.warn('OFFICE_TRIAL_CONFIG okunamadı; ofis paketi hatırlatmaları atlandı.'); }
+    for (const days of [...new Set(reminderDays)].sort((a, b) => b - a)) {
+      const dayFrom = new Date(new Date(localDay + 'T00:00:00+03:00').getTime() + days * 86400000);
+      const dayUntil = new Date(dayFrom.getTime() + 86400000);
+      const offices = Prisma.sql`
+        SELECT o."ownerUserId" AS "userId", 'MEMBERSHIP_EXPIRING' AS type, 'ONEMLI' AS priority,
+          ${`Ofis üyeliğinizin / denemenizin bitmesine ${days} gün kaldı`}::text AS title,
+          'Ofis üyelik durumunuzu uygulamadan kontrol edebilirsiniz.' AS body, '/office' AS "actionUrl",
+          'office-expiry:' || s.key || ':' || (s."valueJson"->>'expiresAt') || ':' || ${String(days)}::text AS "eventKey"
+        FROM "SystemSetting" s JOIN "Office" o ON o.id = s."valueJson"->>'officeId'
+        WHERE s.key LIKE 'OFFICE_SUBSCRIPTION_%' AND o."isActive" = true AND o."ownerUserId" IS NOT NULL
+          AND COALESCE(s."valueJson"->>'ended', 'false') <> 'true'
+          AND s."valueJson"->>'expiresAt' >= ${dayFrom.toISOString()} AND s."valueJson"->>'expiresAt' < ${dayUntil.toISOString()}`;
+      while ((await this.publish(offices)) === 100) {
+        /* Office packages use SystemSetting (derived snapshot), not individual memberships. */
+      }
     }
   }
 }

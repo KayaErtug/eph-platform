@@ -71,6 +71,7 @@ const baseDrawerItems: MenuItem[] = [
   { label: "Profilim", href: "/profil", icon: UserCircle2 },
   { label: "Kontör Cüzdanım", href: "/kontor", icon: WalletCards },
   
+  { label: "Ofisim", href: "/ofisim", icon: WalletCards },
   { label: "Üyeliğim", href: "/uyelik", icon: CreditCard },
   { label: "Ayarlar", href: "/notification-settings", icon: Settings },
   { label: "Yardım Merkezi", href: "/platform-anayasasi", icon: HelpCircle },
@@ -246,20 +247,22 @@ export default function EphAppShell({ title, children }: EphAppShellProps) {
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#F8FAFC] text-[#172033]">
       <header className="sticky top-0 z-50 border-b border-[#DDE7F3] bg-white/95 backdrop-blur-xl">
-        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-2 px-3 py-3 md:px-6 md:py-4">
-          <button
-            type="button"
-            onClick={handleBack}
-            className="flex h-10 min-w-10 items-center justify-center rounded-2xl border border-[#DDE7F3] bg-[#F8FAFC] px-3 text-[#172033] transition hover:bg-white md:h-11 md:min-w-11"
-            aria-label="Geri dön"
-          >
-            <ArrowLeft size={18} />
-            <span className="ml-1 hidden text-xs font-black sm:inline">
-              Geri
-            </span>
-          </button>
+        <div className="mx-auto grid w-full max-w-7xl grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 px-3 py-3 md:px-6 md:py-4">
+          <div className="flex items-center justify-start">
+            <button
+              type="button"
+              onClick={handleBack}
+              className="flex h-11 min-w-11 items-center justify-center rounded-2xl border border-[#DDE7F3] bg-[#F8FAFC] px-3 text-[#172033] transition hover:bg-white"
+              aria-label="Geri dön"
+            >
+              <ArrowLeft size={18} />
+              <span className="ml-1 hidden text-xs font-black sm:inline">
+                Geri
+              </span>
+            </button>
+          </div>
 
-          <div className="min-w-0 flex-1 text-center">
+          <div className="min-w-0 px-2 text-center">
             <div
               className="mx-auto mb-1 hidden w-fit rounded-full border px-3 py-1 text-[11px] font-black md:block"
               style={{
@@ -279,7 +282,7 @@ export default function EphAppShell({ title, children }: EphAppShellProps) {
           <div className="flex shrink-0 items-center justify-end gap-1.5">
             <Link
               href="/kontor"
-              className="hidden h-10 items-center gap-1.5 rounded-2xl border px-2.5 text-[11px] font-black shadow-sm transition hover:bg-white sm:flex md:h-11"
+              className="hidden h-11 items-center gap-1.5 rounded-2xl border px-2.5 text-[11px] font-black shadow-sm transition hover:bg-white sm:flex"
               style={kontorBadgeStyle}
               aria-label="Kontör cüzdanı"
             >
@@ -290,7 +293,7 @@ export default function EphAppShell({ title, children }: EphAppShellProps) {
 
             <Link
               href="/kontor"
-              className="flex h-10 w-10 items-center justify-center rounded-2xl border shadow-sm transition hover:bg-white sm:hidden"
+              className="flex h-11 w-11 items-center justify-center rounded-2xl border shadow-sm transition hover:bg-white sm:hidden"
               style={kontorBadgeStyle}
               aria-label="Kontör cüzdanı"
             >
@@ -304,7 +307,7 @@ export default function EphAppShell({ title, children }: EphAppShellProps) {
 
             <Link
               href="/notification-settings"
-              className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[#DDE7F3] bg-[#F8FAFC] text-[#172033] transition hover:bg-white md:h-11 md:w-11"
+              className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#DDE7F3] bg-[#F8FAFC] text-[#172033] transition hover:bg-white"
               aria-label="Bildirimler"
             >
               <Bell size={18} />
@@ -312,7 +315,7 @@ export default function EphAppShell({ title, children }: EphAppShellProps) {
 
             <Link
               href="/messages"
-              className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[#DDE7F3] bg-[#F8FAFC] text-[#172033] transition hover:bg-white md:h-11 md:w-11"
+              className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#DDE7F3] bg-[#F8FAFC] text-[#172033] transition hover:bg-white"
               aria-label="Mesajlar"
             >
               <MessageCircle size={18} />
@@ -321,7 +324,7 @@ export default function EphAppShell({ title, children }: EphAppShellProps) {
             <button
               type="button"
               onClick={() => setDrawerOpen(true)}
-              className="flex h-10 w-10 items-center justify-center rounded-2xl border text-white shadow-lg transition md:h-11 md:w-11"
+              className="flex h-11 w-11 items-center justify-center rounded-2xl border text-white shadow-lg transition"
               style={{
                 borderColor: theme.primary,
                 backgroundColor: theme.primary,

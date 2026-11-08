@@ -1,0 +1,621 @@
+diff --git a/src/membership/membership-quota.rules.ts b/src/membership/membership-quota.rules.ts
+index efde9b52..a9dd2910 100644
+--- a/src/membership/membership-quota.rules.ts
++++ b/src/membership/membership-quota.rules.ts
+@@ -1,25 +1,29 @@
+ import { BadRequestException } from '@nestjs/common';
+ import { KotaDonemi, Prisma, Role } from '@prisma/client';
++import { resolvePoolAccess } from './pool-access';
+ 
+ export async function consumeMembershipQuota(tx: Prisma.TransactionClient, actorId: string, kind: 'TALEP' | 'HAVUZ') {
+   const actor = await tx.user.findUnique({ where: { id: actorId }, select: { role: true, officeId: true } });
+   if (!actor || actor.role === Role.SUPER_ADMIN) return;
+-  const office = actor.officeId
++  const access = await resolvePoolAccess(tx, { id: actorId, role: actor.role });
++  const office = access.code === 'OFFICE_PACKAGE'
++    ? await tx.office.findUnique({ where: { id: access.officeId }, select: { id: true, ownerUserId: true } })
++    : actor.officeId
+     ? await tx.office.findUnique({ where: { id: actor.officeId }, select: { id: true, ownerUserId: true } })
+     : await tx.office.findFirst({ where: { ownerUserId: actorId, isActive: true }, select: { id: true, ownerUserId: true } });
+   const userId = office?.ownerUserId || actorId;
+   const now = new Date();
+-  const membership = await tx.kullaniciUyelikPaketi.findFirst({
++  const membership = access.code === 'OFFICE_PACKAGE' ? null : await tx.kullaniciUyelikPaketi.findFirst({
+     where: { kullaniciId: userId, durum: 'AKTIF', baslangicTarihi: { lte: now }, OR: [{ bitisTarihi: null }, { bitisTarihi: { gte: now } }] },
+     orderBy: { baslangicTarihi: 'desc' },
+   });
+   const pack = membership ? await tx.uyelikPaketi.findUnique({ where: { id: membership.paketId } }) : null;
+   let limit = kind === 'TALEP' ? pack?.aylikTalepLimiti : pack?.aylikHavuzGonderimLimiti;
+   if (office) {
+-    const sub = await tx.systemSetting.findUnique({ where: { key: `OFFICE_SUBSCRIPTION_${office.id}` } });
+-    const code = (sub?.valueJson as Prisma.JsonObject | null)?.packageCode;
++    const sub = access.code === 'OFFICE_PACKAGE' ? null : await tx.systemSetting.findUnique({ where: { key: `OFFICE_SUBSCRIPTION_${office.id}` } });
++    const code = access.code === 'OFFICE_PACKAGE' ? access.packageCode : (sub?.valueJson as Prisma.JsonObject | null)?.packageCode;
+     const setting = await tx.systemSetting.findUnique({ where: { key: 'OFFICE_MEMBERSHIP_PACKAGES' } });
+-    const officePack = Array.isArray(setting?.valueJson) ? (setting.valueJson as Prisma.JsonObject[]).find((p) => p.code === code) : undefined;
++    const officePack = Array.isArray(setting?.valueJson) ? (setting.valueJson as Prisma.JsonObject[]).find((p) => typeof p?.code === 'string' && p.code.trim().toUpperCase() === String(code || '').trim().toUpperCase()) : undefined;
+     const officeLimit = officePack?.[kind === 'TALEP' ? 'monthlyDemandLimit' : 'monthlyPoolLimit'];
+     if (typeof officeLimit === 'number') limit = officeLimit;
+   }
+diff --git a/src/portfolio-documents/portfolio-documents.service.ts b/src/portfolio-documents/portfolio-documents.service.ts
+index 31923f8d..3b437584 100644
+--- a/src/portfolio-documents/portfolio-documents.service.ts
++++ b/src/portfolio-documents/portfolio-documents.service.ts
+@@ -1,3 +1,4 @@
++import { resolvePoolAccess } from '../membership/pool-access';
+ import {
+   BadRequestException,
+   ForbiddenException,
+@@ -8,7 +9,6 @@ import {
+   PortfolioApprovalStatus,
+   PortfolioAuthorityType,
+   Prisma,
+-  UyelikDurumu,
+ } from '@prisma/client';
+ 
+ import { PrismaService } from '../prisma/prisma.service';
+@@ -810,101 +810,10 @@ export class PortfolioDocumentsService {
+     return 'Doğrulama Evrakı';
+   }
+ 
+-  private async ensurePoolActionMembership(
+-    userId: string,
+-    userRole?: string,
+-  ) {
+-    if (String(userRole || '').toUpperCase() === 'SUPER_ADMIN') {
+-      return;
+-    }
+-
+-    const now = new Date();
+-
+-    const [activeMembership, latestMembership] = await Promise.all([
+-      this.prisma.kullaniciUyelikPaketi.findFirst({
+-        where: {
+-          kullaniciId: userId,
+-          durum: UyelikDurumu.AKTIF,
+-          baslangicTarihi: {
+-            lte: now,
+-          },
+-          OR: [
+-            {
+-              bitisTarihi: null,
+-            },
+-            {
+-              bitisTarihi: {
+-                gte: now,
+-              },
+-            },
+-          ],
+-        },
+-        orderBy: {
+-          baslangicTarihi: 'desc',
+-        },
+-      }),
+-      this.prisma.kullaniciUyelikPaketi.findFirst({
+-        where: {
+-          kullaniciId: userId,
+-        },
+-        orderBy: {
+-          baslangicTarihi: 'desc',
+-        },
+-      }),
+-    ]);
+-
+-    if (!activeMembership) {
+-      if (!latestMembership) {
+-        throw new ForbiddenException(
+-          'Havuz işlemleri için aktif üyelik gereklidir. Üyelik Merkezi üzerinden paket talebi oluşturabilirsiniz.',
+-        );
+-      }
+-
+-      if (
+-        latestMembership.durum === UyelikDurumu.AKTIF &&
+-        latestMembership.baslangicTarihi.getTime() > now.getTime()
+-      ) {
+-        throw new ForbiddenException(
+-          'Üyeliğiniz henüz başlamadığı için Havuz işlemleri kullanılamıyor.',
+-        );
+-      }
+-
+-      if (
+-        latestMembership.durum === UyelikDurumu.SURESI_DOLDU ||
+-        (latestMembership.durum === UyelikDurumu.AKTIF &&
+-          latestMembership.bitisTarihi !== null &&
+-          latestMembership.bitisTarihi.getTime() < now.getTime())
+-      ) {
+-        throw new ForbiddenException(
+-          'Üyelik süreniz dolduğu için Havuz işlemleri kilitlidir. Havuzu görüntülemeye devam edebilirsiniz.',
+-        );
+-      }
+-
+-      if (latestMembership.durum === UyelikDurumu.IPTAL) {
+-        throw new ForbiddenException(
+-          'Üyeliğiniz iptal edildiği için Havuz işlemleri kullanılamıyor.',
+-        );
+-      }
+-
+-      throw new ForbiddenException(
+-        'Üyeliğiniz aktif olmadığı için Havuz işlemleri kullanılamıyor.',
+-      );
+-    }
+-
+-    const membershipPackage = await this.prisma.uyelikPaketi.findUnique({
+-      where: {
+-        id: activeMembership.paketId,
+-      },
+-      select: {
+-        aktifMi: true,
+-      },
+-    });
+-
+-    if (!membershipPackage || !membershipPackage.aktifMi) {
+-      throw new ForbiddenException(
+-        'Üyelik paketiniz aktif olmadığı için Havuz işlemleri kullanılamıyor.',
+-      );
+-    }
++  private async ensurePoolActionMembership(userId: string, userRole?: string) {
++    const access = await resolvePoolAccess(this.prisma, { id: userId, role: userRole });
++    if (!access.allowed) throw new ForbiddenException(access.message);
++    return access;
+   }
+ 
+   // DOCUMENT_AI_ANALYSIS_ENABLED: 1 = açık; kayıt yoksa, 1 değilse veya okunamazsa KAPALI.
+diff --git a/src/units/pool-publication.service.spec.ts b/src/units/pool-publication.service.spec.ts
+index 7d342ffb..83b8389a 100644
+--- a/src/units/pool-publication.service.spec.ts
++++ b/src/units/pool-publication.service.spec.ts
+@@ -55,7 +55,7 @@ function harness() {
+         return data;
+       },
+     },
+-    office: { findFirst: async () => null, findUnique: async () => ({ id: 'office-1', ownerUserId: 'office-owner', isActive: officeActive }) },
++    office: { findMany: async () => officeActive && officeMember ? [{ id: 'office-1' }] : [], findFirst: async () => null, findUnique: async () => ({ id: 'office-1', ownerUserId: 'office-owner', isActive: officeActive }) },
+     user: { findUnique: async () => ({ id: actor.id, role: 'EMLAKCI', officeId: officeMember ? 'office-1' : null }), findFirst: async () => officeMember ? { id: actor.id } : null },
+     systemSetting: { findUnique: async ({ where }: any) => where.key.startsWith('EPH_OFFICE_SPENDING_') ? { valueJson: { mode: officeMode } } : null },
+     poolAudienceGroup: { findMany: async () => [] },
+diff --git a/src/units/pool-publication.service.ts b/src/units/pool-publication.service.ts
+index 1469a220..a22a8c7c 100644
+--- a/src/units/pool-publication.service.ts
++++ b/src/units/pool-publication.service.ts
+@@ -119,7 +119,7 @@ export class PoolPublicationService {
+       let previousBalance = wallet.balance;
+       let remainingBalance = wallet.balance;
+       if (!alreadyPublished) {
+-        await consumeMembershipQuota(tx, wallet.chargeUserId, 'HAVUZ');
++        await consumeMembershipQuota(tx, user.id, 'HAVUZ');
+         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`wallet:${wallet.chargeUserId}`}))`;
+         await tx.$queryRaw`SELECT "id" FROM "KontorCuzdani" WHERE "kullaniciId" = ${wallet.chargeUserId} FOR UPDATE`;
+         const lockedWallet = await tx.kontorCuzdani.findUnique({ where: { kullaniciId: wallet.chargeUserId } });
+diff --git a/src/units/units.service.ts b/src/units/units.service.ts
+index 39c8e672..9df7d0bd 100644
+--- a/src/units/units.service.ts
++++ b/src/units/units.service.ts
+@@ -1,3 +1,4 @@
++import { resolvePoolAccess, type PoolMembershipAccess } from '../membership/pool-access';
+ import { actorPaidWhere, resolveOfficeWallet } from '../office/office-wallet.rules';
+ import { officeProfile, officeProfileKey } from '../office/office-profile';
+ import { TextSafetyService } from '../text-safety/text-safety.service';
+@@ -24,7 +25,6 @@ import {
+   Role,
+   UnitStatus,
+   UnitType,
+-  UyelikDurumu,
+ } from '@prisma/client';
+ import { randomUUID } from 'crypto';
+ 
+@@ -81,25 +81,6 @@ type PoolActionPayload = {
+   note?: string;
+ };
+ 
+-type PoolMembershipAccessCode =
+-  | 'ACTIVE'
+-  | 'SUPER_ADMIN'
+-  | 'NO_MEMBERSHIP'
+-  | 'NOT_STARTED'
+-  | 'EXPIRED'
+-  | 'PASSIVE'
+-  | 'CANCELLED'
+-  | 'PACKAGE_INACTIVE';
+-
+-type PoolMembershipAccess = {
+-  allowed: boolean;
+-  code: PoolMembershipAccessCode;
+-  message: string;
+-  packageCode: string | null;
+-  packageName: string | null;
+-  expiresAt: Date | null;
+-};
+-
+ const unitInclude = {
+   project: {
+     select: {
+@@ -420,154 +401,8 @@ export class UnitsService {
+     return Boolean(user?.id && ownerId && user.id === ownerId);
+   }
+ 
+-  private async getPoolMembershipAccess(
+-    user: CurrentUserPayload,
+-  ): Promise<PoolMembershipAccess> {
+-    if (this.isSuperAdmin(user)) {
+-      return {
+-        allowed: true,
+-        code: 'SUPER_ADMIN',
+-        message: 'Yazılım Ekibi Havuz işlem erişimi aktif.',
+-        packageCode: 'SYSTEM',
+-        packageName: 'Yazılım Ekibi',
+-        expiresAt: null,
+-      };
+-    }
+-
+-    const now = new Date();
+-
+-    const [activeMembership, latestMembership] = await Promise.all([
+-      this.prisma.kullaniciUyelikPaketi.findFirst({
+-        where: {
+-          kullaniciId: user.id,
+-          durum: UyelikDurumu.AKTIF,
+-          baslangicTarihi: {
+-            lte: now,
+-          },
+-          OR: [
+-            {
+-              bitisTarihi: null,
+-            },
+-            {
+-              bitisTarihi: {
+-                gte: now,
+-              },
+-            },
+-          ],
+-        },
+-        orderBy: {
+-          baslangicTarihi: 'desc',
+-        },
+-      }),
+-      this.prisma.kullaniciUyelikPaketi.findFirst({
+-        where: {
+-          kullaniciId: user.id,
+-        },
+-        orderBy: {
+-          baslangicTarihi: 'desc',
+-        },
+-      }),
+-    ]);
+-
+-    if (!activeMembership) {
+-      if (!latestMembership) {
+-        return {
+-          allowed: false,
+-          code: 'NO_MEMBERSHIP',
+-          message:
+-            'Havuz işlemleri için aktif üyelik gereklidir. Üyelik Merkezi üzerinden paket talebi oluşturabilirsiniz.',
+-          packageCode: null,
+-          packageName: null,
+-          expiresAt: null,
+-        };
+-      }
+-
+-      if (
+-        latestMembership.durum === UyelikDurumu.AKTIF &&
+-        latestMembership.baslangicTarihi.getTime() > now.getTime()
+-      ) {
+-        return {
+-          allowed: false,
+-          code: 'NOT_STARTED',
+-          message:
+-            'Üyeliğiniz henüz başlamadığı için Havuz işlemleri kullanılamıyor.',
+-          packageCode: null,
+-          packageName: null,
+-          expiresAt: latestMembership.bitisTarihi,
+-        };
+-      }
+-
+-      if (
+-        latestMembership.durum === UyelikDurumu.SURESI_DOLDU ||
+-        (latestMembership.durum === UyelikDurumu.AKTIF &&
+-          latestMembership.bitisTarihi !== null &&
+-          latestMembership.bitisTarihi.getTime() < now.getTime())
+-      ) {
+-        return {
+-          allowed: false,
+-          code: 'EXPIRED',
+-          message:
+-            'Üyelik süreniz dolduğu için Havuz işlemleri kilitlidir. Havuzu görüntülemeye devam edebilirsiniz.',
+-          packageCode: null,
+-          packageName: null,
+-          expiresAt: latestMembership.bitisTarihi,
+-        };
+-      }
+-
+-      if (latestMembership.durum === UyelikDurumu.IPTAL) {
+-        return {
+-          allowed: false,
+-          code: 'CANCELLED',
+-          message:
+-            'Üyeliğiniz iptal edildiği için Havuz işlemleri kullanılamıyor.',
+-          packageCode: null,
+-          packageName: null,
+-          expiresAt: latestMembership.bitisTarihi,
+-        };
+-      }
+-
+-      return {
+-        allowed: false,
+-        code: 'PASSIVE',
+-        message:
+-          'Üyeliğiniz aktif olmadığı için Havuz işlemleri kullanılamıyor.',
+-        packageCode: null,
+-        packageName: null,
+-        expiresAt: latestMembership.bitisTarihi,
+-      };
+-    }
+-
+-    const membershipPackage = await this.prisma.uyelikPaketi.findUnique({
+-      where: {
+-        id: activeMembership.paketId,
+-      },
+-      select: {
+-        paketKodu: true,
+-        paketAdi: true,
+-        aktifMi: true,
+-      },
+-    });
+-
+-    if (!membershipPackage || !membershipPackage.aktifMi) {
+-      return {
+-        allowed: false,
+-        code: 'PACKAGE_INACTIVE',
+-        message:
+-          'Üyelik paketiniz aktif olmadığı için Havuz işlemleri kullanılamıyor.',
+-        packageCode: membershipPackage?.paketKodu || null,
+-        packageName: membershipPackage?.paketAdi || null,
+-        expiresAt: activeMembership.bitisTarihi,
+-      };
+-    }
+-
+-    return {
+-      allowed: true,
+-      code: 'ACTIVE',
+-      message: 'Havuz işlem erişiminiz aktif.',
+-      packageCode: membershipPackage.paketKodu,
+-      packageName: membershipPackage.paketAdi,
+-      expiresAt: activeMembership.bitisTarihi,
+-    };
++  private getPoolMembershipAccess(user: CurrentUserPayload): Promise<PoolMembershipAccess> {
++    return resolvePoolAccess(this.prisma, user);
+   }
+ 
+   private async ensurePoolActionMembership(user: CurrentUserPayload) {
+diff --git a/src/membership/pool-access.ts b/src/membership/pool-access.ts
+new file mode 100644
+index 0000000..491fbb2
+--- /dev/null
++++ b/src/membership/pool-access.ts
+@@ -0,0 +1,74 @@
++import { Prisma, Role, UyelikDurumu } from '@prisma/client';
++
++type PoolAccessDb = Pick<Prisma.TransactionClient, 'kullaniciUyelikPaketi' | 'uyelikPaketi' | 'user' | 'office' | 'systemSetting'>;
++export type PoolMembershipAccess = {
++  allowed: boolean;
++  code: 'ACTIVE' | 'SUPER_ADMIN' | 'OFFICE_PACKAGE' | 'NO_MEMBERSHIP' | 'NOT_STARTED' | 'EXPIRED' | 'PASSIVE' | 'CANCELLED' | 'PACKAGE_INACTIVE';
++  message: string;
++  packageCode: string | null;
++  packageName: string | null;
++  expiresAt: Date | null;
++  officeId?: string;
++};
++
++const object = (value: Prisma.JsonValue | undefined): Prisma.JsonObject =>
++  value && typeof value === 'object' && !Array.isArray(value) ? value as Prisma.JsonObject : {};
++const text = (value: unknown) => typeof value === 'string' ? value.trim() : '';
++
++// Kişisel üyelik önceliklidir. Ofis aboneliği, kardeş ofis ağı ile aynı SystemSetting kaynağından okunur.
++export async function resolvePoolAccess(db: PoolAccessDb, user: { id: string; role?: Role | string }): Promise<PoolMembershipAccess> {
++  if (String(user.role || '').toUpperCase() === Role.SUPER_ADMIN) {
++    return { allowed: true, code: 'SUPER_ADMIN', message: 'Yazılım Ekibi Havuz işlem erişimi aktif.', packageCode: 'SYSTEM', packageName: 'Yazılım Ekibi', expiresAt: null };
++  }
++  const now = new Date();
++  const [active, latest] = await Promise.all([
++    db.kullaniciUyelikPaketi.findFirst({
++      where: { kullaniciId: user.id, durum: UyelikDurumu.AKTIF, baslangicTarihi: { lte: now }, OR: [{ bitisTarihi: null }, { bitisTarihi: { gte: now } }] },
++      orderBy: { baslangicTarihi: 'desc' },
++    }),
++    db.kullaniciUyelikPaketi.findFirst({ where: { kullaniciId: user.id }, orderBy: { baslangicTarihi: 'desc' } }),
++  ]);
++  const pack = active ? await db.uyelikPaketi.findUnique({ where: { id: active.paketId }, select: { paketKodu: true, paketAdi: true, aktifMi: true } }) : null;
++  if (active && pack?.aktifMi) {
++    return { allowed: true, code: 'ACTIVE', message: 'Havuz işlem erişiminiz aktif.', packageCode: pack.paketKodu, packageName: pack.paketAdi, expiresAt: active.bitisTarihi };
++  }
++
++  // Ofis ilişkisini JWT yerine güncel kayıttan doğrula; sahiplerin User.officeId alanı boş olabilir.
++  const actor = await db.user.findUnique({ where: { id: user.id }, select: { role: true, officeId: true } });
++  if (actor?.role === Role.SUPER_ADMIN) {
++    return { allowed: true, code: 'SUPER_ADMIN', message: 'Yazılım Ekibi Havuz işlem erişimi aktif.', packageCode: 'SYSTEM', packageName: 'Yazılım Ekibi', expiresAt: null };
++  }
++  const offices = actor ? await db.office.findMany({
++    where: { isActive: true, OR: [{ ownerUserId: user.id }, ...(actor.officeId ? [{ id: actor.officeId }] : [])] },
++    select: { id: true }, orderBy: { id: 'asc' },
++  }) : [];
++  if (offices.length) {
++    const catalog = await db.systemSetting.findUnique({ where: { key: 'OFFICE_MEMBERSHIP_PACKAGES' }, select: { valueJson: true } });
++    const packages = Array.isArray(catalog?.valueJson) ? catalog.valueJson.map(object) : [];
++    for (const office of offices) {
++      const row = await db.systemSetting.findUnique({ where: { key: `OFFICE_SUBSCRIPTION_${office.id}` }, select: { valueJson: true } });
++      const sub = object(row?.valueJson);
++      const code = text(sub.packageCode).toUpperCase();
++      const officePack = packages.find(item => text(item.code).toUpperCase() === code);
++      const expiry = sub.expiresAt == null ? null : new Date(text(sub.expiresAt));
++      // Bozuk tarih veya pasif katalog paketi erişim vermez. Süresiz abonelik, mevcut ofis kuralıyla uyumludur.
++      if (!code || !officePack || officePack.active === false || sub.active === false || (expiry && (!Number.isFinite(expiry.getTime()) || expiry <= now))) continue;
++      return {
++        allowed: true, code: 'OFFICE_PACKAGE', message: 'Ofis paketiniz ile Havuz işlem erişiminiz aktif.',
++        packageCode: code, packageName: text(officePack.name) || text(officePack.title) || text(sub.packageName) || code,
++        expiresAt: expiry, officeId: office.id,
++      };
++    }
++  }
++
++  // Ofis paketi de uygun değilse mevcut kişisel üyelik mesajını ve kodunu koru.
++  const denied = (code: PoolMembershipAccess['code'], message: string): PoolMembershipAccess => ({
++    allowed: false, code, message, packageCode: null, packageName: null, expiresAt: latest?.bitisTarihi ?? null,
++  });
++  if (active) return { ...denied('PACKAGE_INACTIVE', 'Üyelik paketiniz aktif olmadığı için Havuz işlemleri kullanılamıyor.'), packageCode: pack?.paketKodu || null, packageName: pack?.paketAdi || null, expiresAt: active.bitisTarihi };
++  if (!latest) return denied('NO_MEMBERSHIP', 'Havuz işlemleri için aktif üyelik gereklidir. Üyelik Merkezi üzerinden paket talebi oluşturabilirsiniz.');
++  if (latest.durum === UyelikDurumu.AKTIF && latest.baslangicTarihi > now) return denied('NOT_STARTED', 'Üyeliğiniz henüz başlamadığı için Havuz işlemleri kullanılamıyor.');
++  if (latest.durum === UyelikDurumu.SURESI_DOLDU || (latest.durum === UyelikDurumu.AKTIF && latest.bitisTarihi !== null && latest.bitisTarihi < now)) return denied('EXPIRED', 'Üyelik süreniz dolduğu için Havuz işlemleri kilitlidir. Havuzu görüntülemeye devam edebilirsiniz.');
++  if (latest.durum === UyelikDurumu.IPTAL) return denied('CANCELLED', 'Üyeliğiniz iptal edildiği için Havuz işlemleri kullanılamıyor.');
++  return denied('PASSIVE', 'Üyeliğiniz aktif olmadığı için Havuz işlemleri kullanılamıyor.');
++}
+diff --git a/src/membership/pool-access.spec.ts b/src/membership/pool-access.spec.ts
+new file mode 100644
+index 0000000..9786ffe
+--- /dev/null
++++ b/src/membership/pool-access.spec.ts
+@@ -0,0 +1,147 @@
++import { Role, UyelikDurumu } from '@prisma/client';
++import { resolvePoolAccess } from './pool-access';
++import { consumeMembershipQuota } from './membership-quota.rules';
++import { UnitsService } from '../units/units.service';
++import { PortfolioDocumentsService } from '../portfolio-documents/portfolio-documents.service';
++
++const now = new Date('2026-10-31T12:00:00Z');
++const future = new Date('2026-12-31T12:00:00Z');
++const past = new Date('2026-09-01T12:00:00Z');
++const personal = (overrides = {}) => ({ id: 'membership', paketId: 'personal', durum: UyelikDurumu.SURESI_DOLDU as UyelikDurumu, baslangicTarihi: past, bitisTarihi: past, ...overrides });
++
++function setup(owner = false) {
++  const state = {
++    membership: personal() as ReturnType<typeof personal> | null,
++    personalActive: true,
++    officeActive: true,
++    linked: true,
++    expiresAt: future.toISOString() as string | null,
++    code: 'GOLD',
++    packages: [{ code: 'GOLD', name: 'Altın Ofis', active: true }] as Record<string, unknown>[],
++    used: 0,
++  };
++  const office = { id: 'office', ownerUserId: owner ? 'actor' : 'owner', isActive: true };
++  const db = {
++    user: { findUnique: jest.fn(async () => ({ id: 'actor', role: Role.EMLAKCI, officeId: owner || !state.linked ? null : 'office' })) },
++    office: {
++      findMany: jest.fn(async ({ where }) => state.officeActive && (owner || state.linked) && where.isActive ? [{ id: 'office' }] : []),
++      findUnique: jest.fn(async () => ({ ...office, isActive: state.officeActive })),
++      findFirst: jest.fn(async () => owner && state.officeActive ? office : null),
++    },
++    kullaniciUyelikPaketi: { findFirst: jest.fn(async ({ where }) => {
++      const membership = state.membership;
++      if (!membership) return null;
++      if (!where.durum) return membership;
++      return membership.durum === 'AKTIF' && membership.baslangicTarihi <= now && (membership.bitisTarihi === null || membership.bitisTarihi >= now) ? membership : null;
++    }) },
++    uyelikPaketi: { findUnique: jest.fn(async () => ({ paketKodu: 'ALTIN', paketAdi: 'Kişisel Altın', aktifMi: state.personalActive, aylikTalepLimiti: 1, aylikHavuzGonderimLimiti: 1 })) },
++    systemSetting: { findUnique: jest.fn(async ({ where }) => {
++      if (where.key === 'OFFICE_MEMBERSHIP_PACKAGES') return { valueJson: state.packages };
++      if (where.key === 'OFFICE_SUBSCRIPTION_office') return { valueJson: { packageCode: state.code, expiresAt: state.expiresAt } };
++      return null;
++    }) },
++    $executeRaw: jest.fn(async () => 1),
++    kotaKullanimi: { upsert: jest.fn(async () => ({ id: 'quota', kullanilan: state.used })), update: jest.fn(async () => ({})) },
++  };
++  return { db, state };
++}
++
++describe('EPH-89 shared pool membership access', () => {
++  beforeEach(() => { jest.useFakeTimers(); jest.setSystemTime(now); });
++  afterEach(() => jest.useRealTimers());
++
++  it('keeps valid personal membership first, without requiring an office', async () => {
++    const { db, state } = setup(); state.membership = personal({ durum: UyelikDurumu.AKTIF, bitisTarihi: future });
++    state.officeActive = false;
++    expect(await resolvePoolAccess(db as any, { id: 'actor' })).toMatchObject({ allowed: true, code: 'ACTIVE', packageName: 'Kişisel Altın', expiresAt: future });
++    expect(db.office.findMany).not.toHaveBeenCalled();
++  });
++
++  it.each([true, false])('expired personal + active office: owner=%s', async owner => {
++    const { db } = setup(owner);
++    expect(await resolvePoolAccess(db as any, { id: 'actor' })).toEqual({ allowed: true, code: 'OFFICE_PACKAGE', message: 'Ofis paketiniz ile Havuz işlem erişiminiz aktif.', packageCode: 'GOLD', packageName: 'Altın Ofis', expiresAt: future, officeId: 'office' });
++    expect(db.office.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { isActive: true, OR: owner ? [{ ownerUserId: 'actor' }] : [{ ownerUserId: 'actor' }, { id: 'office' }] } }));
++  });
++
++  it.each([true, false])('no personal membership + active office: owner=%s', async owner => {
++    const { db, state } = setup(owner); state.membership = null;
++    expect(await resolvePoolAccess(db as any, { id: 'actor' })).toMatchObject({ allowed: true, code: 'OFFICE_PACKAGE' });
++  });
++
++  it('returns existing EXPIRED message when both memberships have expired', async () => {
++    const { db, state } = setup(); state.expiresAt = past.toISOString();
++    expect(await resolvePoolAccess(db as any, { id: 'actor' })).toMatchObject({ allowed: false, code: 'EXPIRED', message: 'Üyelik süreniz dolduğu için Havuz işlemleri kilitlidir. Havuzu görüntülemeye devam edebilirsiniz.' });
++  });
++
++  it('inactive office cannot rescue expired personal membership', async () => {
++    const { db, state } = setup(); state.officeActive = false;
++    expect(await resolvePoolAccess(db as any, { id: 'actor' })).toMatchObject({ allowed: false, code: 'EXPIRED' });
++  });
++
++  it.each(['not-a-date', now.toISOString()])('rejects malformed or elapsed office expiry: %s', async expiresAt => {
++    const { db, state } = setup(); state.expiresAt = expiresAt;
++    expect(await resolvePoolAccess(db as any, { id: 'actor' })).toMatchObject({ allowed: false, code: 'EXPIRED' });
++  });
++
++  it('supports a subscription with no expiry, like the existing office eligibility source', async () => {
++    const { db, state } = setup(); state.expiresAt = null;
++    expect(await resolvePoolAccess(db as any, { id: 'actor' })).toMatchObject({ allowed: true, code: 'OFFICE_PACKAGE', expiresAt: null });
++  });
++
++  it('rejects inactive, missing or unrelated office packages', async () => {
++    const { db, state } = setup(); state.packages[0].active = false;
++    expect((await resolvePoolAccess(db as any, { id: 'actor' })).allowed).toBe(false);
++    state.packages = [];
++    expect((await resolvePoolAccess(db as any, { id: 'actor' })).allowed).toBe(false);
++    state.linked = false;
++    expect((await resolvePoolAccess(db as any, { id: 'actor' })).allowed).toBe(false);
++  });
++
++  it('keeps NOT_STARTED when no office package can rescue access', async () => {
++    const { db, state } = setup(); state.membership = personal({ durum: UyelikDurumu.AKTIF, baslangicTarihi: future, bitisTarihi: future }); state.officeActive = false;
++    expect(await resolvePoolAccess(db as any, { id: 'actor' })).toMatchObject({ allowed: false, code: 'NOT_STARTED' });
++  });
++
++  it('SUPER_ADMIN is always allowed, without membership or office reads', async () => {
++    const { db } = setup();
++    expect(await resolvePoolAccess(db as any, { id: 'super', role: Role.SUPER_ADMIN })).toMatchObject({ allowed: true, code: 'SUPER_ADMIN' });
++    expect(db.kullaniciUyelikPaketi.findFirst).not.toHaveBeenCalled(); expect(db.user.findUnique).not.toHaveBeenCalled();
++  });
++
++  it('both service guards and GET pool/wallet use the shared office access', async () => {
++    const { db } = setup();
++    const units = Object.assign(Object.create(UnitsService.prototype), { prisma: db, getOrCreateKontorWallet: jest.fn(async () => ({ bakiye: 50, aktifMi: true })) });
++    const documents = Object.assign(Object.create(PortfolioDocumentsService.prototype), { prisma: db });
++    expect(await units.ensurePoolActionMembership({ id: 'actor' })).toMatchObject({ code: 'OFFICE_PACKAGE' });
++    expect(await documents.ensurePoolActionMembership('actor')).toMatchObject({ code: 'OFFICE_PACKAGE' });
++    expect((await units.getPoolWallet({ id: 'actor' })).membershipAccess).toMatchObject({ allowed: true, code: 'OFFICE_PACKAGE' });
++  });
++
++  it('both guards keep the existing denial after office expiry', async () => {
++    const { db, state } = setup(); state.expiresAt = past.toISOString();
++    const units = Object.assign(Object.create(UnitsService.prototype), { prisma: db });
++    const documents = Object.assign(Object.create(PortfolioDocumentsService.prototype), { prisma: db });
++    await expect(units.ensurePoolActionMembership({ id: 'actor' })).rejects.toThrow('Üyelik süreniz dolduğu');
++    await expect(documents.ensurePoolActionMembership('actor')).rejects.toThrow('Üyelik süreniz dolduğu');
++  });
++
++  it.each(['TALEP', 'HAVUZ'] as const)('uses the office %s quota and shares its owner counter', async kind => {
++    const { db, state } = setup(); state.packages[0].monthlyDemandLimit = 8; state.packages[0].monthlyPoolLimit = 6;
++    await consumeMembershipQuota(db as any, 'actor', kind);
++    expect(db.kotaKullanimi.upsert).toHaveBeenCalledWith(expect.objectContaining({ create: expect.objectContaining({ kullaniciId: 'owner', limit: kind === 'TALEP' ? 8 : 6 }) }));
++    expect(db.kotaKullanimi.update).toHaveBeenCalledTimes(1);
++    expect(db.uyelikPaketi.findUnique).not.toHaveBeenCalled();
++  });
++
++  it('does not apply a personal quota when office quota is missing', async () => {
++    const { db } = setup();
++    await consumeMembershipQuota(db as any, 'actor', 'HAVUZ');
++    expect(db.kotaKullanimi.upsert).not.toHaveBeenCalled(); expect(db.uyelikPaketi.findUnique).not.toHaveBeenCalled();
++  });
++
++  it('blocks an exhausted office quota before increment', async () => {
++    const { db, state } = setup(); state.packages[0].monthlyPoolLimit = 3; state.used = 3;
++    await expect(consumeMembershipQuota(db as any, 'actor', 'HAVUZ')).rejects.toThrow('kotası (3) doldu');
++    expect(db.kotaKullanimi.update).not.toHaveBeenCalled();
++  });
++});

@@ -53,16 +53,15 @@ describe('limit listesi', () => {
 });
 
 describe('resolveMaxTeams', () => {
-  it('paketin maxTeams alanı eşik tablosundan önceliklidir', () => {
-    expect(resolveMaxTeams({ maxTeams: 7 }, 3)).toBe(7);
-    expect(resolveMaxTeams({ maxTeams: 0 }, 30)).toBe(0);
+  it('paketin ayardaki maxTeams alanını döndürür (0 geçerli)', () => {
+    expect(resolveMaxTeams({ maxTeams: 7 })).toBe(7);
+    expect(resolveMaxTeams({ maxTeams: 0 })).toBe(0);
   });
 
-  it('maxTeams yoksa danışman kapasitesinden yedek tablo', () => {
-    expect(resolveMaxTeams({}, 25)).toBe(5);
-    expect(resolveMaxTeams(undefined, 15)).toBe(3);
-    expect(resolveMaxTeams({ maxTeams: null }, 7)).toBe(2);
-    expect(resolveMaxTeams({ maxTeams: -1 }, 1)).toBe(1);
-    expect(resolveMaxTeams({}, 0)).toBe(0);
+  it('maxTeams ayarı yoksa/geçersizse kodda yedek tablo YOK: 0 = kapalı (fail-closed, §0-B, ODM-7G-D F11/F13)', () => {
+    expect(resolveMaxTeams({})).toBe(0);
+    expect(resolveMaxTeams(undefined)).toBe(0);
+    expect(resolveMaxTeams({ maxTeams: null })).toBe(0);
+    expect(resolveMaxTeams({ maxTeams: -1 })).toBe(0);
   });
 });

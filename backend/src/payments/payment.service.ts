@@ -1,4 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, Logger, NotFoundException, OnApplicationBootstrap, OnModuleDestroy, ServiceUnavailableException } from '@nestjs/common';
+import { loadOfficeSettings, protectLiveSnapshotsOnCatalogChange } from '../office/office-entitlement.service';
+import { OfficePackageRow, parsePackageCatalog } from '../office/office-entitlement.rules';
 import { AuditAction, PaymentAttemptStatus, PaymentOrderPurpose, PaymentOrderStatus, PaymentTransactionStatus, PaymentTransactionType, Prisma, UyelikPaketKodu } from '@prisma/client';
 import { isIP } from 'node:net';
 import { randomUUID } from 'node:crypto';
@@ -111,6 +113,22 @@ export class PaymentService implements OnApplicationBootstrap, OnModuleDestroy {
     });
   }
 
+  /** EPH-70B2: yeni ofis kataloğu (paketler + eklentiler + deneme + ücretsiz). Tümü DB ayarlarından; ayar bozuksa null (sessiz varsayılan yok). Web fiyatı burada gösterilir (mobil mağazadan okur). */
+  private async officeCatalog() {
+    try {
+      const { catalog, addon, trial, free } = await loadOfficeSettings(this.prisma);
+      const rows = [...catalog.values()];
+      return {
+        packages: rows.filter((p) => p.active && !['DENEME'].includes(p.code)).map((p) => ({ code: p.code, name: p.name, price: p.price, custom: p.custom, users: p.custom ? null : p.totalUsers, portfolio: p.custom ? null : p.portfolio,
+          monthlyPk: p.custom ? null : p.monthlyPk, crm: p.custom ? null : p.crm, kardesOfis: p.kardesOfis, ofisBoyDahil: p.ofisBoyDahil, ofisBoyEklenti: p.ofisBoyEklenti, storeSold: !p.custom && !['UCRETSIZ', 'DENEME'].includes(p.code) })),
+        addons: { ekKullanici: { monthlyPrice: addon.ekKullanici.aylikFiyat, perUserPortfolio: addon.ekKullanici.kisiBasiPortfoy, perUserPk: addon.ekKullanici.kisiBasiPk, minPackage: addon.ekKullanici.enAzPaket, tiers: addon.ekKullanici.kademeler },
+          ofisBoy: { monthlyPrice: addon.ofisBoy.aylikFiyat, seatsPerProduct: addon.ofisBoy.koltukPerUrun, allowedPackages: addon.ofisBoy.izinliPaketler } },
+        trial: { days: trial.gun, levelPackage: trial.seviyePaketi, pk: trial.pk, cardRequired: trial.kartIstenir, reminderDays: trial.hatirlatmaGunleri, kardesOfis: trial.kardesOfis, ofisBoy: trial.ofisBoy },
+        free,
+      };
+    } catch { return null; }
+  }
+
   async publicCatalog() {
     const [settings, packages, officePackages] = await Promise.all([
       this.settings(),
@@ -125,7 +143,9 @@ export class PaymentService implements OnApplicationBootstrap, OnModuleDestroy {
       }),
       this.membership.getOfficePackages(),
     ]);
+    const officeCatalog = await this.officeCatalog();
     return {
+      officeCatalog,
       paymentEnabled: settings.enabled,
       pkProducts: settings.pkProducts.filter((p) => p.active && p.code === 'PK_1000_STANDARD').map((p) => ({ name: p.name, credits: p.credits, price: p.amountMinor / 100 })),
       packages: packages.map((item) => {
@@ -169,10 +189,39 @@ export class PaymentService implements OnApplicationBootstrap, OnModuleDestroy {
         monthlyDemandLimit: dto.monthlyDemandLimit, monthlyPoolLimit: dto.monthlyPoolLimit, trialDays: dto.trialDays,
         agents: dto.agents, totalUsers: dto.agents + 1 });
       if (dto.maxTeams !== undefined) office.maxTeams = dto.maxTeams;
+      if (dto.kardesOfis !== undefined) office.kardesOfis = dto.kardesOfis;
+      if (dto.ofisBoyDahil !== undefined) office.ofisBoyDahil = dto.ofisBoyDahil;
+      if (dto.ofisBoyEklenti !== undefined) office.ofisBoyEklenti = dto.ofisBoyEklenti;
+      // ODM-7G-D F10: yeni modelin doğrulayıcısından geçmeyen katalog KAYDEDİLMEZ (fail-closed); eski/yeni kopyalar aynı transaction'da türetilir
+      let beforeRow: OfficePackageRow | undefined; let afterRow: OfficePackageRow | undefined;
+      try {
+        const oldMap = parsePackageCatalog(Array.isArray(row.valueJson) ? row.valueJson : []);
+        const newMap = parsePackageCatalog(offices);
+        beforeRow = oldMap.get(code.toUpperCase()); afterRow = newMap.get(code.toUpperCase());
+      } catch (error) { throw new BadRequestException(`Ofis paket ayarı geçersiz: ${(error as Error).message}`); }
       const saved = await tx.systemSetting.update({ where: { key: 'OFFICE_MEMBERSHIP_PACKAGES' }, data: { valueJson: offices as Prisma.InputJsonValue, updatedById: actor } });
+      const derived: string[] = [];
+      const upsertSetting = async (key: string, patch: Record<string, unknown>) => {
+        const cur = await tx.systemSetting.findUnique({ where: { key } });
+        if (!cur || !cur.valueJson || typeof cur.valueJson !== 'object' || Array.isArray(cur.valueJson)) return;
+        await tx.systemSetting.update({ where: { key }, data: { valueJson: { ...(cur.valueJson as object), ...patch } as Prisma.InputJsonObject, updatedById: actor } });
+        derived.push(key);
+      };
+      // Tek gerçek kaynak: DENEME → OFFICE_TRIAL_CONFIG (gün, PK); UCRETSIZ → OFFICE_FREE_LIMITS. Katalog satırları geriye uyum kopyasıdır.
+      if (code === 'DENEME') {
+        if (!(dto.trialDays > 0)) throw new BadRequestException('Deneme süresi en az 1 gün olmalıdır.');
+        await upsertSetting('OFFICE_TRIAL_CONFIG', { gun: dto.trialDays, pk: dto.monthlyPk });
+      }
+      if (code === 'UCRETSIZ') await upsertSetting('OFFICE_FREE_LIMITS', { kullanici: dto.agents + 1, aktifPortfoy: dto.portfolioCapacity, crm: dto.crmCapacity === -1 ? null : dto.crmCapacity, aylikPaketPk: dto.monthlyPk });
+      // Kardeş Ofis listesi paket satırındaki kardesOfis'ten türetilir (ayrı sabit yok)
+      const sisterCodes = offices.filter((o) => o.kardesOfis === true && !['DENEME', 'UCRETSIZ'].includes(String(o.code))).map((o) => String(o.code).toUpperCase());
+      const sisterRow = await tx.systemSetting.findUnique({ where: { key: 'KARDES_OFIS_PAKETLER' } });
+      if (sisterRow) { await tx.systemSetting.update({ where: { key: 'KARDES_OFIS_PAKETLER' }, data: { valueJson: sisterCodes as Prisma.InputJsonValue, updatedById: actor } }); derived.push('KARDES_OFIS_PAKETLER'); }
+      // 18a: kapasite azaltımı canlı aboneliklerin mevcut dönemini etkilemez
+      const protectedSubs = await protectLiveSnapshotsOnCatalogChange(tx, code.toUpperCase(), beforeRow, afterRow);
       await tx.auditLog.create({ data: { actorId: actor, action: AuditAction.UPDATE_SYSTEM_SETTING, entityType: 'SystemSetting', entityId: saved.id,
         description: `Ofis paketi güncellendi: ${code}`,
-        metadata: JSON.parse(JSON.stringify({ key: `OFFICE_MEMBERSHIP_PACKAGES:${code}`, previousValue: before, newValue: office })) } });
+        metadata: JSON.parse(JSON.stringify({ key: `OFFICE_MEMBERSHIP_PACKAGES:${code}`, previousValue: before, newValue: office, derivedSettings: derived, protectedSubscriptions: protectedSubs })) } });
       return { saved: true };
     });
   }

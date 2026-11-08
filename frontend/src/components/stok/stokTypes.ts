@@ -71,6 +71,10 @@ export interface Unit {
   deedOwnerFullName?: string;
   deedOwnerPhone?: string;
   deedOwnerEmail?: string;
+  allowPhoneCall?: boolean;
+  contactPhone?: string;
+  allowWhatsapp?: boolean;
+  whatsappPhone?: string;
   features?: string[];
 
   isVerified?: boolean;
@@ -151,6 +155,10 @@ export interface UnitFormState {
   deedOwnerFullName: string;
   deedOwnerPhone: string;
   deedOwnerEmail: string;
+  allowPhoneCall: boolean;
+  contactPhone: string;
+  allowWhatsapp: boolean;
+  whatsappPhone: string;
   features?: string[];
 }
 

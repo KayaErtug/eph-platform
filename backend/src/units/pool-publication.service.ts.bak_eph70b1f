@@ -1,0 +1,154 @@
+import { resolveOfficeWallet } from '../office/office-wallet.rules';
+import { consumeMembershipQuota } from '../membership/membership-quota.rules';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { KontorHareketTuru, KontorIslemTuru, PoolAudienceMode, PortfolioApprovalStatus, Prisma, Role } from '@prisma/client';
+import { createHash } from 'crypto';
+import { PrismaService } from '../prisma/prisma.service';
+import { readCost } from '../pricing/commercial-costs';
+
+export type PoolPublicationInput = {
+  walletSource?: string;
+  walletOfficeId?: string;
+  expectedActorId?: string;
+  requestId?: string;
+  expectedCostPk?: number;
+  poolAudience?: { mode?: string; roles?: string[]; groupIds?: string[] };
+};
+
+export type PublicationUnit = Prisma.UnitGetPayload<{
+  include: { project: { include: { owner: { select: { role: true } } } } };
+}>;
+
+const RECEIPT_ACTION = 'PORTFOLIO_POOL_PUBLICATION_RECEIPT';
+const clean = (value: unknown) => typeof value === 'string' ? value.trim() : '';
+
+@Injectable()
+export class PoolPublicationService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  private selection(input: PoolPublicationInput) {
+    const walletSource = clean(input.walletSource).toUpperCase() || undefined;
+    const walletOfficeId = clean(input.walletOfficeId) || null;
+    if (walletSource && walletSource !== 'PERSONAL' && walletSource !== 'OFFICE') throw new BadRequestException('Geçersiz PK kaynağı.');
+    if (walletSource === 'OFFICE' && !walletOfficeId) throw new BadRequestException('Ofis PK kaynağı için ofis seçilmelidir.');
+    if (walletSource === 'PERSONAL' && walletOfficeId) throw new BadRequestException('Kişisel PK kaynağında ofis seçilemez.');
+    return { walletSource, walletOfficeId };
+  }
+
+  private assertActor(userId: string, input: PoolPublicationInput) {
+    if (input.expectedActorId !== undefined && clean(input.expectedActorId) !== userId) {
+      throw new ForbiddenException('Oturum değişti. Yeni PK işlemi başlatılmadı.');
+    }
+  }
+
+  private async wallet(db: PrismaService | Prisma.TransactionClient, userId: string, selection: ReturnType<PoolPublicationService['selection']>) {
+    const { chargeUserId, walletSource, walletOfficeId } = await resolveOfficeWallet(db, userId, selection, db !== this.prisma);
+    const wallet = await db.kontorCuzdani.findUnique({ where: { kullaniciId: chargeUserId } });
+    return { chargeUserId, walletSource, walletOfficeId, balance: wallet?.bakiye ?? 0, active: wallet?.aktifMi === true };
+  }
+
+  async quote(unit: PublicationUnit, userId: string, input: PoolPublicationInput = {}) {
+    this.assertActor(userId, input);
+    const selection = this.selection(input);
+    const wallet = await this.wallet(this.prisma, userId, selection);
+    const alreadyPublished = unit.isPoolVisible && unit.approvalStatus === PortfolioApprovalStatus.HAVUZDA;
+    const publicationCostPk = await readCost(this.prisma, 'COST_HAVUZ_PORTFOY_YAYIN');
+    const costPk = alreadyPublished ? 0 : publicationCostPk;
+    return { costPk, balance: wallet.balance, eligible: alreadyPublished || (wallet.active && wallet.balance >= costPk), alreadyPublished, walletSource: wallet.walletSource, walletOfficeId: wallet.walletOfficeId };
+  }
+
+  private audience(input: PoolPublicationInput) {
+    if (input.poolAudience === undefined) return null;
+    const value = input.poolAudience;
+    if (!value || (value.mode !== 'PUBLIC' && value.mode !== 'TARGETED')) throw new BadRequestException('Geçerli bir görünürlük modu seçilmelidir.');
+    const allowedRoles: string[] = [Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI];
+    const roles = value.mode === 'TARGETED' && Array.isArray(value.roles) ? [...new Set(value.roles.map(clean))].sort() : [];
+    const groupIds = value.mode === 'TARGETED' && Array.isArray(value.groupIds) ? [...new Set(value.groupIds.map(clean))].sort() : [];
+    if (roles.some(role => !allowedRoles.includes(role)) || groupIds.some(id => !id || id.length > 128)) throw new BadRequestException('Hedef kitle seçimi geçersiz.');
+    if (value.mode === 'TARGETED' && !roles.length && !groupIds.length) throw new BadRequestException('Hedefli Havuz için en az bir rol veya grup seçmelisiniz.');
+    return { mode: value.mode as PoolAudienceMode, roles: roles as Role[], groupIds };
+  }
+
+  async publish(
+    snapshot: PublicationUnit,
+    user: { id: string; role?: Role | string },
+    rawInput: PoolPublicationInput | undefined,
+    include: Prisma.UnitInclude,
+    validateUnit: (unit: PublicationUnit) => Promise<void>,
+  ) {
+    const input = rawInput || {};
+    this.assertActor(user.id, input);
+    const selection = this.selection(input);
+    const audience = this.audience(input);
+    const currentCostPk = await readCost(this.prisma, 'COST_HAVUZ_PORTFOY_YAYIN');
+    const modern = input.requestId !== undefined || input.walletSource !== undefined || input.walletOfficeId !== undefined || input.expectedActorId !== undefined || input.expectedCostPk !== undefined;
+    if (modern && (!/^[A-Za-z0-9_-]{8,128}$/.test(clean(input.requestId)) || clean(input.expectedActorId) !== user.id || !Number.isSafeInteger(input.expectedCostPk) || (input.expectedCostPk !== 0 && input.expectedCostPk !== currentCostPk))) {
+      throw new BadRequestException('Yayınlama işlem anahtarı, oturum veya güncel ücret doğrulanamadı.');
+    }
+    const cycle = snapshot.poolRemovedAt?.toISOString() || 'initial';
+    const requestId = modern ? clean(input.requestId) : 'legacy-' + createHash('sha256').update(`${user.id}:${snapshot.id}:${cycle}`).digest('hex');
+    const fingerprint = createHash('sha256').update(JSON.stringify([snapshot.id, selection.walletSource, selection.walletOfficeId, audience])).digest('hex');
+
+    return this.prisma.$transaction(async tx => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`pool-publish-request:${user.id}:${requestId}`}))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`pool-publish-unit:${snapshot.id}`}))`;
+      const current = await tx.unit.findUnique({ where: { id: snapshot.id }, include: { project: { include: { owner: { select: { role: true } } } } } });
+      if (!current) throw new NotFoundException('Portföy bulunamadı.');
+      await validateUnit(current);
+      const previous = await tx.adminActionLog.findFirst({ where: { actorId: user.id, action: RECEIPT_ACTION, metadata: { path: ['requestId'], equals: requestId } }, orderBy: { createdAt: 'desc' } });
+      const wallet = await this.wallet(tx, user.id, selection);
+      const publicationCostPk = await readCost(tx, 'COST_HAVUZ_PORTFOY_YAYIN');
+      if (previous) {
+        const metadata = previous.metadata as Prisma.JsonObject;
+        if (previous.entityId !== snapshot.id || metadata?.fingerprint !== fingerprint) throw new BadRequestException('Bu yayınlama işlem anahtarı farklı bir işlem için kullanılmış.');
+        const billing = metadata.billing as Prisma.JsonObject;
+        if (!billing || typeof billing.spent !== 'number' || !Number.isSafeInteger(billing.spent) || typeof billing.chargeUserId !== 'string') throw new BadRequestException('Önceki yayınlama makbuzu doğrulanamadı. Yeni kesinti yapılmadı.');
+        const unit = await tx.unit.findUnique({ where: { id: snapshot.id }, include });
+        return { ...unit, billing: { ...billing, spent: 0, originalSpent: billing.spent, remainingBalance: wallet.balance, replayed: true } };
+      }
+
+      const alreadyPublished = current.isPoolVisible && current.approvalStatus === PortfolioApprovalStatus.HAVUZDA;
+      if (!alreadyPublished && modern && input.expectedCostPk !== publicationCostPk) throw new BadRequestException('Güncel Havuz yayın ücretini kontrol edip tekrar onaylayın.');
+      if (!alreadyPublished && audience?.groupIds.length) {
+        const groups = await tx.poolAudienceGroup.findMany({ where: { id: { in: audience.groupIds }, ...(user.role === Role.SUPER_ADMIN ? {} : { ownerId: current.project.ownerId }) }, select: { id: true } });
+        if (groups.length !== audience.groupIds.length) throw new BadRequestException('Seçilen hedef kitle gruplarından biri geçersiz.');
+      }
+
+      let spent = 0;
+      let operationId: string | null = null;
+      let previousBalance = wallet.balance;
+      let remainingBalance = wallet.balance;
+      if (!alreadyPublished) {
+        await consumeMembershipQuota(tx, user.id, 'HAVUZ');
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`wallet:${wallet.chargeUserId}`}))`;
+        await tx.$queryRaw`SELECT "id" FROM "KontorCuzdani" WHERE "kullaniciId" = ${wallet.chargeUserId} FOR UPDATE`;
+        const lockedWallet = await tx.kontorCuzdani.findUnique({ where: { kullaniciId: wallet.chargeUserId } });
+        if (!lockedWallet?.aktifMi || lockedWallet.bakiye < publicationCostPk) throw new BadRequestException('Seçilen PK bakiyesi yetersiz veya cüzdan aktif değil.');
+        previousBalance = lockedWallet.bakiye;
+        remainingBalance = previousBalance - publicationCostPk;
+        const debit = await tx.kontorCuzdani.updateMany({ where: { kullaniciId: wallet.chargeUserId, aktifMi: true, bakiye: { gte: publicationCostPk } }, data: { bakiye: { decrement: publicationCostPk }, toplamHarcama: { increment: publicationCostPk } } });
+        if (debit.count !== 1) throw new BadRequestException('PK kesintisi doğrulanamadı. Yayınlama geri alındı.');
+        const movement = await tx.kontorHareketi.create({ data: { kullaniciId: wallet.chargeUserId, hareketTuru: KontorHareketTuru.HARCAMA, islemTuru: KontorIslemTuru.HAVUZ_PORTFOY_YAYIN, miktar: publicationCostPk, oncekiBakiye: previousBalance, sonrakiBakiye: remainingBalance, aciklama: `Portföy EPH Havuzunda yayınlandı. ${publicationCostPk} PK harcandı.`, ilgiliKayitTuru: 'UNIT', ilgiliKayitId: snapshot.id, olusturanId: user.id } });
+        spent = publicationCostPk;
+        operationId = movement.id;
+      }
+
+      const publishedAt = new Date();
+      const labels: Record<string, string> = { [Role.EMLAKCI]: 'Emlakçı', [Role.MUTEAHHIT]: 'Müteahhit', [Role.INSAAT_FIRMASI]: 'İnşaat Firması' };
+      const unit = alreadyPublished
+        ? await tx.unit.findUnique({ where: { id: snapshot.id }, include })
+        : await tx.unit.update({ where: { id: snapshot.id }, data: { approvalStatus: PortfolioApprovalStatus.HAVUZDA, submittedForApprovalAt: null, approvedAt: publishedAt, rejectedAt: null, approvalNote: (labels[current.project.owner.role] || 'Portföy sahibi') + ' portföyü geçici belge muafiyeti kapsamında doğrudan havuzda yayınlandı.', isPoolVisible: true, poolPublishedAt: publishedAt, poolRemovedAt: null }, include });
+
+      if (!alreadyPublished && audience) {
+        await tx.poolAudienceUnit.upsert({ where: { unitId: snapshot.id }, create: { unitId: snapshot.id, mode: audience.mode, roles: audience.roles }, update: { mode: audience.mode, roles: audience.roles } });
+        await tx.poolAudienceUnitGroup.deleteMany({ where: { unitId: snapshot.id } });
+        if (audience.groupIds.length) await tx.poolAudienceUnitGroup.createMany({ data: audience.groupIds.map(groupId => ({ unitId: snapshot.id, groupId })), skipDuplicates: true });
+      }
+
+      const billing = { requestId, costPk: alreadyPublished ? 0 : publicationCostPk, spent, operationId, previousBalance, remainingBalance, replayed: false, walletSource: wallet.walletSource, walletOfficeId: wallet.walletOfficeId, chargeUserId: wallet.chargeUserId };
+      await tx.adminActionLog.create({ data: { actorId: user.id, targetUserId: current.project.ownerId, action: RECEIPT_ACTION, entityType: 'UNIT', entityId: snapshot.id, description: alreadyPublished ? 'Portföy zaten havuzda; yeni PK kesilmedi.' : 'Havuz yayını ve PK kesintisi aynı transaction içinde tamamlandı.', metadata: { requestId, fingerprint, billing } as Prisma.InputJsonValue } });
+      if (!alreadyPublished) await tx.adminActionLog.create({ data: { actorId: user.id, targetUserId: current.project.ownerId, action: 'PORTFOLIO_DIRECT_POOL_PUBLISH_DOCUMENT_EXEMPTION', entityType: 'UNIT', entityId: snapshot.id, description: 'Portföy, geçici Tapu ve Yetki Belgesi muafiyeti kapsamında doğrudan havuzda yayınlandı.', metadata: { approvalStatusBefore: current.approvalStatus, approvalStatusAfter: PortfolioApprovalStatus.HAVUZDA, ownerRole: current.project.owner.role, temporaryDocumentExemption: true, publishedAt: publishedAt.toISOString(), spentPk: spent, requestId, operationId, walletSource: selection.walletSource, walletOfficeId: selection.walletOfficeId } } });
+      return { ...unit, billing };
+    }, { timeout: 15000 });
+  }
+}

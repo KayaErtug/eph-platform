@@ -13,6 +13,7 @@ import {
   CalendarDays,
   CheckCircle2,
   ClipboardCheck,
+  CreditCard,
   FileText,
   HelpCircle,
   Home,
@@ -452,6 +453,13 @@ export default function AdminPage() {
   ];
 
   const moduleCards: ModuleCardItem[] = [
+    ...(isSuperAdmin ? [{
+      title: "Ödeme Yönetimi",
+      desc: "Üyelik fiyatları, PK paketleri, ödemeler ve iade talepleri",
+      href: "/admin/odemeler",
+      icon: <CreditCard size={30} />,
+      tone: "blue" as const,
+    }] : []),
     {
       title: "Portföy Onayları",
       desc: "Portföy başvurularını inceleyin ve yönetin",
@@ -1058,6 +1066,7 @@ function SideNav({
       <SideNavItem href="/admin/reports" icon={<Activity size={19} />} label="Raporlar" />
 
       <SideLabel label="Sistem" />
+      {isSuperAdmin ? <SideNavItem href="/admin/odemeler" icon={<CreditCard size={19} />} label="Ödeme Yönetimi" /> : null}
       <SideNavItem href="/admin/settings" icon={<Settings size={19} />} label="Ayarlar" />
       <SideNavItem href="/admin/audit-log" icon={<FileText size={19} />} label="Audit Log" />
       <SideNavItem href="/admin/help-center" icon={<HelpCircle size={19} />} label="Yardım Merkezi" />

@@ -11,11 +11,17 @@ import {
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
 } from "react";
 
 import type { AdvancedFilterTheme } from "@/components/advanced-filter";
+import {
+  EPHLocationMultiField,
+  formatLocationArea,
+  normalizeLocationAreas,
+} from "@/components/create-system";
 import {
   fetchDistrictOptions,
   fetchPlaceOptions,
@@ -23,12 +29,13 @@ import {
   type LocationOption,
 } from "@/components/stok/locationData";
 
+import { getEPHCriteriaFieldVisual } from "./criteria-field-visuals";
+
 import type {
   EPHSchemaChoiceField,
   EPHSchemaDefinition,
   EPHSchemaField,
   EPHSchemaLocationField,
-  EPHSchemaLocationMultiField,
   EPHSchemaMoneyField,
   EPHSchemaOption,
   EPHSchemaState,
@@ -106,6 +113,22 @@ function fieldSummary(
     return values.join(" / ") || "Konum seçin";
   }
 
+  if (field.type === "location-multi") {
+    const areas = normalizeLocationAreas(state[field.areasKey]);
+
+    if (areas.length === 0) {
+      return field.placeholder || "Konum seçin";
+    }
+
+    if (areas.length === 1) {
+      const [area] = areas;
+
+      return formatLocationArea(area);
+    }
+
+    return `${areas.length} bölge seçildi`;
+  }
+
   if (field.type === "money") {
     const amount = asString(value);
     const currency = field.currencyKey
@@ -169,13 +192,33 @@ export default function SchemaFormEngine({
   );
   const [activeField, setActiveField] = useState<EPHSchemaField | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const wasOpenRef = useRef(false);
+  const previousSchemaRef = useRef(schema);
 
   useEffect(() => {
-    if (!open) return;
+    const justOpened =
+      open && !wasOpenRef.current;
 
-    setDraft(createSchemaInitialState(schema, value, "form"));
-    setErrors({});
-    setActiveField(null);
+    const schemaChanged =
+      previousSchemaRef.current !== schema;
+
+    if (
+      open &&
+      (justOpened || schemaChanged)
+    ) {
+      setDraft(
+        createSchemaInitialState(
+          schema,
+          value,
+          "form",
+        ),
+      );
+      setErrors({});
+      setActiveField(null);
+    }
+
+    wasOpenRef.current = open;
+    previousSchemaRef.current = schema;
   }, [open, schema, value]);
 
   useEffect(() => {
@@ -226,45 +269,92 @@ export default function SchemaFormEngine({
     "--af-danger": mergedTheme.danger,
   } as CSSProperties;
 
-  const setValue = (key: string, nextValue: EPHSchemaValue) => {
-    setDraft((current) => {
-      const next = {
-        ...current,
-        [key]: Array.isArray(nextValue) ? [...nextValue] : nextValue,
-      };
+  const relatedValidationKeys:
+    Record<string, string[]> = {
+      minArea: ["maxArea"],
+      maxArea: ["minArea"],
+      minRoom: ["maxRoom"],
+      maxRoom: ["minRoom"],
+      minBudget: ["maxBudget"],
+      maxBudget: ["minBudget"],
+    };
 
-      onChange?.(cloneSchemaState(next));
-      return next;
+  const updateLiveErrors = (
+    nextState: EPHSchemaState,
+    changedKeys: string[],
+  ) => {
+    const keys = new Set(changedKeys);
+
+    changedKeys.forEach((key) => {
+      relatedValidationKeys[key]?.forEach(
+        (relatedKey) => keys.add(relatedKey),
+      );
     });
 
+    if (keys.has("propertyType")) {
+      [
+        "minArea",
+        "maxArea",
+        "minRoom",
+        "maxRoom",
+        "minBudget",
+        "maxBudget",
+      ].forEach((key) => keys.add(key));
+    }
+
+    const result = validateSchemaState(
+      schema,
+      nextState,
+      "form",
+    );
+
     setErrors((current) => {
-      if (!current[key]) return current;
-      const next = { ...current };
-      delete next[key];
-      return next;
+      const nextErrors = { ...current };
+
+      keys.forEach((key) => {
+        const error = result.errors[key];
+
+        if (error) {
+          nextErrors[key] = error;
+        } else {
+          delete nextErrors[key];
+        }
+      });
+
+      return nextErrors;
     });
   };
 
-  const patchValues = (values: EPHSchemaState) => {
-    setDraft((current) => {
-      const next = {
-        ...current,
-        ...values,
-      };
+  const setValue = (
+    key: string,
+    nextValue: EPHSchemaValue,
+  ) => {
+    const next = {
+      ...draft,
+      [key]: Array.isArray(nextValue)
+        ? [...nextValue]
+        : nextValue,
+    };
 
-      onChange?.(cloneSchemaState(next));
-      return next;
-    });
+    setDraft(next);
+    onChange?.(cloneSchemaState(next));
+    updateLiveErrors(next, [key]);
+  };
 
-    setErrors((current) => {
-      const next = { ...current };
+  const patchValues = (
+    values: EPHSchemaState,
+  ) => {
+    const next = {
+      ...draft,
+      ...values,
+    };
 
-      for (const key of Object.keys(values)) {
-        delete next[key];
-      }
-
-      return next;
-    });
+    setDraft(next);
+    onChange?.(cloneSchemaState(next));
+    updateLiveErrors(
+      next,
+      Object.keys(values),
+    );
   };
 
   const submit = async () => {
@@ -363,6 +453,11 @@ export default function SchemaFormEngine({
                         errors[field.neighborhoodKey]
                       : "");
 
+                  const visual =
+                    getEPHCriteriaFieldVisual(
+                      field.key,
+                    );
+
                   if (field.type === "boolean") {
                     const active = Boolean(draft[field.key]);
 
@@ -406,17 +501,37 @@ export default function SchemaFormEngine({
                       type="button"
                       disabled={disabled}
                       onClick={() => setActiveField(field)}
-                      className={`grid min-h-[58px] w-full grid-cols-[128px_minmax(0,1fr)] items-center gap-3 px-3 text-left disabled:opacity-45 ${
+                      className={`grid min-h-[62px] w-full grid-cols-[128px_minmax(0,1fr)] items-center gap-3 px-3 text-left transition-colors disabled:opacity-45 ${
                         fieldIndex === 0
                           ? ""
-                          : "border-t border-[var(--af-border)]"
-                      } ${error ? "bg-red-50" : ""}`}
+                          : visual?.separatorClassName ||
+                            "border-t border-[var(--af-border)]"
+                      } ${
+                        error
+                          ? "bg-red-50 shadow-[inset_4px_0_0_#DC2626]"
+                          : visual?.rowClassName || ""
+                      }`}
                     >
                       <span className="min-w-0">
-                        <span className="block text-[12px] font-black">
+                        <span
+                          className={`block text-[12px] font-black ${
+                            error
+                              ? "text-red-700"
+                              : visual?.labelClassName || ""
+                          }`}
+                        >
                           {field.label}
                           {field.validation?.required ? " *" : ""}
                         </span>
+
+                        {visual?.showBadge && !error && (
+                          <span
+                            className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[8px] font-black tracking-[0.06em] ${visual.badgeClassName}`}
+                          >
+                            {visual.badge}
+                          </span>
+                        )}
+
                         {error && (
                           <span className="mt-0.5 block text-[9px] font-bold leading-3 text-red-600">
                             {error}
@@ -429,14 +544,20 @@ export default function SchemaFormEngine({
                           className={`min-w-0 truncate text-right text-[11.5px] font-bold ${
                             error
                               ? "text-red-600"
-                              : "text-[var(--af-accent-text)]"
+                              : visual?.valueClassName ||
+                                "text-[var(--af-accent-text)]"
                           }`}
                         >
                           {fieldSummary(field, draft)}
                         </span>
                         <ChevronDown
                           size={16}
-                          className="shrink-0 text-[var(--af-muted)]"
+                          className={`shrink-0 ${
+                            error
+                              ? "text-red-500"
+                              : visual?.chevronClassName ||
+                                "text-[var(--af-muted)]"
+                          }`}
                         />
                       </span>
                     </button>
@@ -461,7 +582,10 @@ export default function SchemaFormEngine({
             <button
               type="button"
               onClick={submit}
-              disabled={saving}
+              disabled={
+                saving ||
+                Object.keys(errors).length > 0
+              }
               className="flex h-12 items-center justify-center gap-2 rounded-[18px] bg-[var(--af-accent)] px-4 text-[13px] font-black text-white disabled:opacity-55"
             >
               {saving && <Loader2 size={17} className="animate-spin" />}
@@ -601,7 +725,16 @@ function FormFieldContent({
 
   if (field.type === "location-multi") {
     return (
-      <LocationMultiField field={field} state={state} setValue={setValue} />
+      <EPHLocationMultiField
+        value={state[field.areasKey]}
+        showNeighborhood={field.showNeighborhood}
+        onChange={(areas) =>
+          setValue(
+            field.areasKey,
+            areas as unknown as EPHSchemaValue,
+          )
+        }
+      />
     );
   }
 
@@ -654,6 +787,10 @@ function FormFieldContent({
     );
   }
 
+  const useThousandsSeparator =
+    field.type === "number" &&
+    (field.key === "minBudget" || field.key === "maxBudget");
+
   return (
     <TextInput
       value={asString(state[field.key])}
@@ -661,14 +798,24 @@ function FormFieldContent({
       inputMode={field.type === "number" ? "numeric" : "text"}
       type={field.type === "date" ? "date" : "text"}
       maxLength={field.validation?.maxLength}
-      onChange={(value) =>
+      onChange={(value) => {
+        if (useThousandsSeparator) {
+          const digits = value.replace(/\D/g, "");
+
+          setValue(
+            field.key,
+            digits ? Number(digits).toLocaleString("tr-TR") : "",
+          );
+          return;
+        }
+
         setValue(
           field.key,
           field.type === "number" && value !== ""
             ? Number(value.replace(/[^\d.-]/g, ""))
             : value,
-        )
-      }
+        );
+      }}
     />
   );
 }
@@ -1043,322 +1190,6 @@ function TextInput({
       placeholder={placeholder}
       className="h-12 w-full rounded-[18px] border border-[var(--af-border)] bg-[var(--af-surface)] px-3 text-center text-[13px] font-black outline-none placeholder:text-[var(--af-muted)]"
     />
-  );
-}
-
-type LocationAreaEntry = {
-  city: string;
-  district: string;
-  neighborhood: string;
-};
-
-function normalizeLocationAreas(value: unknown): LocationAreaEntry[] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((item) => ({
-      city: String((item as { city?: unknown })?.city || "").trim(),
-      district: String((item as { district?: unknown })?.district || "").trim(),
-      neighborhood: String(
-        (item as { neighborhood?: unknown })?.neighborhood || "",
-      ).trim(),
-    }))
-    .filter((item) => item.city && item.district);
-}
-
-function locationAreaKey(area: LocationAreaEntry) {
-  return `${area.city}|${area.district}|${area.neighborhood}`;
-}
-
-function LocationMultiField({
-  field,
-  state,
-  setValue,
-}: {
-  field: EPHSchemaLocationMultiField;
-  state: EPHSchemaState;
-  setValue: (key: string, value: EPHSchemaValue) => void;
-}) {
-  const areas = normalizeLocationAreas(state[field.areasKey]);
-
-  const [level, setLevel] = useState<"city" | "district" | "neighborhood">(
-    "city",
-  );
-  const [search, setSearch] = useState("");
-  const [cities, setCities] = useState<LocationOption[]>([]);
-  const [districts, setDistricts] = useState<DistrictOption[]>([]);
-  const [places, setPlaces] = useState<PlaceOption[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [tempCity, setTempCity] = useState("");
-  const [tempDistrict, setTempDistrict] = useState("");
-  const [tempNeighborhood, setTempNeighborhood] = useState("");
-
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    fetchProvinceOptions()
-      .then((items) => {
-        if (active) setCities(items);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-    if (!tempCity) {
-      setDistricts([]);
-      return;
-    }
-    setLoading(true);
-    fetchDistrictOptions(tempCity)
-      .then((items) => {
-        if (active) setDistricts(items.map((item) => ({ ...item, city: tempCity })));
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [tempCity]);
-
-  useEffect(() => {
-    let active = true;
-    if (!field.showNeighborhood || !tempCity || !tempDistrict) {
-      setPlaces([]);
-      return;
-    }
-    const districtOption = districts.find((item) => item.name === tempDistrict);
-    setLoading(true);
-    fetchPlaceOptions(tempCity, tempDistrict, districtOption?.id)
-      .then((items) => {
-        if (active)
-          setPlaces(
-            items.map((item) => ({ ...item, city: tempCity, district: tempDistrict })),
-          );
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [tempCity, tempDistrict, districts, field.showNeighborhood]);
-
-  const tabs = [
-    { key: "city" as const, label: "İl", disabled: false },
-    { key: "district" as const, label: "İlçe", disabled: !tempCity },
-    {
-      key: "neighborhood" as const,
-      label: "Mahalle",
-      disabled: !field.showNeighborhood || !tempCity || !tempDistrict,
-    },
-  ].filter((item) => item.key !== "neighborhood" || field.showNeighborhood);
-
-  const options: EPHSchemaOption[] =
-    level === "city"
-      ? cities.map((item) => ({ value: item.name, label: item.name }))
-      : level === "district"
-        ? districts.map((item) => ({
-            value: item.name,
-            label: `${item.city} / ${item.name}`,
-          }))
-        : places.map((item) => ({
-            value: item.name,
-            label: `${item.city} / ${item.district} / ${item.name}`,
-          }));
-
-  const query = search.toLocaleLowerCase("tr-TR").trim();
-  const visibleOptions = query
-    ? options.filter((option) =>
-        option.label.toLocaleLowerCase("tr-TR").includes(query),
-      )
-    : options;
-
-  const selected =
-    level === "city"
-      ? tempCity
-        ? [tempCity]
-        : []
-      : level === "district"
-        ? tempDistrict
-          ? [tempDistrict]
-          : []
-        : tempNeighborhood
-          ? [tempNeighborhood]
-          : [];
-
-  const addArea = () => {
-    if (!tempCity || !tempDistrict) return;
-    const entry: LocationAreaEntry = {
-      city: tempCity,
-      district: tempDistrict,
-      neighborhood: tempNeighborhood,
-    };
-    if (areas.some((item) => locationAreaKey(item) === locationAreaKey(entry))) {
-      return;
-    }
-    setValue(field.areasKey, [...areas, entry] as unknown as EPHSchemaValue);
-    setTempNeighborhood("");
-    setLevel(field.showNeighborhood ? "neighborhood" : "district");
-    setSearch("");
-  };
-
-  const removeArea = (target: LocationAreaEntry) => {
-    setValue(
-      field.areasKey,
-      areas.filter(
-        (item) => locationAreaKey(item) !== locationAreaKey(target),
-      ) as unknown as EPHSchemaValue,
-    );
-  };
-
-  const groups: { city: string; district: string; items: LocationAreaEntry[] }[] =
-    [];
-  areas.forEach((area) => {
-    let group = groups.find(
-      (item) => item.city === area.city && item.district === area.district,
-    );
-    if (!group) {
-      group = { city: area.city, district: area.district, items: [] };
-      groups.push(group);
-    }
-    group.items.push(area);
-  });
-
-  return (
-    <div>
-      <div
-        className={`grid gap-1.5 ${
-          field.showNeighborhood ? "grid-cols-3" : "grid-cols-2"
-        }`}
-      >
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            disabled={tab.disabled}
-            onClick={() => {
-              setLevel(tab.key);
-              setSearch("");
-            }}
-            className={`h-11 rounded-[15px] border px-2 text-[10.5px] font-black disabled:opacity-35 ${
-              level === tab.key
-                ? "border-[var(--af-accent)] bg-[var(--af-accent-soft)] text-[var(--af-accent-text)]"
-                : "border-[var(--af-border)] bg-[var(--af-surface)]"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-2">
-        <SearchInput
-          value={search}
-          placeholder={`${tabs.find((tab) => tab.key === level)?.label || ""} ara...`}
-          onChange={setSearch}
-        />
-      </div>
-
-      <div className="mt-2">
-        {loading ? (
-          <div className="flex min-h-[160px] items-center justify-center">
-            <Loader2
-              size={22}
-              className="animate-spin text-[var(--af-accent-text)]"
-            />
-          </div>
-        ) : (
-          <OptionList
-            options={visibleOptions}
-            selected={selected}
-            onToggle={(option) => {
-              if (level === "city") {
-                setTempCity(option.value);
-                setTempDistrict("");
-                setTempNeighborhood("");
-                setLevel("district");
-                setSearch("");
-                return;
-              }
-              if (level === "district") {
-                setTempDistrict(option.value);
-                setTempNeighborhood("");
-                setLevel(field.showNeighborhood ? "neighborhood" : "district");
-                setSearch("");
-                return;
-              }
-              setTempNeighborhood(option.value);
-              setSearch("");
-            }}
-          />
-        )}
-      </div>
-
-      <button
-        type="button"
-        onClick={addArea}
-        disabled={!tempCity || !tempDistrict}
-        className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-[15px] border border-[var(--af-accent)] bg-[var(--af-accent-soft)] text-[12px] font-black text-[var(--af-accent-text)] disabled:opacity-40"
-      >
-        Bölgeyi Ekle
-        {tempCity && tempDistrict
-          ? ` · ${tempCity} / ${tempDistrict}${tempNeighborhood ? ` / ${tempNeighborhood}` : ""}`
-          : ""}
-      </button>
-
-      <div className="mt-3 rounded-[16px] border border-[var(--af-border)] bg-[var(--af-surface)] p-2.5">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <p className="text-[11px] font-black text-[var(--af-accent-text)]">
-            Seçilen Bölgeler
-          </p>
-          <span className="text-[10px] font-black text-[var(--af-accent-text)]">
-            {areas.length} bölge
-          </span>
-        </div>
-
-        {groups.length === 0 ? (
-          <div className="rounded-[12px] border border-dashed border-[var(--af-border)] px-3 py-3 text-center text-[11px] font-bold text-[var(--af-muted)]">
-            Mahalle seçmeden eklerseniz ilçenin tamamı kaydedilir. Çoklu il/ilçe/mahalle ekleyebilirsiniz.
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {groups.map((group) => (
-              <div
-                key={`${group.city}-${group.district}`}
-                className="rounded-[12px] border border-[var(--af-border)] bg-white p-2"
-              >
-                <div className="flex items-center gap-1.5 text-[11px] font-black text-[var(--af-accent-text)]">
-                  <MapPin size={13} />
-                  {group.city} / {group.district}
-                </div>
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {group.items.map((area) => (
-                    <button
-                      key={locationAreaKey(area)}
-                      type="button"
-                      onClick={() => removeArea(area)}
-                      className="inline-flex max-w-full items-center gap-1 rounded-full border border-[var(--af-border)] bg-[var(--af-surface)] px-2.5 py-1 text-[10.5px] font-black text-[var(--af-accent-text)]"
-                      title="Kaldır"
-                    >
-                      <span className="break-words">
-                        {area.neighborhood || "İlçenin tamamı"}
-                      </span>
-                      <X size={12} className="shrink-0" />
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
   );
 }
 

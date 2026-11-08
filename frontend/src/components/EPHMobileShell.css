@@ -10,7 +10,7 @@
   z-index: 80;
   height: 64px;
   display: grid;
-  grid-template-columns: 50px 1fr 96px;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   padding: 6px 12px 8px;
   background: rgba(255, 255, 255, 0.94);
@@ -25,9 +25,10 @@
   text-align: center !important;
   font-size: 17px;
   font-weight: 800;
-  line-height: 1;
+  line-height: 1.2;
   letter-spacing: -0.02em;
-  color: #06194a;
+  color: #1e3a8a;
+  padding: 0 8px;
 }
 
 .eph-mobile-top-actions {
@@ -39,16 +40,17 @@
 
 .eph-mobile-icon-button,
 .eph-mobile-avatar-button {
-  width: 42px;
-  height: 42px;
-  min-height: 42px;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  min-width: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border: 0;
   border-radius: 14px;
   background: #ffffff;
-  color: #06194a;
+  color: #1e3a8a;
   box-shadow:
     0 8px 18px rgba(15, 23, 42, 0.05),
     inset 0 1px 0 rgba(255, 255, 255, 0.96);
@@ -148,7 +150,7 @@
 }
 
 .eph-mobile-nav-item.active {
-  color: #6d28ff;
+  color: #ea580c;
 }
 
 .eph-mobile-nav-item span {
@@ -211,7 +213,7 @@
   overflow: hidden !important;
   flex: 0 0 auto !important;
   padding: 16px 16px 16px !important;
-  background: linear-gradient(135deg, #1557d6 0%, #4f46e5 52%, #7c3aed 100%) !important;
+  background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 52%, #2563eb 100%) !important;
   color: #ffffff !important;
 }
 
@@ -619,4 +621,9 @@
   .fixed.inset-0.z-50 {
     padding-bottom: max(14px, env(safe-area-inset-bottom, 0px)) !important;
   }
+}
+
+/* EPH V1 — Lina yüzen ikon global olarak kapatıldı */
+.eph-mobile-lina-fab {
+  display: none !important;
 }

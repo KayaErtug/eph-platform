@@ -54,13 +54,13 @@ describe('Mobile office dashboard contract', () => {
     expect((await f.service.dashboard('owner')).offices[0].maxTeams).toBe(maxTeams);
   });
 
-  it('uses the existing EPH-24A capacity fallback when maxTeams is absent', async () => {
+  it('ODM-7G-D F13: maxTeams ayarda yoksa kodda yedek tablo yok; 0 (kapalı) döner', async () => {
     const f = fixture();
     f.db.systemSetting.findUnique.mockImplementation(async ({ where }) => {
       if (where.key === 'OFFICE_SUBSCRIPTION_office') return { valueJson: { agents: 7 } };
       return null;
     });
-    expect((await f.service.dashboard('owner')).offices[0].maxTeams).toBe(2);
+    expect((await f.service.dashboard('owner')).offices[0].maxTeams).toBe(0);
   });
 
   it('shows pending applicants even when capacity is full, with a blocked reason', async () => {

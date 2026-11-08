@@ -1,6 +1,7 @@
 import { Prisma, Role, UyelikDurumu } from '@prisma/client';
+import { entitlementSource, resolveOfficeEntitlements } from '../office/office-entitlement.service';
 
-type PoolAccessDb = Pick<Prisma.TransactionClient, 'kullaniciUyelikPaketi' | 'uyelikPaketi' | 'user' | 'office' | 'systemSetting'>;
+type PoolAccessDb = Pick<Prisma.TransactionClient, 'kullaniciUyelikPaketi' | 'uyelikPaketi' | 'user' | 'office' | 'systemSetting' | 'ofisAbonelik' | 'ofisEklenti' | 'ofisDenemeKaydi'>;
 export type PoolMembershipAccess = {
   allowed: boolean;
   code: 'ACTIVE' | 'SUPER_ADMIN' | 'OFFICE_PACKAGE' | 'NO_MEMBERSHIP' | 'NOT_STARTED' | 'EXPIRED' | 'PASSIVE' | 'CANCELLED' | 'PACKAGE_INACTIVE';
@@ -42,6 +43,13 @@ export async function resolvePoolAccess(db: PoolAccessDb, user: { id: string; ro
     where: { isActive: true, OR: [{ ownerUserId: user.id }, ...(actor.officeId ? [{ id: actor.officeId }] : [])] },
     select: { id: true }, orderBy: { id: 'asc' },
   }) : [];
+  if (offices.length && await entitlementSource(db) === 'relational') {
+    // EPH-70B2: tek çözümleyici. Ücretsiz dahil her ofis havuza erişir (görme açık); aktif ilan/talep ve PK sınırları ayrı uygulayıcılardadır.
+    for (const office of offices) {
+      const eff = await resolveOfficeEntitlements(db, office.id, now);
+      return { allowed: true, code: 'OFFICE_PACKAGE', message: 'Ofis paketiniz ile Havuz işlem erişiminiz aktif.', packageCode: eff.packageCode ?? 'UCRETSIZ', packageName: eff.packageName, expiresAt: eff.endsAt, officeId: office.id };
+    }
+  }
   if (offices.length) {
     const catalog = await db.systemSetting.findUnique({ where: { key: 'OFFICE_MEMBERSHIP_PACKAGES' }, select: { valueJson: true } });
     const packages = Array.isArray(catalog?.valueJson) ? catalog.valueJson.map(object) : [];

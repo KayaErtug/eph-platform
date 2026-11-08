@@ -1,10 +1,14 @@
-// Ofis takım kotası: paketin maxTeams alanı; alan yoksa yalnız danışman kapasitesinden türetilen yedek tablo.
-export function resolveMaxTeams(pkg: { maxTeams?: unknown } | null | undefined, agentCapacity: number): number {
+import { Logger } from '@nestjs/common';
+
+const logger = new Logger('OfficeTeamQuota');
+
+/**
+ * Ofis takım kotası: paketin ayardaki maxTeams alanı. §0-B: kodda yedek tablo YOKTUR (ODM-7G-D F11/F13).
+ * Alan yoksa/geçersizse 0 = KAPALI (fail-closed: takım açılamaz) ve uyarı kaydı yazılır; okuma uçları çökmez.
+ */
+export function resolveMaxTeams(pkg: { maxTeams?: unknown } | null | undefined): number {
   const configured = pkg?.maxTeams;
   if (typeof configured === 'number' && Number.isInteger(configured) && configured >= 0) return configured;
-  if (agentCapacity >= 25) return 5;
-  if (agentCapacity >= 15) return 3;
-  if (agentCapacity >= 7) return 2;
-  if (agentCapacity >= 1) return 1;
+  logger.warn('Paket ayarında maxTeams yok/geçersiz; takım kotası 0 (kapalı) kabul edildi.');
   return 0;
 }

@@ -1,0 +1,675 @@
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  PortfolioApprovalStatus,
+  ProjectSetupStatus,
+  Role,
+  UnitStatus,
+  UyelikDurumu,
+} from '@prisma/client';
+
+import { PrismaService } from '../prisma/prisma.service';
+import {
+  countsAgainstActivePortfolioLimit,
+  isPortfolioBusinessRole,
+} from './portfolio-policy';
+import { UnitsService } from './units.service';
+import type { PoolPublicationInput } from './pool-publication.service';
+
+type CurrentUserPayload = {
+  id: string;
+  role?: Role | string;
+};
+
+type ProjectAccessSnapshot = {
+  id: string;
+  ownerId: string;
+  code: string | null;
+  declaredIndependentUnitCount: number | null;
+  declaredSalesInventoryCount: number | null;
+  plannedUnitTypes: unknown[];
+  setupStatus: ProjectSetupStatus | null;
+  owner: {
+    role: Role;
+  };
+  _count: {
+    blocks: number;
+    mediaPackages: number;
+    designReviewRequests: number;
+  };
+};
+
+const policyUnitInclude = {
+  salesRepresentative: { select: { id: true, firstName: true, lastName: true, phone: true, role: true } },
+  project: {
+    select: {
+      id: true,
+      name: true,
+      city: true,
+      district: true,
+      neighborhood: true,
+      address: true,
+      latitude: true,
+      longitude: true,
+      mapAddress: true,
+      placeId: true,
+      ownerId: true,
+      owner: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          memberCode: true, companyName: true, office: { select: { name: true } },
+        },
+      },
+    },
+  },
+  mediaPackage: { select: { assets: { orderBy: [{ isCover: 'desc' as const }, { sortOrder: 'asc' as const }], select: { id: true, url: true, supabaseUrl: true, isCover: true, sortOrder: true } } } },
+  images: {
+    orderBy: [
+      { isCover: 'desc' as const },
+      { sortOrder: 'asc' as const },
+      { createdAt: 'asc' as const },
+    ],
+  },
+  authorityDocuments: {
+    orderBy: { createdAt: 'desc' as const },
+  },
+};
+
+@Injectable()
+export class PolicyAwareUnitsService extends UnitsService {
+  constructor(private readonly policyPrisma: PrismaService) {
+    super(policyPrisma);
+  }
+
+  private isPolicySuperAdmin(user?: CurrentUserPayload) {
+    return String(user?.role || '').toUpperCase() === Role.SUPER_ADMIN;
+  }
+
+  private ensurePolicyOwnerOrSuperAdmin(
+    user: CurrentUserPayload,
+    ownerId: string,
+  ) {
+    if (this.isPolicySuperAdmin(user)) return;
+
+    if (user.id !== ownerId) {
+      throw new ForbiddenException(
+        'Bu portföy için işlem yetkiniz yok.',
+      );
+    }
+  }
+
+  private ensurePolicySupportedPortfolioRole(
+    user: CurrentUserPayload,
+    ownerRole?: Role | string | null,
+  ) {
+    if (this.isPolicySuperAdmin(user)) return;
+
+    if (!isPortfolioBusinessRole(ownerRole || user.role)) {
+      throw new ForbiddenException(
+        'Bu kullanıcı rolü için portföy işlemi tanımlı değildir.',
+      );
+    }
+  }
+
+  private isPolicyProjectSalesProject(project: ProjectAccessSnapshot) {
+    return Boolean(
+      project.code ||
+        project.declaredIndependentUnitCount !== null ||
+        project.declaredSalesInventoryCount !== null ||
+        project.plannedUnitTypes.length > 0 ||
+        project._count.blocks > 0 ||
+        project._count.mediaPackages > 0 ||
+        project._count.designReviewRequests > 0,
+    );
+  }
+
+  private getPolicyClassicPortfolioProjectWhere() {
+    return {
+      code: null,
+      declaredIndependentUnitCount: null,
+      declaredSalesInventoryCount: null,
+      plannedUnitTypes: {
+        isEmpty: true,
+      },
+      blocks: {
+        none: {},
+      },
+      mediaPackages: {
+        none: {},
+      },
+      designReviewRequests: {
+        none: {},
+      },
+    };
+  }
+
+  private async getPolicyProjectAccessSnapshot(
+    projectId: string,
+  ): Promise<ProjectAccessSnapshot> {
+    const project = await this.policyPrisma.project.findUnique({
+      where: {
+        id: projectId,
+      },
+      select: {
+        id: true,
+        ownerId: true,
+        code: true,
+        declaredIndependentUnitCount: true,
+        declaredSalesInventoryCount: true,
+        plannedUnitTypes: true,
+        setupStatus: true,
+        owner: {
+          select: {
+            role: true,
+          },
+        },
+        _count: {
+          select: {
+            blocks: true,
+            mediaPackages: true,
+            designReviewRequests: true,
+          },
+        },
+      },
+    });
+
+    if (!project) {
+      throw new NotFoundException('Proje bulunamadı.');
+    }
+
+    return project as ProjectAccessSnapshot;
+  }
+
+  private async getPolicyUnitAccessSnapshot(id: string) {
+    const unit = await this.policyPrisma.unit.findUnique({
+      where: {
+        id,
+      },
+      include: {
+        project: {
+          select: {
+            id: true,
+            ownerId: true,
+            code: true,
+            declaredIndependentUnitCount: true,
+            declaredSalesInventoryCount: true,
+            plannedUnitTypes: true,
+            setupStatus: true,
+            owner: {
+              select: {
+                role: true,
+              },
+            },
+            _count: {
+              select: {
+                blocks: true,
+                mediaPackages: true,
+                designReviewRequests: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!unit) {
+      throw new NotFoundException('Portföy bulunamadı.');
+    }
+
+    return unit;
+  }
+
+  private async getPolicyActiveMembershipPackage(userId: string) {
+    const now = new Date();
+
+    const activeMembership =
+      await this.policyPrisma.kullaniciUyelikPaketi.findFirst({
+        where: {
+          kullaniciId: userId,
+          durum: UyelikDurumu.AKTIF,
+          baslangicTarihi: {
+            lte: now,
+          },
+          OR: [
+            {
+              bitisTarihi: null,
+            },
+            {
+              bitisTarihi: {
+                gte: now,
+              },
+            },
+          ],
+        },
+        orderBy: {
+          baslangicTarihi: 'desc',
+        },
+      });
+
+    if (!activeMembership) {
+      throw new ForbiddenException(
+        'Portföy işlemleri için aktif üyelik paketi gereklidir.',
+      );
+    }
+
+    const membershipPackage =
+      await this.policyPrisma.uyelikPaketi.findUnique({
+        where: {
+          id: activeMembership.paketId,
+        },
+        select: {
+          paketKodu: true,
+          paketAdi: true,
+          aktifPortfoyLimiti: true,
+          aktifMi: true,
+        },
+      });
+
+    if (!membershipPackage || !membershipPackage.aktifMi) {
+      throw new ForbiddenException(
+        'Üyelik paketiniz aktif olmadığı için portföy işlemleri kullanılamıyor.',
+      );
+    }
+
+    return membershipPackage;
+  }
+
+  private async ensurePolicyActivePortfolioCapacity(
+    user: CurrentUserPayload,
+    ownerId: string,
+    excludeUnitId?: string,
+  ) {
+    if (this.isPolicySuperAdmin(user)) return;
+
+    const membershipPackage =
+      await this.getPolicyActiveMembershipPackage(ownerId);
+
+    const activePortfolioCount =
+      await this.policyPrisma.unit.count({
+        where: {
+          id: excludeUnitId
+            ? {
+                not: excludeUnitId,
+              }
+            : undefined,
+          status: {
+            notIn: [
+              UnitStatus.SATILDI,
+              UnitStatus.KIRALANDII,
+              UnitStatus.PASIF,
+            ],
+          },
+          project: {
+            ownerId,
+            ...this.getPolicyClassicPortfolioProjectWhere(),
+          },
+        },
+      });
+
+    const limit = Math.max(
+      0,
+      Number(membershipPackage.aktifPortfoyLimiti || 0),
+    );
+
+    if (activePortfolioCount >= limit) {
+      throw new BadRequestException(
+        `${membershipPackage.paketAdi} paketinizde aktif portföy limitiniz ${limit}. ` +
+          `Aktif portföy sayınız ${activePortfolioCount}. ` +
+          'Yeni aktif portföy için mevcut bir portföyü Satıldı, Kiralandı veya Pasif durumuna alabilirsiniz.',
+      );
+    }
+  }
+
+  override async create(
+    user: CurrentUserPayload,
+    projectId: string,
+    data: any,
+  ) {
+    const project = await this.getPolicyProjectAccessSnapshot(projectId);
+
+    this.ensurePolicyOwnerOrSuperAdmin(user, project.ownerId);
+    this.ensurePolicySupportedPortfolioRole(user, project.owner.role);
+
+    if (
+      !this.isPolicyProjectSalesProject(project) &&
+      countsAgainstActivePortfolioLimit(
+        data?.status || UnitStatus.SATILIK,
+      )
+    ) {
+      await this.ensurePolicyActivePortfolioCapacity(
+        user,
+        project.ownerId,
+      );
+    }
+
+    return super.create(user, projectId, data);
+  }
+
+  private async ensurePolicyPublicationAccess(
+    id: string,
+    user: CurrentUserPayload,
+  ) {
+    const unit = await this.getPolicyUnitAccessSnapshot(id);
+
+    this.ensurePolicyOwnerOrSuperAdmin(
+      user,
+      unit.project.ownerId,
+    );
+    this.ensurePolicySupportedPortfolioRole(
+      user,
+      unit.project.owner.role,
+    );
+
+    if (this.isPolicyProjectSalesProject(unit.project as ProjectAccessSnapshot)) {
+      throw new BadRequestException(
+        'Proje Satış Merkezi portföyleri klasik portföy yayın akışını kullanamaz.',
+      );
+    }
+
+    if (!countsAgainstActivePortfolioLimit(unit.status)) {
+      throw new BadRequestException(
+        'Satıldı, Kiralandı veya Pasif durumundaki portföy Havuzda yayınlanamaz.',
+      );
+    }
+
+    await this.ensurePolicyActivePortfolioCapacity(
+      user,
+      unit.project.ownerId,
+      unit.id,
+    );
+  }
+
+  override async publicationQuote(id: string, user: CurrentUserPayload, selection: PoolPublicationInput = {}) {
+    await this.ensurePolicyPublicationAccess(id, user);
+    return super.publicationQuote(id, user, selection);
+  }
+
+  override async submitApproval(id: string, user: CurrentUserPayload, body?: PoolPublicationInput) {
+    await this.ensurePolicyPublicationAccess(id, user);
+    return super.submitApproval(id, user, body);
+  }
+
+  override async removeFromPool(
+    id: string,
+    user: CurrentUserPayload,
+  ) {
+    const unit = await this.getPolicyUnitAccessSnapshot(id);
+
+    this.ensurePolicyOwnerOrSuperAdmin(
+      user,
+      unit.project.ownerId,
+    );
+    this.ensurePolicySupportedPortfolioRole(
+      user,
+      unit.project.owner.role,
+    );
+
+    if (!unit.isPoolVisible) {
+      throw new BadRequestException(
+        'Bu portföy Havuzda yayınlanmıyor.',
+      );
+    }
+
+    return this.policyPrisma.unit.update({
+      where: {
+        id,
+      },
+      data: {
+        approvalStatus: PortfolioApprovalStatus.TASLAK,
+        submittedForApprovalAt: null,
+        approvedAt: null,
+        rejectedAt: null,
+        approvalNote:
+          'Portföy sahibi tarafından Havuzdan kaldırıldı. İstenildiğinde doğrudan yeniden yayınlanabilir.',
+        isPoolVisible: false,
+        poolRemovedAt: new Date(),
+      },
+      include: policyUnitInclude,
+    });
+  }
+
+  override async updateStatus(
+    id: string,
+    user: CurrentUserPayload,
+    status: UnitStatus,
+  ) {
+    const unit = await this.getPolicyUnitAccessSnapshot(id);
+
+    this.ensurePolicyOwnerOrSuperAdmin(
+      user,
+      unit.project.ownerId,
+    );
+    this.ensurePolicySupportedPortfolioRole(
+      user,
+      unit.project.owner.role,
+    );
+
+    const currentCounts =
+      countsAgainstActivePortfolioLimit(unit.status);
+    const nextCounts =
+      countsAgainstActivePortfolioLimit(status);
+
+    if (!currentCounts && nextCounts) {
+      await this.ensurePolicyActivePortfolioCapacity(
+        user,
+        unit.project.ownerId,
+        unit.id,
+      );
+    }
+
+    const shouldLeavePool = !nextCounts;
+
+    return this.policyPrisma.unit.update({
+      where: {
+        id,
+      },
+      data: {
+        status,
+        approvalStatus: shouldLeavePool
+          ? PortfolioApprovalStatus.TASLAK
+          : unit.approvalStatus,
+        isPoolVisible: shouldLeavePool
+          ? false
+          : unit.isPoolVisible,
+        poolRemovedAt: shouldLeavePool
+          ? new Date()
+          : unit.poolRemovedAt,
+        approvalNote: shouldLeavePool
+          ? `Portföy ${status} durumuna alındığı için Havuzdan kaldırıldı.`
+          : unit.approvalNote,
+      },
+      include: policyUnitInclude,
+    });
+  }
+
+  override async update(
+    id: string,
+    user: CurrentUserPayload,
+    data: any,
+  ) {
+    const unit = await this.getPolicyUnitAccessSnapshot(id);
+
+    this.ensurePolicyOwnerOrSuperAdmin(
+      user,
+      unit.project.ownerId,
+    );
+    this.ensurePolicySupportedPortfolioRole(
+      user,
+      unit.project.owner.role,
+    );
+
+    const nextStatus =
+      (data?.status as UnitStatus | undefined) ||
+      unit.status;
+
+    const currentCounts =
+      countsAgainstActivePortfolioLimit(unit.status);
+    const nextCounts =
+      countsAgainstActivePortfolioLimit(nextStatus);
+
+    if (!currentCounts && nextCounts) {
+      await this.ensurePolicyActivePortfolioCapacity(
+        user,
+        unit.project.ownerId,
+        unit.id,
+      );
+    }
+
+    const wasPoolVisible =
+      unit.isPoolVisible ||
+      unit.approvalStatus ===
+        PortfolioApprovalStatus.HAVUZDA;
+
+    if (!wasPoolVisible) {
+      return super.update(id, user, data);
+    }
+
+    if (nextCounts) {
+      await this.ensurePolicyActivePortfolioCapacity(
+        user,
+        unit.project.ownerId,
+        unit.id,
+      );
+    }
+
+    const originalState = {
+      approvalStatus: unit.approvalStatus,
+      isPoolVisible: unit.isPoolVisible,
+      submittedForApprovalAt:
+        unit.submittedForApprovalAt,
+      approvedAt: unit.approvedAt,
+      rejectedAt: unit.rejectedAt,
+      approvalNote: unit.approvalNote,
+      poolPublishedAt: unit.poolPublishedAt,
+      poolRemovedAt: unit.poolRemovedAt,
+    };
+
+    await this.policyPrisma.unit.update({
+      where: {
+        id,
+      },
+      data: {
+        approvalStatus:
+          PortfolioApprovalStatus.TASLAK,
+        isPoolVisible: false,
+        poolRemovedAt: new Date(),
+      },
+    });
+
+    try {
+      const updated = await super.update(
+        id,
+        user,
+        data,
+      );
+
+      if (!nextCounts) {
+        const removedAt = new Date();
+
+        await this.policyPrisma.unit.update({
+          where: {
+            id,
+          },
+          data: {
+            approvalStatus:
+              PortfolioApprovalStatus.TASLAK,
+            isPoolVisible: false,
+            submittedForApprovalAt: null,
+            approvedAt: null,
+            rejectedAt: null,
+            poolRemovedAt: removedAt,
+            approvalNote:
+              `Portföy ${nextStatus} durumuna alındığı için Havuzdan kaldırıldı.`,
+          },
+        });
+
+        return {
+          ...updated,
+          approvalStatus:
+            PortfolioApprovalStatus.TASLAK,
+          isPoolVisible: false,
+          submittedForApprovalAt: null,
+          approvedAt: null,
+          rejectedAt: null,
+          poolRemovedAt: removedAt,
+          approvalNote:
+            `Portföy ${nextStatus} durumuna alındığı için Havuzdan kaldırıldı.`,
+        };
+      }
+
+      const publishedAt =
+        originalState.poolPublishedAt ||
+        new Date();
+
+      await this.policyPrisma.unit.update({
+        where: {
+          id,
+        },
+        data: {
+          approvalStatus:
+            PortfolioApprovalStatus.HAVUZDA,
+          isPoolVisible: true,
+          submittedForApprovalAt: null,
+          approvedAt: null,
+          rejectedAt: null,
+          poolPublishedAt: publishedAt,
+          poolRemovedAt: null,
+          approvalNote:
+            'Havuzdaki portföy sahibi tarafından güncellendi; doğrudan yayın durumu korundu.',
+        },
+      });
+
+      return {
+        ...updated,
+        approvalStatus:
+          PortfolioApprovalStatus.HAVUZDA,
+        isPoolVisible: true,
+        submittedForApprovalAt: null,
+        approvedAt: null,
+        rejectedAt: null,
+        poolPublishedAt: publishedAt,
+        poolRemovedAt: null,
+        approvalNote:
+          'Havuzdaki portföy sahibi tarafından güncellendi; doğrudan yayın durumu korundu.',
+      };
+    } catch (error) {
+      await this.policyPrisma.unit.update({
+        where: {
+          id,
+        },
+        data: originalState,
+      });
+
+      throw error;
+    }
+  }
+
+  override async remove(
+    id: string,
+    user: CurrentUserPayload,
+  ) {
+    const unit = await this.getPolicyUnitAccessSnapshot(id);
+
+    this.ensurePolicyOwnerOrSuperAdmin(
+      user,
+      unit.project.ownerId,
+    );
+    this.ensurePolicySupportedPortfolioRole(
+      user,
+      unit.project.owner.role,
+    );
+
+    return this.policyPrisma.unit.delete({
+      where: {
+        id,
+      },
+    });
+  }
+}

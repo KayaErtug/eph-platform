@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import Link from "next/link";
+import { ContactForm } from "@/components/ContactForm";
+import { useAuthStore } from "@/store/auth.store";
 import {
   ArrowRight,
   ArrowUp,
@@ -11,6 +13,7 @@ import {
   ChevronRight,
   CirclePlay,
   Cookie,
+  Download,
   Home,
   LogIn,
   MapPin,
@@ -18,6 +21,7 @@ import {
   Phone,
   PieChart,
   ShieldCheck,
+  Smartphone,
   UsersRound,
   X,
 } from "lucide-react";
@@ -49,9 +53,9 @@ const marqueeCards = Array.from({ length: 17 }, (_, index) => {
 });
 
 const stats = [
-  { icon: Building2, value: "25.000+", label: "Aktif Portföy" },
-  { icon: UsersRound, value: "10.000+", label: "Kayıtlı Üye" },
-  { icon: PieChart, value: "1.500+", label: "Günlük Talep" },
+  { icon: Building2, value: "25.000+", label: "Aktif Portföy Hedefi" },
+  { icon: UsersRound, value: "10.000+", label: "Kayıtlı Üye Hedefi" },
+  { icon: PieChart, value: "1.500+", label: "Günlük Talep Hedefi" },
   { icon: ShieldCheck, value: "7/24", label: "Canlı Destek" },
 ];
 
@@ -64,9 +68,9 @@ const heroTrustSignals = [
 ];
 
 const heroProofPoints = [
-  { value: "25.000+", label: "paylaşıma hazır portföy" },
-  { value: "10.000+", label: "doğrulanmış üye" },
-  { value: "1.500+", label: "günlük talep hareketi" },
+  { value: "25.000+", label: "paylaşıma hazır portföy hedefi" },
+  { value: "10.000+", label: "doğrulanmış üye hedefi" },
+  { value: "1.500+", label: "günlük talep hareketi hedefi" },
 ];
 
 function useScrollReveal() {
@@ -241,6 +245,14 @@ function VerticalMarquee() {
 
 function Header() {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const token = useAuthStore((state) => state.token);
+  const hasHydrated = useAuthStore((state) => state.hasHydrated);
+  const signedIn = mounted && hasHydrated && Boolean(token);
+  const accountHref = signedIn ? "/ucretlendirme" : "/giris";
+  const accountLabel = signedIn ? "PK Satın Al" : "Giriş Yap";
+
+  useEffect(() => setMounted(true), []);
 
   return (
     <>
@@ -256,21 +268,20 @@ function Header() {
 
           <nav className="hidden items-center gap-10 text-[13px] font-medium text-white/78 lg:flex">
             <a href="#ozellikler" className="transition hover:text-white">Özellikler</a>
-            <a href="#fiyatlandirma" className="transition hover:text-white">Fiyatlandırma</a>
-            <a href="#blog" className="transition hover:text-white">Blog</a>
+            <a href="#indir" className="transition hover:text-white">Uygulama İndir</a>
+            <a href="#fiyatlandirma" className="transition hover:text-white">İstatistikler</a>
             <a href="#iletisim" className="transition hover:text-white">İletişim</a>
           </nav>
 
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-            <Link href="/kayit" className="shine-button relative inline-flex h-10 items-center justify-center gap-2 overflow-hidden rounded-[10px] border border-blue-300/35 bg-[#2563EB] px-3.5 text-[12px] font-semibold text-white shadow-[0_12px_34px_rgba(37,99,235,.30)] transition hover:-translate-y-0.5 hover:bg-[#1D4ED8] sm:h-11 sm:px-5 sm:text-[13px]">
-              Başvur
-              <ArrowRight size={15} />
+            <a href="#indir" className="shine-button relative inline-flex h-10 items-center justify-center gap-2 overflow-hidden rounded-[10px] border border-blue-300/35 bg-[#2563EB] px-4 text-[12px] font-semibold text-white shadow-[0_12px_34px_rgba(37,99,235,.30)] transition hover:-translate-y-0.5 hover:bg-[#1D4ED8] sm:h-11 sm:px-5 sm:text-[13px]">
+              <Smartphone size={15} />
+              Uygulamayı İndir
+            </a>
+            <Link href={accountHref} className="inline-flex h-10 items-center justify-center rounded-[10px] border border-white/16 bg-white/[0.05] px-3 text-[12px] font-semibold text-white/90 transition hover:-translate-y-0.5 hover:border-white/28 hover:bg-white/[0.10] sm:h-11 sm:px-5 sm:text-[13px]">
+              {accountLabel}
             </Link>
-            <Link href="/giris" className="hidden h-10 items-center justify-center gap-2 rounded-[10px] border border-white/12 bg-white/[0.05] px-3.5 text-[12px] font-semibold text-white/84 transition hover:-translate-y-0.5 hover:border-white/24 hover:bg-white/[0.09] md:inline-flex md:h-11 md:px-5 md:text-[13px]">
-              <LogIn size={15} />
-              Giriş
-            </Link>
-            <button type="button" onClick={() => setOpen(true)} className="flex h-10 w-10 items-center justify-center rounded-[10px] border border-white/10 text-white/82 transition hover:bg-white/8 sm:h-11 sm:w-11" aria-label="Menü">
+            <button type="button" onClick={() => setOpen(true)} aria-expanded={open} aria-controls="landing-menu" className="flex h-10 w-10 items-center justify-center rounded-[10px] border border-white/10 text-white/82 transition hover:bg-white/8 sm:h-11 sm:w-11" aria-label="Menü">
               <Menu size={23} strokeWidth={1.7} />
             </button>
           </div>
@@ -278,17 +289,19 @@ function Header() {
       </header>
 
       <div className={`fixed inset-0 z-[80] bg-[#071326]/70 backdrop-blur-sm transition ${open ? "opacity-100" : "pointer-events-none opacity-0"}`} onClick={() => setOpen(false)} />
-      <aside className={`fixed right-4 top-4 z-[90] w-[calc(100%-32px)] max-w-[360px] rounded-[24px] border border-white/14 bg-[#10213B] p-5 shadow-[0_30px_100px_rgba(0,0,0,.45)] transition md:right-7 md:top-7 ${open ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-4 opacity-0"}`}>
+      <aside id="landing-menu" inert={!open} className={`fixed right-4 top-4 z-[90] w-[calc(100%-32px)] max-w-[360px] rounded-[24px] border border-white/14 bg-[#10213B] p-5 shadow-[0_30px_100px_rgba(0,0,0,.45)] transition md:right-7 md:top-7 ${open ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-4 opacity-0"}`}>
         <button type="button" onClick={() => setOpen(false)} className="ml-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/14 text-white" aria-label="Kapat">
           <X size={18} />
         </button>
         <div className="mt-4 grid gap-3 text-[16px] font-semibold text-white">
           <a onClick={() => setOpen(false)} href="#ozellikler">Özellikler</a>
-          <a onClick={() => setOpen(false)} href="#fiyatlandirma">Fiyatlandırma</a>
-          <a onClick={() => setOpen(false)} href="#blog">Blog</a>
+          <a onClick={() => setOpen(false)} href="#indir">Uygulama İndir</a>
+          <a onClick={() => setOpen(false)} href="#fiyatlandirma">İstatistikler</a>
           <a onClick={() => setOpen(false)} href="#iletisim">İletişim</a>
-          <Link href="/kayit" className="mt-4 rounded-[12px] bg-[#2563EB] px-4 py-3 text-center">Ücretsiz Başvur</Link>
-          <Link href="/giris" className="rounded-[12px] border border-white/16 px-4 py-3 text-center text-white/82">Giriş Yap</Link>
+          <a onClick={() => setOpen(false)} href="#indir" className="mt-4 inline-flex items-center justify-center gap-2 rounded-[12px] bg-[#2563EB] px-4 py-3 text-center text-white">
+            <Smartphone size={18} /> Mobil Uygulamayı İndir
+          </a>
+          <Link onClick={() => setOpen(false)} href={accountHref} className="inline-flex items-center justify-center rounded-[12px] border border-white/16 px-4 py-3 text-center text-white/90">{accountLabel}</Link>
         </div>
       </aside>
     </>
@@ -316,7 +329,7 @@ function Hero() {
       <div className="relative z-10 mx-auto grid min-h-[920px] max-w-[1380px] items-center gap-12 px-5 pb-16 pt-28 md:px-10 lg:min-h-[810px] lg:grid-cols-[0.9fr_1.1fr] lg:gap-16 lg:pb-10 lg:pt-24">
         <div className="mx-auto max-w-[650px] text-center lg:mx-0 lg:text-left" data-reveal>
           <div className="mx-auto mb-5 inline-flex items-center gap-2 rounded-full border border-blue-300/20 bg-white/[0.07] px-4 py-2 text-[11px] font-bold uppercase tracking-[0.2em] text-[#BFDBFE] backdrop-blur-xl lg:mx-0">
-            <ShieldCheck size={15} /> Admin onaylı kapalı devre profesyonel ağ
+            <Smartphone size={15} /> Resmi Mobil Uygulama · Sadece Cebinizde
           </div>
 
           <h1 className="text-[42px] font-light leading-[1.07] tracking-[-0.055em] text-white sm:text-[56px] md:text-[68px] lg:text-[72px]">
@@ -328,19 +341,15 @@ function Hero() {
           </h1>
 
           <p className="mx-auto mt-7 max-w-[590px] text-[15px] font-normal leading-8 text-white/76 md:text-[17px] lg:mx-0">
-            Portföylerinizi doğrulanmış gayrimenkul profesyonelleriyle paylaşın, doğru talep ve alıcılarla daha hızlı eşleşin.
-            CRM, portföy havuzu, pazar analizi ve Lina AI tek merkezde.
+            Emlak Portföy Havuzu deneyimi artık sadece cebinizde! Portföy paylaşımı, akıllı CRM, talep eşleşmesi ve Lina AI işlevlerine Google Play ve App Store resmi mobil uygulamalarımızdan ulaşabilirsiniz.
           </p>
 
           <div className="mt-9 grid gap-3 sm:flex sm:flex-wrap sm:justify-center lg:justify-start">
-            <Link href="/kayit" className="shine-button relative inline-flex h-[56px] items-center justify-center gap-3 overflow-hidden rounded-[12px] bg-[#2563EB] px-8 text-[15px] font-semibold text-white shadow-[0_18px_48px_rgba(37,99,235,.38)] transition hover:-translate-y-1 hover:bg-[#1D4ED8]">
-              Üyelik Başvurusu Yap <ArrowRight size={18} />
-            </Link>
-            <Link href="/giris" className="inline-flex h-[56px] items-center justify-center gap-3 rounded-[12px] border border-white/22 bg-white/8 px-8 text-[15px] font-semibold text-white/94 backdrop-blur-md transition hover:-translate-y-1 hover:border-[#60A5FA] hover:bg-white/12">
-              <LogIn size={19} /> Üye Girişi
-            </Link>
-            <a href="#ozellikler" className="inline-flex h-[56px] items-center justify-center gap-3 rounded-[12px] border border-white/12 bg-[#071326]/38 px-6 text-[14px] font-medium text-white/82 backdrop-blur-md transition hover:border-white/28 hover:text-white">
-              <CirclePlay size={19} strokeWidth={1.7} /> Platformu Keşfet
+            <a href="#indir" className="shine-button relative inline-flex h-[56px] items-center justify-center gap-3 overflow-hidden rounded-[12px] bg-[#2563EB] px-8 text-[15px] font-semibold text-white shadow-[0_18px_48px_rgba(37,99,235,.38)] transition hover:-translate-y-1 hover:bg-[#1D4ED8]">
+              <Smartphone size={20} /> Mobil Uygulamayı İndir
+            </a>
+            <a href="#ozellikler" className="inline-flex h-[56px] items-center justify-center gap-3 rounded-[12px] border border-white/22 bg-white/8 px-8 text-[15px] font-semibold text-white/94 backdrop-blur-md transition hover:-translate-y-1 hover:border-[#60A5FA] hover:bg-white/12">
+              <CirclePlay size={19} strokeWidth={1.7} /> Özellikleri Keşfet
             </a>
           </div>
 
@@ -353,13 +362,18 @@ function Hero() {
             ))}
           </div>
 
-          <div className="mt-7 grid gap-3 sm:grid-cols-3">
-            {heroProofPoints.map((item) => (
-              <div key={item.label} className="rounded-[14px] border border-white/12 bg-white/[0.065] px-4 py-3 backdrop-blur-md">
-                <div className="text-[24px] font-semibold tracking-[-0.03em] text-white">{item.value}</div>
-                <div className="mt-1 text-[12px] font-medium leading-5 text-white/58">{item.label}</div>
-              </div>
-            ))}
+          <div className="mt-7">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#60A5FA]">
+              2027 Hedeflerimiz
+            </div>
+            <div className="mt-2.5 grid gap-3 sm:grid-cols-3">
+              {heroProofPoints.map((item) => (
+                <div key={item.label} className="rounded-[14px] border border-white/12 bg-white/[0.065] px-4 py-3 backdrop-blur-md">
+                  <div className="text-[24px] font-semibold tracking-[-0.03em] text-white">{item.value}</div>
+                  <div className="mt-1 text-[12px] font-medium leading-5 text-white/58">{item.label}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -487,12 +501,12 @@ function CustomerSection() {
             ))}
           </div>
 
-          <Link
-            href="/giris"
+          <a
+            href="#indir"
             className="shine-button relative mt-9 inline-flex h-[54px] items-center justify-center gap-3 overflow-hidden rounded-[12px] bg-[#2563EB] px-7 text-[14px] font-semibold text-white shadow-[0_18px_46px_rgba(37,99,235,.34)] transition hover:-translate-y-1 hover:bg-[#1D4ED8]"
           >
-            Portföyleri Keşfet <ArrowRight size={18} />
-          </Link>
+            <Smartphone size={18} /> Mobil Uygulamada Keşfet
+          </a>
         </div>
       </div>
     </section>
@@ -584,9 +598,9 @@ function AnalyticsSection() {
             ))}
           </div>
 
-          <Link href="/kayit" className="mt-8 inline-flex items-center gap-3 text-[14px] font-medium text-[#93C5FD]">
-            Detaylı Bilgi <ArrowRight size={17} />
-          </Link>
+          <a href="#indir" className="mt-8 inline-flex items-center gap-3 text-[14px] font-medium text-[#93C5FD] transition hover:text-white">
+            <Smartphone size={16} /> Detaylar Mobil Uygulamada <ArrowRight size={17} />
+          </a>
         </div>
 
         <div className="relative mx-auto w-full max-w-[620px]">
@@ -615,17 +629,91 @@ function AnalyticsSection() {
   );
 }
 
+function MobileAppDownloadSection() {
+  return (
+    <section id="indir" data-reveal className="relative overflow-hidden bg-gradient-to-b from-[#09172D] to-[#0E1E38] px-5 py-20 md:px-10">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(37,99,235,0.18),transparent_50%)] pointer-events-none" />
+      <div className="relative z-10 mx-auto max-w-[1180px] rounded-[32px] border border-blue-400/25 bg-gradient-to-br from-[#0F2347]/90 via-[#0C1B36]/90 to-[#071326]/95 p-8 shadow-[0_30px_100px_rgba(0,0,0,0.45)] backdrop-blur-2xl md:p-14">
+        <div className="grid items-center gap-10 lg:grid-cols-[1.2fr_0.8fr]">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-blue-300/20 bg-blue-500/10 px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.2em] text-[#93C5FD]">
+              <Smartphone size={15} /> Mobil Tek Kanal Deneyimi
+            </div>
+            <h2 className="mt-4 text-[32px] font-light leading-[1.12] tracking-[-0.03em] text-white sm:text-[44px]">
+              EPH Artık <span className="font-semibold text-[#60A5FA]">Sadece Mobilde!</span>
+            </h2>
+            <p className="mt-4 max-w-[580px] text-[15px] leading-7 text-white/76 sm:text-[16px]">
+              Tüm EPH özellikleri (Portföy Yönetimi, Ortak Portföy Havuzu, Talep Merkezi, CRM ve Lina AI) yalnızca resmi mobil uygulamalarımız üzerinden sunulmaktadır. Web girişine ihtiyaç duymadan cep telefonunuzla hemen başlayın.
+            </p>
+
+            <div className="mt-8 flex flex-wrap gap-4">
+              <a
+                href="https://play.google.com/store/apps/details?id=com.eph.mobile"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex h-[56px] items-center gap-3 rounded-[14px] border border-white/20 bg-white/10 px-6 text-white backdrop-blur-md transition hover:-translate-y-1 hover:border-white/40 hover:bg-white/15"
+              >
+                <svg className="h-7 w-7 text-[#60A5FA]" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M3.609 1.814L13.793 12 3.61 22.186a2.38 2.38 0 0 1-.61-.986V2.8c.174-.37.388-.707.61-.986zm11.605 11.605l2.459-2.459-11.65-6.66 9.191 9.119zm0 0l-9.191 9.119 11.65-6.66-2.459-2.459zm1.414-1.419l3.355 1.917c.94.537.94 1.419 0 1.956l-3.355 1.917-2.327-2.895 2.327-2.895z" />
+                </svg>
+                <div className="text-left leading-tight">
+                  <div className="text-[10px] uppercase tracking-wider text-white/60">Android İçin</div>
+                  <div className="text-[15px] font-bold">Google Play</div>
+                </div>
+              </a>
+
+              <a
+                href="https://apps.apple.com/app/eph-platform"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex h-[56px] items-center gap-3 rounded-[14px] border border-white/20 bg-white/10 px-6 text-white backdrop-blur-md transition hover:-translate-y-1 hover:border-white/40 hover:bg-white/15"
+              >
+                <svg className="h-7 w-7 text-[#BFDBFE]" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.62-.75 1.04-1.8 0.92-2.85-.9.04-2 .6-2.65 1.35-.58.66-1.09 1.73-.95 2.76.99.08 2.05-.51 2.68-1.26z" />
+                </svg>
+                <div className="text-left leading-tight">
+                  <div className="text-[10px] uppercase tracking-wider text-white/60">iOS / iPhone İçin</div>
+                  <div className="text-[15px] font-bold">App Store</div>
+                </div>
+              </a>
+            </div>
+
+            <div className="mt-6 flex items-center gap-2 text-[13px] text-white/60">
+              <ShieldCheck size={16} className="text-emerald-400" />
+              <span>Google Play ve App Store resmi mağaza güvencesiyle</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col items-center justify-center rounded-[24px] border border-white/10 bg-white/5 p-8 text-center backdrop-blur-xl">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-500/20 text-[#60A5FA]">
+              <Smartphone size={34} />
+            </div>
+            <div className="mt-4 text-[18px] font-bold text-white">Telefondan Anında Başlayın</div>
+            <p className="mt-2 text-[13px] leading-6 text-white/70">
+              SMS telefon doğrulaması ile şifresiz ve güvenli giriş yapın. Tüm saha operasyonlarınızı tek dokunuşla yönetin.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function StatsBand() {
   return (
     <section id="fiyatlandirma" data-reveal className="bg-[#0E1E38] px-5 py-8 md:px-10">
-      <h2 className="mb-6 text-center text-[24px] font-semibold text-white">2027 Hedeflerimiz</h2>
-      <div className="mx-auto grid max-w-[1380px] overflow-hidden rounded-[14px] border border-white/12 bg-white/[0.055] md:grid-cols-4">
-        {stats.map((item) => (
-          <div key={item.label} className="flex items-center justify-center gap-5 border-b border-white/10 px-7 py-6 last:border-b-0 md:border-b-0 md:border-r md:last:border-r-0">
-            <item.icon className="text-[#60A5FA]" size={36} strokeWidth={1.4} />
-            <div><div className="text-[30px] font-light text-white">{item.value}</div><div className="mt-1 text-[13px] text-white/58">{item.label}</div></div>
-          </div>
-        ))}
+      <div className="mx-auto max-w-[1380px]">
+        <div className="mb-3 text-center text-[11px] font-semibold uppercase tracking-[0.16em] text-[#60A5FA]">
+          2027 Hedeflerimiz
+        </div>
+        <div className="grid overflow-hidden rounded-[14px] border border-white/12 bg-white/[0.055] md:grid-cols-4">
+          {stats.map((item) => (
+            <div key={item.label} className="flex items-center justify-center gap-5 border-b border-white/10 px-7 py-6 last:border-b-0 md:border-b-0 md:border-r md:last:border-r-0">
+              <item.icon className="text-[#60A5FA]" size={36} strokeWidth={1.4} />
+              <div><div className="text-[30px] font-light text-white">{item.value}</div><div className="mt-1 text-[13px] text-white/58">{item.label}</div></div>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );
@@ -707,35 +795,17 @@ function HelpDrawer() {
 
       <div className={`fixed inset-0 z-[85] bg-[#061225]/62 backdrop-blur-sm transition ${open ? "opacity-100" : "pointer-events-none opacity-0"}`} onClick={() => setOpen(false)} />
 
-      <aside className={`fixed bottom-0 right-0 z-[90] w-full max-w-[390px] rounded-t-[24px] border border-white/14 bg-[#10213B] p-5 shadow-[0_30px_100px_rgba(0,0,0,.48)] transition md:bottom-6 md:right-6 md:rounded-[24px] ${open ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-8 opacity-0"}`}>
+      <aside inert={!open} aria-labelledby="contact-title" className={`fixed bottom-0 right-0 z-[90] max-h-[90dvh] w-full max-w-[390px] overflow-y-auto rounded-t-[24px] border border-white/14 bg-[#10213B] p-5 shadow-[0_30px_100px_rgba(0,0,0,.48)] transition md:bottom-6 md:right-6 md:rounded-[24px] ${open ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-8 opacity-0"}`}>
         <button type="button" onClick={() => setOpen(false)} className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full border border-white/14 text-white/78" aria-label="Kapat">
           <X size={17} />
         </button>
 
         <div className="pr-10">
-          <div className="text-[20px] font-semibold text-white">Size nasıl yardımcı olabiliriz?</div>
+          <h2 id="contact-title" className="text-[20px] font-semibold text-white">Size nasıl yardımcı olabiliriz?</h2>
           <p className="mt-2 text-[13px] leading-6 text-white/62">Formu doldurun, EPH ekibi kısa süre içinde sizinle iletişime geçsin.</p>
         </div>
 
-        <div className="mt-5 grid gap-3">
-          <input className="h-11 rounded-[10px] border border-white/12 bg-white/[0.06] px-4 text-[13px] text-white outline-none placeholder:text-white/38 focus:border-[#60A5FA]" placeholder="Ad Soyad" />
-          <input className="h-11 rounded-[10px] border border-white/12 bg-white/[0.06] px-4 text-[13px] text-white outline-none placeholder:text-white/38 focus:border-[#60A5FA]" placeholder="Telefon" />
-          <input className="h-11 rounded-[10px] border border-white/12 bg-white/[0.06] px-4 text-[13px] text-white outline-none placeholder:text-white/38 focus:border-[#60A5FA]" placeholder="E-posta" />
-
-          <div className="grid grid-cols-2 gap-3">
-            <label className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-[10px] border border-white/12 text-[12px] text-white/72">
-              <input type="radio" name="office" defaultChecked /> Ofisim Var
-            </label>
-            <label className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-[10px] border border-white/12 text-[12px] text-white/72">
-              <input type="radio" name="office" /> Yok
-            </label>
-          </div>
-
-          <button type="button" className="h-11 rounded-[10px] bg-[#2563EB] text-[13px] font-semibold text-white">Gönder</button>
-          <a href={whatsappUrl} target="_blank" rel="noreferrer" className="flex h-11 items-center justify-center gap-2 rounded-[10px] border border-white/12 text-[13px] font-medium text-white/76">
-            <Phone size={16} /> {whatsappNumber}
-          </a>
-        </div>
+        <ContactForm whatsappUrl={whatsappUrl} whatsappNumber={whatsappNumber} />
       </aside>
     </>
   );
@@ -787,6 +857,7 @@ export default function LandingPage() {
       <PortfolioSlider />
       <CustomerSection />
       <AnalyticsSection />
+      <MobileAppDownloadSection />
       <StatsBand />
       <footer id="iletisim" className="bg-[#F6FAFF] px-5 pt-12 md:px-10">
         <div className="mx-auto max-w-[1180px] rounded-[24px] border border-[#DCE7F5] bg-white p-6 shadow-[0_18px_50px_rgba(15,30,53,.06)] md:p-8">
@@ -804,6 +875,15 @@ export default function LandingPage() {
               <p className="mx-auto mt-4 max-w-[320px] text-[13px] leading-6 text-[#51657F]">
                 Gayrimenkul profesyonelleri için geliştirilmiş modern portföy, CRM ve pazar analizi platformu.
               </p>
+
+              {/* Yasal Sözleşmeler ve Şartlar (iyzico ve Mevzuat Uyumu) */}
+              <div className="mt-5 flex flex-wrap justify-center gap-x-4 gap-y-2 border-t border-[#E6EEF8] pt-4 text-[12px] font-semibold text-[#2563EB]">
+                <Link href="/gizlilik-politikasi" className="hover:underline">Gizlilik Politikası</Link>
+                <Link href="/kullanici-sozlesmesi" className="hover:underline">Kullanıcı Sözleşmesi</Link>
+                <Link href="/teslimat-ve-iade" className="hover:underline">Teslimat ve İade Şartları</Link>
+                <Link href="/kvkk" className="hover:underline">KVKK</Link>
+                <Link href="/cerez-politikasi" className="hover:underline">Çerez Politikası</Link>
+              </div>
             </div>
 
             <div className="text-center md:text-right">
@@ -888,7 +968,7 @@ export default function LandingPage() {
           <div className="mt-2 text-[12px] font-semibold text-[#51657F]">Sayfa Başına Dön</div>
 
           <div className="mx-auto mt-6 max-w-[720px] border-t border-[#E6EEF8] pt-5 text-center text-[12px] font-medium text-[#6A7E96]">
-            © {new Date().getFullYear()} EPH — Emlak Portföy Havuzu. Tüm hakları saklıdır.
+            © 2024 EPH — Emlak Portföy Havuzu. Tüm hakları saklıdır.
           </div>
         </div>
       </section>

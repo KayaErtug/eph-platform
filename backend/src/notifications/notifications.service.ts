@@ -316,6 +316,32 @@ export class NotificationsService {
     return { ok: true, updatedCount: result.count };
   }
 
+  async delete(userId: string, id: string) {
+    const result = await this.prisma.networkNotification.deleteMany({
+      where: { id, userId },
+    });
+    if (!result.count) throw new NotFoundException('Bildirim bulunamadı.');
+    return { ok: true };
+  }
+
+  async deleteAll(userId: string) {
+    const result = await this.prisma.networkNotification.deleteMany({
+      where: { userId },
+    });
+    return { ok: true, deletedCount: result.count };
+  }
+
+  async dismiss(userId: string, body: { type?: string; actionUrl?: string }) {
+    const where: Prisma.NetworkNotificationWhereInput = { userId, isRead: false };
+    if (body.type) where.type = body.type;
+    if (body.actionUrl) where.actionUrl = body.actionUrl;
+    const result = await this.prisma.networkNotification.updateMany({
+      where,
+      data: { isRead: true },
+    });
+    return { ok: true, updatedCount: result.count };
+  }
+
   private async deliver(row: NetworkNotification) {
     const now = new Date();
     if (row.pushAttempts >= 3) return;

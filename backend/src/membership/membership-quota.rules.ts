@@ -1,6 +1,8 @@
 import { BadRequestException } from '@nestjs/common';
 import { KotaDonemi, Prisma, Role } from '@prisma/client';
 import { resolvePoolAccess } from './pool-access';
+import { entitlementSource, resolveOfficeEntitlements } from '../office/office-entitlement.service';
+import { ServiceUnavailableException } from '@nestjs/common';
 
 export async function consumeMembershipQuota(tx: Prisma.TransactionClient, actorId: string, kind: 'TALEP' | 'HAVUZ') {
   const actor = await tx.user.findUnique({ where: { id: actorId }, select: { role: true, officeId: true } });
@@ -11,6 +13,15 @@ export async function consumeMembershipQuota(tx: Prisma.TransactionClient, actor
     : actor.officeId
     ? await tx.office.findUnique({ where: { id: actor.officeId }, select: { id: true, ownerUserId: true } })
     : await tx.office.findFirst({ where: { ownerUserId: actorId, isActive: true }, select: { id: true, ownerUserId: true } });
+  // ODM-7G-D F09: relational modda Ücretsiz ofisin AKTİF ilan/talep sınırı (havuzIlanMax/talepMax) AKTİF KAYIT sayacı ister; aylık kota bunu uygulamaz
+  // ve eski `limit<=0 → sınırsız` kuralı Ücretsiz'i sınırsız bırakırdı. Sayaç uygulayıcısı yazılana kadar fail-closed (ücretli/deneme: aylık katalog kotası aynen sürer).
+  if (access.code === 'OFFICE_PACKAGE' && access.officeId && await entitlementSource(tx) === 'relational') {
+    const eff = await resolveOfficeEntitlements(tx, access.officeId);
+    const activeMax = kind === 'TALEP' ? eff.talepMax : eff.havuzIlanMax;
+    if (eff.state === 'UCRETSIZ' && activeMax !== null) {
+      throw new ServiceUnavailableException({ statusCode: 503, code: 'ENTITLEMENT_READER_NOT_MIGRATED', message: 'Ücretsiz paket aktif kayıt sınırı henüz uygulanamıyor; işlem geçici olarak kapalıdır.', reader: 'membership-quota' });
+    }
+  }
   const userId = office?.ownerUserId || actorId;
   const now = new Date();
   const membership = access.code === 'OFFICE_PACKAGE' ? null : await tx.kullaniciUyelikPaketi.findFirst({

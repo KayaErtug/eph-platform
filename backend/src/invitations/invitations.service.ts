@@ -42,6 +42,7 @@ export class InvitationsService {
 
   private readonly rolKodlari: Record<Role, string> = {
     EMLAKCI: 'EML',
+    OFIS_BOY: 'OFB',
     MUTEAHHIT: 'MUT',
     INSAAT_FIRMASI: 'INS',
     MODERATOR: 'MOD',

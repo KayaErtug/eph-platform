@@ -443,7 +443,7 @@ export class PoolProjectsService {
   private projectInclude() {
     return {
       owner: {
-        select: { id: true, role: true, office: { select: { ownerUserId: true } } },
+        select: { id: true, role: true, officeId: true, office: { select: { id: true, name: true, ownerUserId: true } } },
       },
       blocks: {
         where: { isActive: true },

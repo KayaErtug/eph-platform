@@ -1,3 +1,4 @@
+import { isAccountDeleted } from '../auth/account-deletion';
 import { Cron } from '@nestjs/schedule';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'crypto';
@@ -38,6 +39,7 @@ export class NativePushService {
     const valueJson = { userId, token, platform: String(body.platform), sound: body.sound !== false, preferences };
     await this.prisma.$transaction(async tx => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`native-push:${userId}`}))`;
+      if (await isAccountDeleted(tx, userId)) throw new BadRequestException('Silinen hesaba cihaz bağlanamaz.');
       const devices = await tx.systemSetting.findMany({ where: { key: { startsWith: PREFIX }, valueJson: { path: ['userId'], equals: userId } }, select: { key: true }, take: 20 });
       if (devices.length >= 20 && !devices.some(device => device.key === this.key(token))) throw new BadRequestException('Cihaz bildirim sınırına ulaşıldı. Kullanılmayan cihazların bildirimlerini kapatın.');
       await tx.systemSetting.upsert({ where: { key: this.key(token) }, create: { key: this.key(token), valueJson }, update: { valueJson } });
@@ -61,6 +63,7 @@ export class NativePushService {
   }
 
   async sendToUser(userId: string, payload: Payload, onlyToken?: string, bypassPreferences = false) {
+    if (await isAccountDeleted(this.prisma, userId)) return { ok: false, successCount: 0, failCount: 0, skippedCount: 1 };
     const rows = await this.prisma.systemSetting.findMany({ where: {
       key: onlyToken ? this.key(this.token(onlyToken)) : { startsWith: PREFIX },
       valueJson: { path: ['userId'], equals: userId },
@@ -96,6 +99,67 @@ export class NativePushService {
     }));
     this.logger.log({ event: 'EPH_PUSH', phase: 'send', userId, deviceCount: rows.length, successCount, failCount, skippedCount });
     return { ok: successCount > 0, successCount, failCount, skippedCount };
+  }
+
+  async broadcast(payload: Payload) {
+    const rows = await this.prisma.systemSetting.findMany({
+      where: { key: { startsWith: PREFIX } },
+      take: 5000,
+    });
+
+    const messages: Array<{
+      to: string;
+      title: string;
+      body: string;
+      sound: string | null;
+      channelId: string;
+      data: { url: string };
+    }> = [];
+
+    const seenTokens = new Set<string>();
+
+    for (const row of rows) {
+      const sub = row.valueJson as unknown as Subscription;
+      if (!sub?.token || seenTokens.has(sub.token)) continue;
+      seenTokens.add(sub.token);
+
+      messages.push({
+        to: sub.token,
+        title: payload.title,
+        body: payload.body,
+        sound: sub.sound !== false ? 'default' : null,
+        channelId: sub.sound !== false ? 'eph-default' : 'eph-silent',
+        data: { url: payload.url || '/' },
+      });
+    }
+
+    if (!messages.length) {
+      return { ok: true, sentCount: 0, totalDevices: 0 };
+    }
+
+    let sentCount = 0;
+    for (let i = 0; i < messages.length; i += 100) {
+      const chunk = messages.slice(i, i + 100);
+      try {
+        const response = await fetch('https://exp.host/--/api/v2/push/send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(process.env.EXPO_ACCESS_TOKEN ? { Authorization: `Bearer ${process.env.EXPO_ACCESS_TOKEN}` } : {}),
+          },
+          body: JSON.stringify(chunk),
+          signal: AbortSignal.timeout(15000),
+        });
+
+        if (response.ok) {
+          sentCount += chunk.length;
+        }
+      } catch (err) {
+        this.logger.warn({ event: 'EPH_PUSH_BROADCAST_ERROR', error: String(err) });
+      }
+    }
+
+    return { ok: sentCount > 0, sentCount, totalDevices: messages.length };
   }
 
   @Cron('*/2 * * * *')
