@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import type {
   PortfolioShareData,
-  PortfolioShareFeature,
 } from "./PortfolioShareCard";
 
 function getFeatureIcon(icon: string) {
@@ -30,21 +29,14 @@ function getFeatureIcon(icon: string) {
   return <Home className={className} />;
 }
 
-const defaultFeatures: PortfolioShareFeature[] = [
-  { icon: "pool", label: "Açık / Kapalı Havuz" },
-  { icon: "car", label: "Kapalı Otopark" },
-  { icon: "heat", label: "Yerden Isıtma" },
-  { icon: "smart", label: "Akıllı Ev" },
-  { icon: "bath", label: "Ebeveyn Banyosu" },
-  { icon: "security", label: "7/24 Güvenlik" },
-];
-
 export default function PortfolioSharePdf({
   data,
 }: {
   data: PortfolioShareData;
 }) {
-  const features = data.features?.length ? data.features : defaultFeatures;
+  const features = (data.features || [])
+    .filter((feature) => String(feature.label || "").trim())
+    .slice(0, 6);
 
   return (
     <div
@@ -85,7 +77,7 @@ export default function PortfolioSharePdf({
         <div className="grid grid-cols-[1fr_150px] gap-4">
           <div className="rounded-[26px] border border-[#DDE7F3] bg-[#F7FBFF] p-5">
             <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#64748B]">
-              Satış Fiyatı
+              Fiyat / Bedel
             </p>
 
             <p className="mt-1 text-4xl font-black tracking-[-0.06em] text-[#06194A]">
@@ -99,11 +91,11 @@ export default function PortfolioSharePdf({
             </p>
 
             <p className="mt-1 text-4xl font-black text-[#1557D6]">
-              {data.score || 92}
+              {data.score ?? 0}
             </p>
 
             <p className="text-xs font-black text-[#06194A]">
-              {data.scoreLabel || "Pekiyi"}
+              {data.scoreLabel || "Puanlanmadı"}
             </p>
           </div>
         </div>
@@ -130,7 +122,7 @@ export default function PortfolioSharePdf({
           <PdfInfo
             icon={<ShieldCheck className="h-4 w-4" />}
             label="Yetki"
-            value={data.authorization || "Alındı"}
+            value={data.authorization || "Kontrol"}
           />
         </div>
 
@@ -141,24 +133,30 @@ export default function PortfolioSharePdf({
 
           <p className="mt-3 text-sm font-semibold leading-7 text-[#475569]">
             {data.longDescription ||
-              "Denizli Merkezefendi Şemikler Mahallesi’nde, site içerisinde yer alan 170 m² büyüklüğündeki 3+1 daire satılıktır. Daire 9. katta konumlanmıştır. Yerden ısıtma, akıllı ev sistemi, sosyal donatılar ve güvenli site yaşamı ile öne çıkan yetkili portföydür."}
+              "Bu portföy için detaylı açıklama paylaşılmadı."}
           </p>
         </div>
 
-        <div className="mt-5 grid grid-cols-2 gap-3">
-          {features.slice(0, 6).map((feature) => (
-            <div
-              key={`${feature.icon}-${feature.label}`}
-              className="flex min-h-[48px] items-center gap-3 rounded-[18px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 text-sm font-black text-[#27364F]"
-            >
-              <span className="text-[#1557D6]">
-                {getFeatureIcon(feature.icon)}
-              </span>
+        {features.length > 0 ? (
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            {features.map((feature) => (
+              <div
+                key={`${feature.icon}-${feature.label}`}
+                className="flex min-h-[48px] items-center gap-3 rounded-[18px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 text-sm font-black text-[#27364F]"
+              >
+                <span className="text-[#1557D6]">
+                  {getFeatureIcon(feature.icon)}
+                </span>
 
-              {feature.label}
-            </div>
-          ))}
-        </div>
+                {feature.label}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-5 rounded-[18px] border border-[#DDE7F3] bg-[#F7FBFF] px-4 py-3 text-center text-sm font-black text-[#64748B]">
+            Bu portföy için doğrulanmış özellik paylaşılmadı.
+          </div>
+        )}
 
         <div className="mt-6 flex items-center justify-between gap-4 border-t border-[#DDE7F3] pt-5">
           <div>
@@ -171,7 +169,7 @@ export default function PortfolioSharePdf({
             </p>
 
             <p className="text-sm font-bold text-[#64748B]">
-              {data.consultantPhone || "Telefon bilgisi"}
+              {data.consultantPhone || "Telefon paylaşılmadı"}
             </p>
 
             <p className="mt-2 text-[11px] font-black uppercase tracking-[0.18em] text-[#1557D6]">

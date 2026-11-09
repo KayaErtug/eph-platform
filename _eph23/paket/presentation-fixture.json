@@ -1,0 +1,113 @@
+{
+  "project": {
+    "id": "project-fixture",
+    "name": "Örnek Yaşam Projesi",
+    "city": "Denizli",
+    "district": "Merkezefendi",
+    "neighborhood": "Örnek Mahallesi",
+    "setupStatus": "TAMAMLANDI",
+    "inPool": false,
+    "updatedAt": "2026-11-01T09:01:55.162Z"
+  },
+  "presentation": {
+    "title": "Örnek Yaşam Projesi",
+    "subtitle": "Denizli / Merkezefendi / Örnek Mahallesi",
+    "coverUrl": "https://example.test/project.jpg",
+    "constructionStatus": "%65 tamamlandı · Teslim Haziran 2027",
+    "mapUrl": "https://www.google.com/maps/search/?api=1&query=37.77,29.08",
+    "unitTypes": [
+      {
+        "label": "Daire · 2+1",
+        "count": 3,
+        "available": 2,
+        "netArea": {
+          "min": 90,
+          "max": 100
+        },
+        "grossArea": {
+          "min": 110,
+          "max": 120
+        },
+        "prices": [
+          {
+            "currency": "TRY",
+            "min": 5000000,
+            "max": 5000000
+          },
+          {
+            "currency": "USD",
+            "min": 150000,
+            "max": 150000
+          }
+        ],
+        "hasUnpriced": true
+      }
+    ],
+    "amenities": [
+      "Otopark",
+      "Havuz"
+    ],
+    "gallery": [
+      "https://example.test/project.jpg",
+      "https://example.test/second.jpg"
+    ],
+    "metrics": {
+      "totalUnits": 3,
+      "availableUnits": 2,
+      "reservedUnits": 1,
+      "closedUnits": 0,
+      "imageCount": 3
+    },
+    "highlights": [
+      "1 bloklu proje",
+      "3 bağımsız bölüm",
+      "Daire",
+      "1 sosyal/proje alanı"
+    ],
+    "highlightedUnits": [
+      {
+        "id": "unit-1",
+        "title": "Daire · 2+1",
+        "type": "Daire",
+        "roomCount": "2+1",
+        "netArea": 90,
+        "grossArea": 110,
+        "price": 5000000,
+        "priceCurrency": "TRY",
+        "status": "SATILIK",
+        "coverUrl": "https://example.test/project.jpg"
+      },
+      {
+        "id": "unit-3",
+        "title": "Daire · 2+1",
+        "type": "Daire",
+        "roomCount": "2+1",
+        "netArea": 100,
+        "grossArea": 120,
+        "price": 150000,
+        "priceCurrency": "USD",
+        "status": "SATILIK",
+        "coverUrl": null
+      }
+    ],
+    "copy": {
+      "location": [
+        "Örnek Mahallesi, Merkezefendi, Denizli konumunda yer alan Örnek Yaşam Projesi, yeni bir yaşam alanı arayışında değerlendirebileceğiniz seçeneklerden biridir.",
+        "Günlük yaşamınızı planlarken ulaşım tercihlerinizi, çalışma düzeninizi ve ihtiyaç duyduğunuz hizmetleri birlikte değerlendirebilirsiniz. Konumun yaşam ve yatırım beklentilerinize uygunluğunu, bölgeyi yerinde inceleyerek ve güncel koşulları karşılaştırarak değerlendirebilirsiniz. Projenin çevresini tanımak ve size uygun seçenekleri incelemek için sunumu hazırlayan kişiyle iletişime geçebilirsiniz."
+      ],
+      "project": [
+        "Örnek Yaşam Projesi, 1 blok ve 3 bağımsız bölümden oluşan proje yapısıyla farklı ihtiyaçları birlikte değerlendirme olanağı sunuyor.",
+        "Projedeki en yüksek kat seviyesi 4 olarak kayıtlıdır. Daire · 2+1: 3 adet, net 90–100 m², brüt 110–120 m². Kayıtlı donatı ve sosyal alanlar: Otopark, Havuz. Projenin güncel durumu: %65 tamamlandı · Teslim Haziran 2027. Planları, alan bilgilerini ve güncel satış seçeneklerini birlikte inceleyerek beklentilerinize uygun bölümü değerlendirebilirsiniz."
+      ]
+    },
+    "presenter": {
+      "name": "Paylaşan Danışman",
+      "phone": "05551112233",
+      "photoUrl": null,
+      "office": {
+        "name": "Örnek Ofis",
+        "logoUrl": null
+      }
+    }
+  }
+}

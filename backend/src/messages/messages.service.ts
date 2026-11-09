@@ -217,7 +217,7 @@ export class MessagesService {
       await this.getConversationWithParticipants(conversationId);
 
     this.ensureCanReadConversation(conversation, userId, userRole);
-    await assertNoBlockedInteraction(this.prisma, userId, conversation.ConversationParticipant.map(item => item.userId));
+    if (!this.isSuperAdmin(userRole)) await assertNoBlockedInteraction(this.prisma, userId, conversation.ConversationParticipant.map(item => item.userId));
     await this.ensureNetworkContactAccess(conversation.NetworkPost, userId, userRole);
 
     return {
@@ -240,6 +240,9 @@ export class MessagesService {
       title?: string;
       creatorId?: string;
       participantId?: string;
+      subjectType?: string;
+      subjectId?: string;
+      subjectTitle?: string;
     },
     userId: string,
     userRole: Role,
@@ -266,8 +269,18 @@ export class MessagesService {
       };
     }
 
-    await assertNoBlockedInteraction(this.prisma, creatorId, [body.participantId]);
-    const title = body.title?.trim() || 'EPH GÖRÜŞMESİ';
+    if (!this.isSuperAdmin(userRole)) await assertNoBlockedInteraction(this.prisma, creatorId, [body.participantId]);
+
+    // İş Kilidi (Business Object Lock): Görüşmeler iş odaklı yürütülür.
+    const subjectType = body.subjectType?.toUpperCase() || (body.postId ? 'TALEP' : 'GENEL');
+    let title = body.title?.trim() || '';
+    if (!title) {
+      if (subjectType && subjectType !== 'GENEL') {
+        title = `[${subjectType}] ${body.subjectTitle || body.subjectId || "İş Görüşmesi"}`;
+      } else {
+        title = body.subjectTitle || 'EPH İŞ GÖRÜŞMESİ';
+      }
+    }
 
     if (body.postId) {
       const post = await this.prisma.networkPost.findUnique({ where: { id: body.postId }, select: { id: true, userId: true, isActive: true, expiresAt: true } });
@@ -302,6 +315,10 @@ export class MessagesService {
         id: randomUUID(),
         postId: body.postId || null,
         title,
+        subjectType: subjectType || null,
+        subjectId: body.subjectId || body.postId || null,
+        subjectTitle: body.subjectTitle || title,
+        dealStatus: 'ACTIVE',
         updatedAt: new Date(),
         ConversationParticipant: {
           create: [
@@ -319,12 +336,62 @@ export class MessagesService {
     });
   }
 
+  getQuickTemplates(subjectType?: string) {
+    const norm = (subjectType || '').toUpperCase().trim();
+    if (norm === 'PORTFOY') {
+      return [
+        'Portföyünüz hâlâ güncel mi?',
+        'Müşterim için yer gösterme randevusu talep ediyorum.',
+        'Fiyatta pazarlık payı var mı?',
+        'Portföy yetki belgesi var mı?',
+      ];
+    }
+    if (norm === 'TALEP') {
+      return [
+        'Talebinize birebir uygun portföyüm var, detayları iletebilirim.',
+        'Müşterinizin arayışı devam ediyor mu?',
+        'Bütçe ve ödeme koşullarında esneme var mı?',
+      ];
+    }
+    if (norm === 'YER_GOSTERME') {
+      return [
+        'Yer gösterme belgesi hazırlandı.',
+        'Randevu saatini teyit edebilir miyiz?',
+        'Konuma ulaştığınızda beni arayabilir misiniz?',
+      ];
+    }
+    return [
+      'Portföyünüz hâlâ güncel mi?',
+      'Müşterim için yer gösterme randevusu talep ediyorum.',
+      'Fiyatta pazarlık payı var mı?',
+      'Eşleşen müşterim için detayları görüşebilir miyiz?',
+      'Evrak ve sözleşme durumunu netleştirelim.',
+    ];
+  }
+
+  async updateDealStatus(conversationId: string, status: string, userId: string, role: Role) {
+    const valid = ['ACTIVE', 'ONAY_BEKLIYOR', 'EVRAK_BEKLIYOR', 'SONUCLANDI'];
+    const norm = (status || '').toUpperCase().trim();
+    if (!valid.includes(norm)) {
+      throw new BadRequestException('Geçersiz dosya durumu. İzin verilenler: ACTIVE, ONAY_BEKLIYOR, EVRAK_BEKLIYOR, SONUCLANDI');
+    }
+    const conv = await this.getConversationWithParticipants(conversationId);
+    const isPart = conv.ConversationParticipant.some(p => p.userId === userId);
+    if (!isPart && !this.isSuperAdmin(role)) {
+      throw new ForbiddenException('Bu görüşmenin durumunu güncelleme yetkiniz yok.');
+    }
+    return this.prisma.conversation.update({
+      where: { id: conversationId },
+      data: { dealStatus: norm, updatedAt: new Date() },
+    });
+  }
+
   async getMessages(conversationId: string, userId: string, userRole: Role) {
     const conversation =
       await this.getConversationWithParticipants(conversationId);
 
     this.ensureCanReadConversation(conversation, userId, userRole);
-    await assertNoBlockedInteraction(this.prisma, userId, conversation.ConversationParticipant.map(item => item.userId));
+    if (!this.isSuperAdmin(userRole)) await assertNoBlockedInteraction(this.prisma, userId, conversation.ConversationParticipant.map(item => item.userId));
     await this.ensureNetworkContactAccess(conversation.NetworkPost, userId, userRole);
 
     const blocked = await blockedPeerIds(this.prisma, userId);
@@ -366,7 +433,7 @@ export class MessagesService {
       await this.getConversationWithParticipants(conversationId);
 
     this.ensureCanWriteConversation(conversation, userId, userRole);
-    await assertNoBlockedInteraction(this.prisma, userId, conversation.ConversationParticipant.map(item => item.userId));
+    if (!this.isSuperAdmin(userRole)) await assertNoBlockedInteraction(this.prisma, userId, conversation.ConversationParticipant.map(item => item.userId));
     await this.ensureNetworkContactAccess(conversation.NetworkPost, userId, userRole);
 
     if (body.senderId && body.senderId !== userId) {
@@ -468,7 +535,8 @@ export class MessagesService {
     });
     if (!office || !office.isActive) throw new NotFoundException('Aktif ofis bulunamadı.');
 
-    const isOwner = office.ownerUserId === userId;
+    const actor = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+    const isOwner = office.ownerUserId === userId || actor?.role === Role.SUPER_ADMIN;
     const team = await this.prisma.team.findUnique({
       where: { id: teamId },
       include: {
@@ -543,7 +611,7 @@ export class MessagesService {
       await this.getConversationWithParticipants(conversationId);
 
     this.ensureCanReadConversation(conversation, userId, userRole);
-    await assertNoBlockedInteraction(this.prisma, userId, conversation.ConversationParticipant.map(item => item.userId));
+    if (!this.isSuperAdmin(userRole)) await assertNoBlockedInteraction(this.prisma, userId, conversation.ConversationParticipant.map(item => item.userId));
 
     if (this.isSuperAdmin(userRole) && !this.isConversationParticipant(conversation, userId)) {
       return {

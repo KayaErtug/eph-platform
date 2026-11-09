@@ -10,3 +10,12 @@ build/
 backend/public/profile-images/
 
 *.bak
+
+# Sir koruma (WEB-1B)
+.env*
+!.env.example
+*.p8
+*.pem
+*.key
+*.jks
+*.keystore

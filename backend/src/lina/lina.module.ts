@@ -110,6 +110,7 @@ import { LinaV7PromptService } from "./v7/lina-v7-prompt.service";
     LinaCoordinationReadToolProviderService,
   ],
   exports: [
+    LinaOpenAiClientService,
     LinaService,
     LinaActionEngineService,
     LinaConfirmationGateService,

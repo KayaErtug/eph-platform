@@ -1,0 +1,62 @@
+-- EPH-70B1 — LOT UZLAŞTIRMA SQL (YAZAR!). AJAN ÇALIŞTIRMAZ; Mustafa abi onayıyla, yedek aldıktan sonra sunucuda çalıştırılır.
+-- Amaç: canlı veride lot kalanları harcamayla hiç azalmamış. Her cüzdanda Σ aktif lot kalanı > bakiye ise fark,
+-- uygulamadaki tüketim sırasıyla lotlardan düşülür:
+--   1) süresi olan (PAKET/DENEME) lot — bitişi en yakın önce
+--   2) süresiz, EK PK olmayan lot (DEVIR, HEDIYE, ...) — eskiden yeniye
+--   3) süresiz EK PK lotu (SATIN_ALMA) — en son
+-- Bakiye DEĞİŞMEZ; yalnız PortfolioCreditLot.kalanMiktar azalır. Varsayılan: ROLLBACK (COMMIT'i elle açın).
+-- Not: Önce bu uzlaştırma, sonra dönem sonu job'ı çalışmalıdır (aksi halde bitmiş PAKET lotu bakiyeden fazladan düşebilir).
+
+BEGIN;
+
+-- 0) Çalışırken harcama olmasın diye ilgili cüzdanları kilitle
+SELECT w.id FROM "KontorCuzdani" w
+WHERE w."kullaniciId" IN (SELECT l."kullaniciId" FROM "PortfolioCreditLot" l WHERE l."aktifMi" AND l."kalanMiktar" > 0)
+FOR UPDATE;
+
+-- 1) ÖNCE SAYIM (değişiklik yapmaz)
+WITH tot AS (
+  SELECT w."kullaniciId", w.bakiye, sum(l."kalanMiktar") AS lot_toplam
+  FROM "KontorCuzdani" w JOIN "PortfolioCreditLot" l ON l."kullaniciId" = w."kullaniciId" AND l."aktifMi" AND l."kalanMiktar" > 0
+  GROUP BY w."kullaniciId", w.bakiye
+)
+SELECT count(*) FILTER (WHERE lot_toplam > bakiye) AS "uzlastirilacakCuzdan",
+       COALESCE(sum(lot_toplam - bakiye) FILTER (WHERE lot_toplam > bakiye), 0) AS "dusulecekToplamPk",
+       count(*) AS "lotluCuzdanToplam"
+FROM tot;
+
+-- 2) Yedek tablo (geri alma için)
+CREATE TABLE IF NOT EXISTS "_eph70_lot_yedek" AS
+SELECT l.id, l."kalanMiktar" AS "eskiKalan", now() AS "yedeklendi"
+FROM "PortfolioCreditLot" l WHERE l."aktifMi" AND l."kalanMiktar" > 0;
+
+-- 3) Düşüm
+WITH ranked AS (
+  SELECT l.id, l."kullaniciId", l."kalanMiktar", w.bakiye,
+         CASE WHEN l."sonKullanmaTarihi" IS NOT NULL THEN 0 WHEN l."lotTuru"::text <> 'SATIN_ALMA' THEN 1 ELSE 2 END AS rk,
+         sum(l."kalanMiktar") OVER (PARTITION BY l."kullaniciId") AS lot_toplam,
+         COALESCE(sum(l."kalanMiktar") OVER (
+           PARTITION BY l."kullaniciId"
+           ORDER BY CASE WHEN l."sonKullanmaTarihi" IS NOT NULL THEN 0 WHEN l."lotTuru"::text <> 'SATIN_ALMA' THEN 1 ELSE 2 END,
+                    l."sonKullanmaTarihi" ASC NULLS LAST, l."olusturulmaTarihi" ASC, l.id ASC
+           ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0) AS onceki
+  FROM "PortfolioCreditLot" l
+  JOIN "KontorCuzdani" w ON w."kullaniciId" = l."kullaniciId"
+  WHERE l."aktifMi" AND l."kalanMiktar" > 0
+), plan AS (
+  SELECT id, LEAST("kalanMiktar", GREATEST(0, (lot_toplam - GREATEST(bakiye, 0)) - onceki)) AS dus
+  FROM ranked WHERE lot_toplam > GREATEST(bakiye, 0)
+)
+UPDATE "PortfolioCreditLot" l
+SET "kalanMiktar" = l."kalanMiktar" - p.dus, "guncellenmeTarihi" = now()
+FROM plan p WHERE p.id = l.id AND p.dus > 0;
+
+-- 4) DOĞRULAMA: sonuç 0 olmalı
+SELECT count(*) AS "halaTutarsizCuzdan" FROM (
+  SELECT w.bakiye, sum(l."kalanMiktar") AS t
+  FROM "KontorCuzdani" w JOIN "PortfolioCreditLot" l ON l."kullaniciId" = w."kullaniciId" AND l."aktifMi" AND l."kalanMiktar" > 0
+  GROUP BY w.id, w.bakiye
+) x WHERE x.t > GREATEST(x.bakiye, 0);
+
+ROLLBACK;  -- sonuçlar doğruysa ROLLBACK yerine COMMIT yazın
+-- Geri alma (commit sonrası): UPDATE "PortfolioCreditLot" l SET "kalanMiktar" = y."eskiKalan" FROM "_eph70_lot_yedek" y WHERE y.id = l.id;

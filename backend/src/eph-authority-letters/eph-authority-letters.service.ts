@@ -1,4 +1,5 @@
 import { resolveOfficeWallet } from '../office/office-wallet.rules';
+import { consumeLots, lockWallet } from '../kontor/wallet-lots';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -20,6 +21,7 @@ import * as QRCode from 'qrcode';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { readCost, readLimit } from '../pricing/commercial-costs';
+import { assertReaderMigrated } from '../office/office-legacy';
 
 type CurrentUserPayload = {
   userId: string;
@@ -618,7 +620,14 @@ export class EphAuthorityLettersService {
     };
   }
 
+  // ODM-7G-D F09: yetki belgesi aylık kotası kişisel paketin aktif portföy limitinden türer; relational modda ofise bağlı kullanıcı için ofis hakkına taşınana kadar fail-closed.
+  private async assertAuthorityQuotaReaderMigrated(tx: any, userId: string) {
+    const holder = await tx.user.findUnique({ where: { id: userId }, select: { officeId: true, ownedOffices: { where: { isActive: true }, select: { id: true }, take: 1 } } });
+    if (holder?.officeId || holder?.ownedOffices?.length) await assertReaderMigrated(tx, 'eph-authority-letters.quota');
+  }
+
   private async getAuthorityLetterQuotaSnapshot(input: { tx: any; userId: string }) {
+    await this.assertAuthorityQuotaReaderMigrated(input.tx, input.userId);
     const activePackageRelation = await input.tx.kullaniciUyelikPaketi.findFirst({
       where: {
         kullaniciId: input.userId,
@@ -804,6 +813,7 @@ export class EphAuthorityLettersService {
     userId: string;
     unitId: string;
   }): Promise<AuthorityLetterQuotaResult> {
+    await this.assertAuthorityQuotaReaderMigrated(input.tx, input.userId);
     const activePackageRelation = await input.tx.kullaniciUyelikPaketi.findFirst({
       where: {
         kullaniciId: input.userId,
@@ -885,13 +895,7 @@ export class EphAuthorityLettersService {
     ilgiliKayitId: string;
   }) {
     const chargeUserId = (await resolveOfficeWallet(input.tx, input.userId, {}, true)).chargeUserId;
-    await input.tx.$executeRaw`
-        SELECT pg_advisory_xact_lock(
-          hashtext(${`wallet:${chargeUserId}`})
-        )
-      `;
-
-    await input.tx.$queryRaw`SELECT "id" FROM "KontorCuzdani" WHERE "kullaniciId" = ${chargeUserId} FOR UPDATE`;
+    await lockWallet(input.tx, chargeUserId); // EPH-70B1F: ortak kilit sırası + atomik dönem sonu kapanışı
 
       let wallet = await input.tx.kontorCuzdani.findUnique({
       where: {
@@ -952,6 +956,7 @@ export class EphAuthorityLettersService {
         olusturanId: input.userId,
       },
     });
+    await consumeLots(input.tx, chargeUserId, input.amount, { hareketId: movement.id }); // EPH-70B1F/D1
 
     return {
       wallet: updatedWallet,

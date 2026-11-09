@@ -26,9 +26,11 @@ export class ProjectsController {
 
   @Post()
   @UseGuards(RolesGuard)
-  @Roles(Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.EMLAKCI)
-  create(@CurrentUser() user: any, @Body() body: ProjectLocationBody) {
-    return this.projectsService.create(user.id, body);
+  @Roles(Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.EMLAKCI, Role.SUPER_ADMIN)
+  create(@CurrentUser() user: any, @Body() body: any) {
+    const isSuper = user.role === Role.SUPER_ADMIN || user.role === 'SUPER_ADMIN';
+    const targetOwnerId = (isSuper && body.ownerId) ? body.ownerId : user.id;
+    return this.projectsService.create(targetOwnerId, body);
   }
 
   @Get()
@@ -43,7 +45,7 @@ export class ProjectsController {
 
   @Get('my')
   @UseGuards(RolesGuard)
-  @Roles(Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN, Role.EMLAKCI)
+  @Roles(Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN, Role.EMLAKCI, Role.SUPER_ADMIN)
   myProjects(@CurrentUser() user: any) {
     return this.projectsService.myProjects(user.id, user.role);
   }
@@ -55,14 +57,14 @@ export class ProjectsController {
 
   @Patch(':id')
   @UseGuards(RolesGuard)
-  @Roles(Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN, Role.EMLAKCI)
+  @Roles(Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN, Role.EMLAKCI, Role.SUPER_ADMIN)
   update(@Param('id') id: string, @CurrentUser() user: any, @Body() body: Partial<ProjectLocationBody> & { isActive?: boolean }) {
     return this.projectsService.update(id, user.id, body, user.role);
   }
 
   @Delete(':id')
   @UseGuards(RolesGuard)
-  @Roles(Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN, Role.EMLAKCI)
+  @Roles(Role.MUTEAHHIT, Role.INSAAT_FIRMASI, Role.ADMIN, Role.EMLAKCI, Role.SUPER_ADMIN)
   remove(@Param('id') id: string, @CurrentUser() user: any) {
     return this.projectsService.remove(id, user.id, user.role);
   }

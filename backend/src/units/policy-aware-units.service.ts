@@ -13,6 +13,7 @@ import {
 } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { entitlementSource, resolveOfficeEntitlements } from '../office/office-entitlement.service';
 import {
   countsAgainstActivePortfolioLimit,
   isPortfolioBusinessRole,
@@ -44,6 +45,7 @@ type ProjectAccessSnapshot = {
 };
 
 const policyUnitInclude = {
+  salesRepresentative: { select: { id: true, firstName: true, lastName: true, phone: true, role: true } },
   project: {
     select: {
       id: true,
@@ -253,6 +255,26 @@ export class PolicyAwareUnitsService extends UnitsService {
       });
 
     if (!activeMembership) {
+      const userWithOffice = await this.policyPrisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          officeId: true,
+          office: {
+            select: {
+              isActive: true,
+              ownerUserId: true,
+            },
+          },
+        },
+      });
+      if (
+        userWithOffice?.officeId &&
+        userWithOffice.office?.isActive &&
+        userWithOffice.office.ownerUserId &&
+        userWithOffice.office.ownerUserId !== userId
+      ) {
+        return this.getPolicyActiveMembershipPackage(userWithOffice.office.ownerUserId);
+      }
       throw new ForbiddenException(
         'Portföy işlemleri için aktif üyelik paketi gereklidir.',
       );
@@ -286,6 +308,35 @@ export class PolicyAwareUnitsService extends UnitsService {
     excludeUnitId?: string,
   ) {
     if (this.isPolicySuperAdmin(user)) return;
+
+    // ODM-7G-D F09: relational modda ofis sahibi/üyesinin aktif portföy sınırı OFİS TOPLAMI üzerinden etkin hakkın portföy kapasitesidir
+    // (kişisel üyelik aramaz; ücretli ofisi "üyelik yok" diye reddetmez, eski kişisel paketin limitini uygulamaz).
+    if (await entitlementSource(this.policyPrisma) === 'relational') {
+      const holder = await this.policyPrisma.user.findUnique({ where: { id: ownerId }, select: { officeId: true } });
+      const office = await this.policyPrisma.office.findFirst({
+        where: { isActive: true, OR: [{ ownerUserId: ownerId }, ...(holder?.officeId ? [{ id: holder.officeId }] : [])] },
+        select: { id: true, ownerUserId: true }, orderBy: { id: 'asc' },
+      });
+      if (office) {
+        const eff = await resolveOfficeEntitlements(this.policyPrisma, office.id);
+        const members = await this.policyPrisma.user.findMany({ where: { officeId: office.id }, select: { id: true } });
+        const memberIds = [...new Set([...(office.ownerUserId ? [office.ownerUserId] : []), ...members.map((m) => m.id)])];
+        const officeActiveCount = await this.policyPrisma.unit.count({
+          where: {
+            id: excludeUnitId ? { not: excludeUnitId } : undefined,
+            status: { notIn: [UnitStatus.SATILDI, UnitStatus.KIRALANDII, UnitStatus.PASIF] },
+            project: { ownerId: { in: memberIds }, ...this.getPolicyClassicPortfolioProjectWhere() },
+          },
+        });
+        if (officeActiveCount >= eff.portfolio) {
+          throw new BadRequestException(
+            `${eff.packageName} paketinizde ofisin toplam aktif portföy limiti ${eff.portfolio}. Ofisin aktif portföy sayısı ${officeActiveCount}. ` +
+              'Yeni aktif portföy için mevcut bir portföyü Satıldı, Kiralandı veya Pasif durumuna alabilirsiniz.',
+          );
+        }
+        return;
+      }
+    }
 
     const membershipPackage =
       await this.getPolicyActiveMembershipPackage(ownerId);

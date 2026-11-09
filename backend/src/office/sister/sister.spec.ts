@@ -4,6 +4,7 @@ import { SisterLinksService } from './sister-links.service';
 import { SisterPoolService } from './sister-pool.service';
 import { SisterRequestsService } from './sister-requests.service';
 
+const FUTURE = new Date(Date.now() + 30 * 86400000).toISOString();
 // EPH-81 kardeş ofis ağı: bellek içi sahte Prisma ile yetki, uygunluk, gizlilik ve erişim kaydı kuralları.
 function fixture() {
   const user = (id: string, officeId: string | null, role = 'EMLAKCI') => ({ id, role, officeId, firstName: id, lastName: 'X', phone: `5-${id}` });
@@ -19,7 +20,7 @@ function fixture() {
   const withOwner = (o: any) => o && ({ ...o, owner: users[o.ownerUserId] });
   const settings: any = {
     KARDES_OFIS_PAKETLER: ['ALTIN', 'PLATINUM'],
-    OFFICE_SUBSCRIPTION_A: { packageCode: 'ALTIN' }, OFFICE_SUBSCRIPTION_B: { packageCode: 'PLATINUM' }, OFFICE_SUBSCRIPTION_C: { packageCode: 'BRONZ' },
+    OFFICE_SUBSCRIPTION_A: { packageCode: 'ALTIN', expiresAt: FUTURE }, OFFICE_SUBSCRIPTION_B: { packageCode: 'PLATINUM', expiresAt: FUTURE }, OFFICE_SUBSCRIPTION_C: { packageCode: 'BRONZ', expiresAt: FUTURE },
   };
   const links: any[] = [];
   const requests: any[] = [];
@@ -235,7 +236,7 @@ describe('EPH-81 kardeş ofis ağı', () => {
     it('paket uygun değilse bağ askıda: havuz boş + suspended, detay 403, liste suspended', async () => {
       const f = fixture();
       await f.connect();
-      f.settings.OFFICE_SUBSCRIPTION_B = { packageCode: 'BRONZ' };
+      f.settings.OFFICE_SUBSCRIPTION_B = { packageCode: 'BRONZ', expiresAt: FUTURE };
       const r: any = await f.poolSvc.pool('agentA', 'A');
       expect(r).toMatchObject({ items: [], suspended: true });
       await expect(f.poolSvc.detail('agentA', 'A', 'u1')).rejects.toBeInstanceOf(ForbiddenException);
@@ -245,6 +246,17 @@ describe('EPH-81 kardeş ofis ağı', () => {
       // süresi dolan abonelik de uygunsuzdur
       f.settings.OFFICE_SUBSCRIPTION_B = { packageCode: 'PLATINUM', expiresAt: new Date(Date.now() - 1000).toISOString() };
       expect((await f.poolSvc.pool('agentA', 'A')).items).toEqual([]);
+    });
+
+    it('ODM-7G-D F12: NULL / eksik / bozuk bitiş tarihi süresiz hak SAYILMAZ; kapanmış (ended/active:false) kayıt uygun değil', async () => {
+      for (const bad of [{ packageCode: 'PLATINUM' }, { packageCode: 'PLATINUM', expiresAt: null }, { packageCode: 'PLATINUM', expiresAt: 'bozuk-tarih' },
+        { packageCode: 'PLATINUM', expiresAt: FUTURE, ended: true }, { packageCode: 'PLATINUM', expiresAt: FUTURE, active: false }]) {
+        const f = fixture();
+        await f.connect();
+        f.settings.OFFICE_SUBSCRIPTION_B = bad;
+        expect((await f.poolSvc.pool('agentA', 'A')).items).toEqual([]);
+        expect(((await f.linksSvc.list('ownerA', 'A')) as any).links[0].suspended).toBe(true);
+      }
     });
   });
 

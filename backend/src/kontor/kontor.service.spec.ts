@@ -8,6 +8,8 @@ describe('PK wallet owner and authenticated actor attribution', () => {
     const tx = {
       $executeRaw: jest.fn().mockResolvedValue(1),
       user: { findUnique: jest.fn(async ({ where }) => ({ id: where.id, role: 'SUPER_ADMIN', officeId: null })) }, office: { findUnique: jest.fn(async () => ({ id: 'office', isActive: true, ownerUserId: 'office-owner' })), findFirst: jest.fn().mockResolvedValue(null) }, systemSetting: { findUnique: jest.fn().mockResolvedValue({ valueJson: { mode: 'SHARED' } }) }, $queryRaw: jest.fn().mockResolvedValue([{ id: 'wallet' }]),
+      portfolioCreditLot: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn() },
+      portfolioCreditLotTuketim: { findMany: jest.fn().mockResolvedValue([]), create: jest.fn(), update: jest.fn() },
       kontorHareketi: { findFirst: jest.fn(async ({ where }) => movement && (!where.hareketTuru || movement.hareketTuru === where.hareketTuru) ? movement : null), create: jest.fn(async ({ data }) => { movement = { id: 'movement', ...data }; return movement; }) },
       kontorCuzdani: { upsert: jest.fn().mockResolvedValue({}), findUnique: jest.fn(async () => ({ bakiye: balance, toplamHarcama: 100 - balance, aktifMi: true })), update: jest.fn(async ({ data }) => { balance += data.bakiye.increment ?? -data.bakiye.decrement; return { bakiye: balance, aktifMi: true }; }) },
     };

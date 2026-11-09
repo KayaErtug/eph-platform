@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
 
@@ -21,6 +22,9 @@ export function PWARegister() {
   const { user } = useAuthStore();
   const [showButton, setShowButton] = useState(false);
   const [busy, setBusy] = useState(false);
+  const pathname = usePathname();
+  // Vitrin/herkese açık sayfalarda bildirim düğmesi görünmesin (CANLI-2C)
+  const isPublicShowcase = pathname === "/" || pathname === "/ucretlendirme" || pathname === "/mobil-uygulama";
 
   const setupPush = async () => {
     try {
@@ -155,7 +159,7 @@ export function PWARegister() {
     setShowButton(true);
   }, [user?.id]);
 
-  if (!showButton) return null;
+  if (!showButton || isPublicShowcase) return null;
 
   return (
     <button

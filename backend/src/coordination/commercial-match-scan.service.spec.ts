@@ -73,6 +73,9 @@ function setup() {
   db.kontorHareketi = { ...model('movements'), create: jest.fn(async ({ data }: any) => {
     const row = { id: 'movement-' + ++state.sequence, ...data }; state.movements.push(row); return row;
   }) };
+  // ODM-7F-D: ortak cüzdan (lockWallet -> expireDueLots, consumeLots) lot modellerini okur; lotsuz (izlenmeyen) bakiye senaryosu.
+  db.portfolioCreditLot = { findMany: jest.fn(async () => []), update: jest.fn(async () => ({})), create: jest.fn(async () => ({ id: 'lot' })) };
+  db.portfolioCreditLotTuketim = { create: jest.fn(async () => ({})), findMany: jest.fn(async () => []), update: jest.fn(async () => ({})) };
   let queue = Promise.resolve();
   db.$transaction = jest.fn((worker: any) => {
     const result = queue.then(async () => {

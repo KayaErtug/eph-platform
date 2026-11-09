@@ -1,0 +1,22 @@
+﻿[
+    {
+        "Path":  "D:\\Projects\\SM\\backend\\src\\messages\\messages.service.ts",
+        "Hash":  "7D149A5715F28CC7F46D2DB2008C7D5197371C1E588F156286A78D5B58493B75"
+    },
+    {
+        "Path":  "D:\\Projects\\SM\\backend\\src\\office\\office-management.service.ts",
+        "Hash":  "1EB23704D48E15D8F117EE9F4E5418EA06731C65B3E2CBFD863DB330D1043DD3"
+    },
+    {
+        "Path":  "D:\\Projects\\SM\\backend\\src\\office\\office-profile.spec.ts",
+        "Hash":  "4D590D7BBE4D4D0AED73A331D5EA452E38613B40365DED197DD8E3FBB4549755"
+    },
+    {
+        "Path":  "D:\\Projects\\SM\\backend\\src\\organization\\organization.controller.ts",
+        "Hash":  "D07A423FF69F64F574E227A8085DCB1BD6DD647DDEB053628BA3357129D7E053"
+    },
+    {
+        "Path":  "D:\\Projects\\SM\\backend\\src\\organization\\organization.service.ts",
+        "Hash":  "13BE419BCE60FD0D05380FB5C921E7CF8926744C49B8555F8642BFCBC770B44E"
+    }
+]

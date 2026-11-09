@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { COST_DEFAULTS, COST_PREFIX, LIMIT_DEFAULTS, LIMIT_LIST_DEFAULTS, LIMIT_PREFIX, parseCostValue, parseLimitList } from './commercial-costs';
 import { readTrialPolicy } from './trial-policy';
+import { parseTrialConfig } from '../office/office-entitlement.rules';
 
 const OFFICE_FIELDS = ['code', 'name', 'price', 'monthlyPk', 'active', 'portfolioCapacity', 'crmCapacity', 'monthlyDemandLimit', 'monthlyPoolLimit', 'trialDays', 'agents', 'totalUsers', 'maxTeams'];
 
@@ -10,7 +11,7 @@ export class PricingService {
   constructor(private readonly prisma: PrismaService) {}
 
   async tariff() {
-    const [rows, packages, officeRow, paymentRow] = await Promise.all([
+    const [rows, packages, officeRow, paymentRow, trialConfigRow] = await Promise.all([
       this.prisma.systemSetting.findMany({ where: { OR: [{ key: { startsWith: COST_PREFIX } }, { key: { startsWith: LIMIT_PREFIX } }] }, select: { key: true, valueJson: true } }),
       this.prisma.uyelikPaketi.findMany({
         where: { aktifMi: true },
@@ -22,6 +23,7 @@ export class PricingService {
       }),
       this.prisma.systemSetting.findUnique({ where: { key: 'OFFICE_MEMBERSHIP_PACKAGES' }, select: { valueJson: true } }),
       this.prisma.systemSetting.findUnique({ where: { key: 'EPH_PAYMENT_SETTINGS_V1' }, select: { valueJson: true } }),
+      this.prisma.systemSetting.findUnique({ where: { key: 'OFFICE_TRIAL_CONFIG' }, select: { valueJson: true } }),
     ]);
 
     const stored = new Map(rows.map((row) => [row.key, parseCostValue(row.valueJson)]));
@@ -44,6 +46,8 @@ export class PricingService {
 
     const officeList = Array.isArray(officeRow?.valueJson) ? officeRow.valueJson as Array<Record<string, unknown>> : [];
     const officeTrial = officeList.find((item) => item.code === 'DENEME');
+    let trialCfg: { pk: number; gun: number } | null = null;
+    try { const t = parseTrialConfig(trialConfigRow?.valueJson); trialCfg = { pk: t.pk, gun: t.gun }; } catch { trialCfg = null; }
     const officePackages = officeList.map((item) => Object.fromEntries(OFFICE_FIELDS.filter((field) => field in item).map((field) => [field, item[field]])));
 
     const payment = paymentRow?.valueJson;
@@ -58,7 +62,8 @@ export class PricingService {
       packages: packages.map((item) => ({ ...item, fiyat: item.fiyat === null ? null : Number(item.fiyat) })),
       officePackages,
       // Mobil metinleri için: ofis denemesi hediye PK/gün (OFFICE_MEMBERSHIP_PACKAGES[DENEME]) ve üyelik deneme politikası.
-      officeTrial: officeTrial ? { monthlyPk: officeTrial.monthlyPk ?? null, trialDays: officeTrial.trialDays ?? null } : null,
+      // Tek gerçek kaynak OFFICE_TRIAL_CONFIG (varsa); yoksa eski türetilmiş katalog kopyası (ODM-7G-D)
+      officeTrial: trialCfg ? { monthlyPk: trialCfg.pk, trialDays: trialCfg.gun } : officeTrial ? { monthlyPk: officeTrial.monthlyPk ?? null, trialDays: officeTrial.trialDays ?? null } : null,
       trialPolicy: await readTrialPolicy(this.prisma),
       pkProducts,
     };

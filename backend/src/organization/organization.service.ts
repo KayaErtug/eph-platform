@@ -1,12 +1,15 @@
+import { deletedAccounts, isAccountDeleted } from '../auth/account-deletion';
 import {
   BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { Capability, PortfolioApprovalStatus, Role } from "@prisma/client";
+import { AuditAction, Capability, PortfolioApprovalStatus, Role, SisterLinkStatus } from "@prisma/client";
 import { readLimit } from "../pricing/commercial-costs";
 import { resolveMaxTeams } from "../office/office-team-quota";
+import { entitlementSource, loadOfficeSettings, resolveOfficeEntitlements } from "../office/office-entitlement.service";
+import { EntitlementSettingMissingError, assertReaderMigrated, legacyCapacityFields } from "../office/office-legacy";
 
 import { officeLocationData } from "./office-location";
 import { PrismaService } from "../prisma/prisma.service";
@@ -113,7 +116,7 @@ export class OrganizationService {
       },
     });
 
-    if (!user) {
+    if (!user || await isAccountDeleted(this.prisma, userId)) {
       throw new NotFoundException("Kullanıcı bulunamadı.");
     }
 
@@ -311,11 +314,11 @@ export class OrganizationService {
   }
 
   async getOrganizationUsers() {
+    const deletedIds = [...(await deletedAccounts(this.prisma)).keys()];
     return this.prisma.user.findMany({
       where: {
-        role: {
-          in: [Role.EMLAKCI, Role.MUTEAHHIT, Role.INSAAT_FIRMASI],
-        },
+        id: { notIn: deletedIds },
+        role: Role.EMLAKCI,
       },
       select: {
         id: true,
@@ -342,7 +345,7 @@ export class OrganizationService {
   }
 
   async getOffices() {
-    return this.prisma.office.findMany({
+    const offices = await this.prisma.office.findMany({
       orderBy: [{ isActive: "desc" }, { createdAt: "desc" }],
       include: {
         owner: {
@@ -366,6 +369,44 @@ export class OrganizationService {
         },
         _count: { select: { users: true, teams: true } },
       },
+    });
+
+    if (!offices.length) return [];
+
+    const subKeys = offices.map((o) => `OFFICE_SUBSCRIPTION_${o.id}`);
+    const subSettings = await this.prisma.systemSetting.findMany({
+      where: { key: { in: subKeys } },
+    });
+    const subMap = new Map<string, any>();
+    for (const row of subSettings) {
+      if (row.valueJson && typeof row.valueJson === "object") {
+        subMap.set(row.key, row.valueJson);
+      }
+    }
+
+    // ODM-7G-D F09: relational modda ofis listesi/dashboard aboneliği tek çözümleyiciden gelir (eklenti/iptal/iade dahil); JSON yalnız legacy modda.
+    const relational = (await entitlementSource(this.prisma)) === 'relational';
+    const relationalSubs = new Map<string, any>();
+    if (relational) {
+      for (const office of offices) {
+        const eff = await resolveOfficeEntitlements(this.prisma, office.id);
+        relationalSubs.set(office.id, eff.state === 'UCRETSIZ' ? null : { packageCode: eff.packageCode, packageName: eff.packageName, agents: eff.agents, expiresAt: eff.endsAt ? eff.endsAt.toISOString() : null, active: true });
+      }
+    }
+    return offices.map((office) => {
+      const sub = relational ? (relationalSubs.get(office.id) ?? null) : (subMap.get(`OFFICE_SUBSCRIPTION_${office.id}`) || null);
+      return {
+        ...office,
+        subscription: sub
+          ? {
+              packageCode: sub.packageCode || null,
+              packageName: sub.packageName || sub.packageCode || null,
+              agents: sub.agents ?? null,
+              expiresAt: sub.expiresAt || null,
+              active: sub.active ?? true,
+            }
+          : null,
+      };
     });
   }
 
@@ -675,6 +716,403 @@ export class OrganizationService {
     });
   }
 
+  private ensureSuperAdminActor(actor?: OrganizationActor) {
+    if (this.getActorRole(actor) !== Role.SUPER_ADMIN) {
+      throw new ForbiddenException("Bu işlem yalnız süper admine açıktır.");
+    }
+  }
+
+  async getSisterLinks(status?: SisterLinkStatus) {
+    return this.prisma.officeSisterLink.findMany({
+      where: status ? { status } : undefined,
+      orderBy: { createdAt: "desc" },
+      include: {
+        officeA: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            city: true,
+            district: true,
+            owner: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                phone: true,
+              },
+            },
+          },
+        },
+        officeB: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            city: true,
+            district: true,
+            owner: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                phone: true,
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  async createSisterLink(
+    body: {
+      inviterOfficeId: string;
+      targetOfficeId?: string;
+      targetOfficeCode?: string;
+      commissionSplitPct?: number;
+      autoApprove?: boolean;
+    },
+    actor?: OrganizationActor,
+  ) {
+    this.ensureAdminActor(actor);
+    const actorId = this.getActorId(actor);
+
+    const inviterOffice = await this.prisma.office.findUnique({
+      where: { id: body.inviterOfficeId },
+      select: { id: true, name: true, ownerUserId: true, code: true },
+    });
+    if (!inviterOffice) throw new NotFoundException("Davet eden ofis bulunamadı.");
+
+    let targetOffice = null;
+    if (body.targetOfficeId) {
+      targetOffice = await this.prisma.office.findUnique({
+        where: { id: body.targetOfficeId },
+        select: { id: true, name: true, ownerUserId: true, code: true },
+      });
+    } else if (body.targetOfficeCode) {
+      targetOffice = await this.prisma.office.findUnique({
+        where: { code: body.targetOfficeCode.trim().toUpperCase() },
+        select: { id: true, name: true, ownerUserId: true, code: true },
+      });
+    }
+    if (!targetOffice) throw new NotFoundException("Hedef kardeş ofis bulunamadı.");
+    if (inviterOffice.id === targetOffice.id) {
+      throw new BadRequestException("Bir ofis kendisiyle kardeş olamaz.");
+    }
+
+    const [a, b] = inviterOffice.id < targetOffice.id ? [inviterOffice.id, targetOffice.id] : [targetOffice.id, inviterOffice.id];
+    const pct = typeof body.commissionSplitPct === "number" && body.commissionSplitPct >= 0 && body.commissionSplitPct <= 100
+      ? Math.round(body.commissionSplitPct)
+      : 50;
+
+    const autoApprove = body.autoApprove === true;
+    const status = autoApprove ? SisterLinkStatus.AKTIF : SisterLinkStatus.BEKLIYOR;
+    const now = new Date();
+
+    const existing = await this.prisma.officeSisterLink.findUnique({
+      where: { officeAId_officeBId: { officeAId: a, officeBId: b } },
+    });
+
+    const link = existing
+      ? await this.prisma.officeSisterLink.update({
+          where: { id: existing.id },
+          data: {
+            status,
+            invitedByOfficeId: inviterOffice.id,
+            invitedByUserId: actorId,
+            commissionSplitPct: pct,
+            createdAt: now,
+            respondedAt: autoApprove ? now : null,
+            endedAt: null,
+            endedByUserId: null,
+          },
+        })
+      : await this.prisma.officeSisterLink.create({
+          data: {
+            officeAId: a,
+            officeBId: b,
+            status,
+            invitedByOfficeId: inviterOffice.id,
+            invitedByUserId: actorId,
+            commissionSplitPct: pct,
+            createdAt: now,
+            respondedAt: autoApprove ? now : null,
+          },
+        });
+
+    await this.prisma.auditLog.create({
+      data: {
+        actorId,
+        action: AuditAction.SYSTEM_SECURITY_ACTION,
+        entityType: "OfficeSisterLink",
+        entityId: link.id,
+        description: `Kardeş ofis bağı ${autoApprove ? "doğrudan aktifleştirildi" : "daveti oluşturuldu"}: ${inviterOffice.name} <-> ${targetOffice.name}`,
+        metadata: {
+          operation: "ADMIN_SISTER_LINK_CREATE",
+          officeAId: a,
+          officeBId: b,
+          autoApprove,
+          status,
+        },
+        ipAddress: actor?.ipAddress,
+        userAgent: actor?.userAgent,
+      },
+    });
+
+    return link;
+  }
+
+  async acceptSisterLink(linkId: string, actor?: OrganizationActor) {
+    this.ensureAdminActor(actor);
+    const actorId = this.getActorId(actor);
+    const link = await this.prisma.officeSisterLink.findUnique({
+      where: { id: linkId },
+      include: { officeA: true, officeB: true },
+    });
+    if (!link) throw new NotFoundException("Kardeş ofis bağı bulunamadı.");
+
+    const updated = await this.prisma.officeSisterLink.update({
+      where: { id: linkId },
+      data: {
+        status: SisterLinkStatus.AKTIF,
+        respondedAt: new Date(),
+        endedAt: null,
+        endedByUserId: null,
+      },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        actorId,
+        action: AuditAction.SYSTEM_SECURITY_ACTION,
+        entityType: "OfficeSisterLink",
+        entityId: link.id,
+        description: `Kardeş ofis bağı onaylandı: ${link.officeA.name} <-> ${link.officeB.name}`,
+        metadata: { operation: "ADMIN_SISTER_LINK_ACCEPT", linkId },
+        ipAddress: actor?.ipAddress,
+        userAgent: actor?.userAgent,
+      },
+    });
+
+    return updated;
+  }
+
+  async rejectSisterLink(linkId: string, actor?: OrganizationActor) {
+    this.ensureAdminActor(actor);
+    const actorId = this.getActorId(actor);
+    const link = await this.prisma.officeSisterLink.findUnique({
+      where: { id: linkId },
+      include: { officeA: true, officeB: true },
+    });
+    if (!link) throw new NotFoundException("Kardeş ofis bağı bulunamadı.");
+
+    const updated = await this.prisma.officeSisterLink.update({
+      where: { id: linkId },
+      data: {
+        status: SisterLinkStatus.REDDEDILDI,
+        respondedAt: new Date(),
+      },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        actorId,
+        action: AuditAction.SYSTEM_SECURITY_ACTION,
+        entityType: "OfficeSisterLink",
+        entityId: link.id,
+        description: `Kardeş ofis daveti reddedildi: ${link.officeA.name} <-> ${link.officeB.name}`,
+        metadata: { operation: "ADMIN_SISTER_LINK_REJECT", linkId },
+        ipAddress: actor?.ipAddress,
+        userAgent: actor?.userAgent,
+      },
+    });
+
+    return updated;
+  }
+
+  async endSisterLink(linkId: string, actor?: OrganizationActor) {
+    this.ensureAdminActor(actor);
+    const actorId = this.getActorId(actor);
+    const link = await this.prisma.officeSisterLink.findUnique({
+      where: { id: linkId },
+      include: { officeA: true, officeB: true },
+    });
+    if (!link) throw new NotFoundException("Kardeş ofis bağı bulunamadı.");
+
+    const updated = await this.prisma.officeSisterLink.update({
+      where: { id: linkId },
+      data: {
+        status: SisterLinkStatus.SONLANDI,
+        endedAt: new Date(),
+        endedByUserId: actorId,
+      },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        actorId,
+        action: AuditAction.SYSTEM_SECURITY_ACTION,
+        entityType: "OfficeSisterLink",
+        entityId: link.id,
+        description: `Kardeş ofis bağı sonlandırıldı: ${link.officeA.name} <-> ${link.officeB.name}`,
+        metadata: { operation: "ADMIN_SISTER_LINK_END", linkId },
+        ipAddress: actor?.ipAddress,
+        userAgent: actor?.userAgent,
+      },
+    });
+
+    return updated;
+  }
+
+  async getOfficePackages() {
+    const setting = await this.prisma.systemSetting.findUnique({
+      where: { key: "OFFICE_MEMBERSHIP_PACKAGES" },
+    });
+    return Array.isArray(setting?.valueJson) ? setting.valueJson : [];
+  }
+
+  async updateOfficePackage(
+    officeId: string,
+    body: {
+      packageCode: string;
+      durationDays?: number;
+      durationMonths?: number;
+      reason?: string;
+    },
+    actor?: OrganizationActor,
+  ) {
+    this.ensureAdminActor(actor);
+    const actorId = this.getActorId(actor);
+    // ODM-7G-D F09/F10: eski yazıcı yalnız SystemSetting günceller; relational okuyucular bunu görmez ve çift kaynak oluşur. Relational modda ortak ADMIN hak yolu kullanılır.
+    await assertReaderMigrated(this.prisma, 'organization.updateOfficePackage (POST /office/packages/purchase kullanın)');
+
+    const office = await this.prisma.office.findUnique({
+      where: { id: officeId },
+      select: { id: true, name: true, ownerUserId: true },
+    });
+
+    if (!office) {
+      throw new NotFoundException("Ofis bulunamadı.");
+    }
+
+    const packageCode = String(body.packageCode || "").trim().toUpperCase();
+    if (!packageCode) {
+      throw new BadRequestException("Paket kodu zorunludur.");
+    }
+
+    const packages = await this.getOfficePackages();
+    const targetPkg: any = (packages as any[]).find(
+      (p: any) => String(p.code || "").toUpperCase() === packageCode,
+    );
+
+    if (!targetPkg) {
+      throw new BadRequestException(`"${packageCode}" geçerli bir ofis paketi değildir.`);
+    }
+
+    const now = new Date();
+    let expiresAt: Date | null = null;
+    if (typeof body.durationDays === "number" && body.durationDays > 0) {
+      expiresAt = new Date(now.getTime() + body.durationDays * 24 * 60 * 60 * 1000);
+    } else if (typeof body.durationMonths === "number" && body.durationMonths > 0) {
+      expiresAt = new Date(now.getTime() + body.durationMonths * 30 * 24 * 60 * 60 * 1000);
+    } else if (packageCode === "DENEME") {
+      // §0-B: süre ayardan (kodda 14 gün yok)
+      const trialDays = Number(targetPkg.trialDays);
+      if (!Number.isSafeInteger(trialDays) || trialDays <= 0) throw new EntitlementSettingMissingError("DENEME trialDays");
+      expiresAt = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000);
+    } else {
+      // §0-B: kodda "standart 365 gün" yok; yönetici süreyi açıkça verir
+      throw new BadRequestException("Süre (durationDays veya durationMonths) zorunludur.");
+    }
+
+    const key = `OFFICE_SUBSCRIPTION_${office.id}`;
+    if (typeof targetPkg.agents !== "number") throw new EntitlementSettingMissingError(`${targetPkg.code} agents`);
+    const sisterSetting = await this.prisma.systemSetting.findUnique({ where: { key: "KARDES_OFIS_PAKETLER" }, select: { valueJson: true } });
+    const sisterCodes = Array.isArray(sisterSetting?.valueJson) ? (sisterSetting.valueJson as unknown[]).map((c) => String(c).trim().toUpperCase()) : [];
+    const valueJson = {
+      packageCode: targetPkg.code,
+      packageName: targetPkg.name || targetPkg.code,
+      agents: targetPkg.agents,
+      features: targetPkg.features || {},
+      kardesOfis: sisterCodes.includes(String(targetPkg.code).toUpperCase()),
+      active: true,
+      startedAt: now.toISOString(),
+      expiresAt: expiresAt ? expiresAt.toISOString() : null,
+      updatedBy: actorId,
+      reason: body.reason || "Yönetim panelinden paket güncellemesi",
+    };
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.systemSetting.upsert({
+        where: { key },
+        update: { valueJson },
+        create: { key, valueJson },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          actorId,
+          action: AuditAction.SYSTEM_SECURITY_ACTION,
+          entityType: "Office",
+          entityId: office.id,
+          description: `Ofis paketi güncellendi: ${office.name} -> ${targetPkg.name || targetPkg.code}`,
+          metadata: {
+            operation: "OFFICE_PACKAGE_UPDATE",
+            officeId: office.id,
+            officeName: office.name,
+            newPackageCode: targetPkg.code,
+            newPackageName: targetPkg.name || targetPkg.code,
+            expiresAt: expiresAt ? expiresAt.toISOString() : null,
+            reason: body.reason || null,
+          },
+          ipAddress: actor?.ipAddress,
+          userAgent: actor?.userAgent,
+        },
+      });
+    });
+
+    return {
+      success: true,
+      officeId: office.id,
+      officeName: office.name,
+      subscription: {
+        packageCode: targetPkg.code,
+        packageName: targetPkg.name || targetPkg.code,
+        agents: valueJson.agents,
+        expiresAt: valueJson.expiresAt,
+        active: true,
+      },
+    };
+  }
+
+  // Güvenli "silme": kayıt silinmez, pasifleştirilir ve AuditLog'a yazılır.
+  async deactivateOffice(id: string, actor?: OrganizationActor) {
+    this.ensureSuperAdminActor(actor);
+    const actorId = this.getActorId(actor);
+    const office = await this.prisma.office.findUnique({ where: { id }, select: { id: true, name: true, isActive: true } });
+    if (!office) throw new NotFoundException("Ofis bulunamadı.");
+
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.office.update({ where: { id }, data: { isActive: false } });
+      await tx.auditLog.create({
+        data: {
+          actorId,
+          action: AuditAction.SYSTEM_SECURITY_ACTION,
+          entityType: "Office",
+          entityId: id,
+          description: `Ofis pasifleştirildi: ${office.name}`,
+          metadata: { operation: "OFFICE_DEACTIVATED", previousIsActive: office.isActive, newIsActive: false },
+          ipAddress: actor?.ipAddress,
+          userAgent: actor?.userAgent,
+        },
+      });
+      return { ok: true, deactivated: true, office: updated };
+    });
+  }
+
   async getTeams() {
     return this.prisma.team.findMany({
       orderBy: [{ isActive: "desc" }, { createdAt: "desc" }],
@@ -887,6 +1325,12 @@ export class OrganizationService {
   }
 
     async getMaxTeamsForOffice(officeId: string): Promise<number> {
+    // ODM-7G-D F13: office-management.maxTeamsFor ile AYNI sonuç — relational modda tek çözümleyici + ayardaki maxTeams; legacy'de türetilmiş snapshot.
+    if ((await entitlementSource(this.prisma)) === 'relational') {
+      const eff = await resolveOfficeEntitlements(this.prisma, officeId);
+      const row = eff.packageCode ? (await loadOfficeSettings(this.prisma)).catalog.get(eff.packageCode) : undefined;
+      return resolveMaxTeams(row, eff.agents);
+    }
     const subscription = await this.prisma.systemSetting.findUnique({
       where: { key: `OFFICE_SUBSCRIPTION_${officeId}` },
     });
@@ -896,9 +1340,9 @@ export class OrganizationService {
     });
     const packages = Array.isArray(packagesSetting?.valueJson) ? (packagesSetting.valueJson as any[]) : [];
     const currentPkg = packages.find((p) => p.code === sub?.packageCode);
-    const agentCapacity = Number(currentPkg?.agents ?? sub?.agents ?? 3);
-
-    return resolveMaxTeams(currentPkg, agentCapacity);
+    // PROVA-2: maxTeams yoksa ESKİ kural — danışman kapasitesinden türet (yoksa 0 = kapalı)
+    const agents = Number(currentPkg?.agents ?? sub?.agents);
+    return resolveMaxTeams(currentPkg, Number.isFinite(agents) ? agents : 0);
   }
 
   async createTeam(
@@ -921,7 +1365,12 @@ export class OrganizationService {
     if (!office || !office.isActive)
       throw new NotFoundException("Aktif ofis bulunamadı.");
 
-    if (leaderId) await this.getUserOrThrow(leaderId);
+    if (leaderId) {
+      const leader = await this.getUserOrThrow(leaderId);
+      if (leader.role !== Role.EMLAKCI) {
+        throw new BadRequestException("Takım lideri yalnızca emlakçı rolündeki kullanıcılardan seçilebilir.");
+      }
+    }
 
     const activeTeamsCount = await this.prisma.team.count({
       where: { officeId, isActive: true },
@@ -975,6 +1424,31 @@ export class OrganizationService {
     });
   }
 
+  async deactivateTeam(id: string, actor?: OrganizationActor) {
+    this.ensureSuperAdminActor(actor);
+    const actorId = this.getActorId(actor);
+    const team = await this.prisma.team.findUnique({ where: { id }, select: { id: true, name: true, officeId: true, isActive: true } });
+    if (!team) throw new NotFoundException("Takım bulunamadı.");
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.teamMember.updateMany({ where: { teamId: id, isActive: true }, data: { isActive: false, leftAt: new Date() } });
+      const updated = await tx.team.update({ where: { id }, data: { isActive: false } });
+      await tx.auditLog.create({
+        data: {
+          actorId,
+          action: AuditAction.SYSTEM_SECURITY_ACTION,
+          entityType: "Team",
+          entityId: id,
+          description: `Takım pasifleştirildi: ${team.name}`,
+          metadata: { operation: "TEAM_DEACTIVATED", officeId: team.officeId, previousIsActive: team.isActive, newIsActive: false },
+          ipAddress: actor?.ipAddress,
+          userAgent: actor?.userAgent,
+        },
+      });
+      return { ok: true, deactivated: true, team: updated };
+    });
+  }
+
   async setTeamLeader(
     teamId: string,
     leaderId: string | null,
@@ -990,7 +1464,12 @@ export class OrganizationService {
 
     if (!team || !team.isActive)
       throw new NotFoundException("Aktif takım bulunamadı.");
-    if (leaderId) await this.getUserOrThrow(leaderId);
+    if (leaderId) {
+      const leader = await this.getUserOrThrow(leaderId);
+      if (leader.role !== Role.EMLAKCI) {
+        throw new BadRequestException("Takım lideri yalnızca emlakçı rolündeki kullanıcılardan seçilebilir.");
+      }
+    }
 
     const previousLeaderId = team.leaderId;
 
@@ -1025,7 +1504,10 @@ export class OrganizationService {
     this.ensureAdminActor(actor);
 
     if (!userId) throw new BadRequestException("Kullanıcı seçimi zorunludur.");
-    await this.getUserOrThrow(userId);
+    const user = await this.getUserOrThrow(userId);
+    if (user.role !== Role.EMLAKCI) {
+      throw new BadRequestException("Takım ve ofis üyeliğine yalnızca emlakçı rolündeki kullanıcılar atanabilir.");
+    }
 
     const team = await this.prisma.team.findUnique({
       where: { id: teamId },

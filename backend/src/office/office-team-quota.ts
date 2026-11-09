@@ -1,4 +1,8 @@
-// Ofis takım kotası: paketin maxTeams alanı; alan yoksa yalnız danışman kapasitesinden türetilen yedek tablo.
+/**
+ * Ofis takım kotası (PROVA-2, Mustafa abi kararı): paketin ayardaki maxTeams alanı varsa o;
+ * yoksa ESKİ kuraldaki gibi danışman kapasitesinden türetilir (ODM-7G-D'de kaldırılan geri dönüş geri getirildi).
+ * Basamak eşikleri eski koddakiyle aynıdır; ticari fiyat/paket değeri değildir. Kapasite yoksa/geçersizse 0 (kapalı).
+ */
 export function resolveMaxTeams(pkg: { maxTeams?: unknown } | null | undefined, agentCapacity: number): number {
   const configured = pkg?.maxTeams;
   if (typeof configured === 'number' && Number.isInteger(configured) && configured >= 0) return configured;

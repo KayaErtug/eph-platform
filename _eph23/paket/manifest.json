@@ -1,0 +1,32 @@
+[
+  {
+    "file": "D:\\Projects\\SM\\backend\\src\\lina\\lina.module.ts",
+    "backup": "D:\\Projects\\SM\\_eph23\\yedek\\backend\\src\\lina\\lina.module.ts.bak",
+    "baseline_sha256": "acec4fb5a42ee8c92335b5b49aaf67bdd5650c34b899cab425981655591c0aa4",
+    "final_sha256": "1fc0fb8886ae93d43bc6e568adb48f4371f49a0194c90282da8ad8371d3af79f"
+  },
+  {
+    "file": "D:\\Projects\\SM\\backend\\src\\project-sales\\project-sales-launch.service.ts",
+    "backup": "D:\\Projects\\SM\\_eph23\\yedek\\backend\\src\\project-sales\\project-sales-launch.service.ts.bak",
+    "baseline_sha256": "cd757cb6c794c6b53d40793197ffdb3e71c3b80e475cbbe7b08863da2f832333",
+    "final_sha256": "0a6ce7dc7c4e3e7c78e74e93d59c5ff98b9ab73d4f26e814934b19409abeb345"
+  },
+  {
+    "file": "D:\\Projects\\SM\\frontend\\src\\app\\proje-sunum\\[token]\\page.tsx",
+    "backup": "D:\\Projects\\SM\\_eph23\\yedek\\frontend\\src\\app\\proje-sunum\\[token]\\page.tsx.bak",
+    "baseline_sha256": "f929f845c3b91d259fdcd25977c66ba09b8bb5ded5d6feeb55dd508b09a93df6",
+    "final_sha256": "b726265f244d25521e92d4a8de5f22c74276abfc548131444346c55f0709a3c0"
+  },
+  {
+    "file": "D:\\Projects\\SM\\frontend\\src\\components\\EPHMobileShell.tsx",
+    "backup": "D:\\Projects\\SM\\_eph23\\yedek\\frontend\\src\\components\\EPHMobileShell.tsx.bak",
+    "baseline_sha256": "f1c60427d5816f2ff7a57cb3b9620e7cb995f5c9d514250d5114a4204c67260f",
+    "final_sha256": "8726670a58a6d879d6a9d42371c8ba553d8279b77cc6cd1b50c41aa435cfaf48"
+  },
+  {
+    "file": "D:\\Projects\\eph-mobile-final\\src\\app\\project-sales\\[id]\\launch.tsx",
+    "backup": "D:\\Projects\\SM\\_eph23\\yedek\\mobile\\src\\app\\project-sales\\[id]\\launch.tsx.bak",
+    "baseline_sha256": "71e7f0a882deae88a705fb4684838acb777a7b5aa92ba2482239bc463adedcba",
+    "final_sha256": "14d1227b1ebb47efa75ba35845ef41a7a930d4f33e25ee5313e1659ccc1b42ad"
+  }
+]

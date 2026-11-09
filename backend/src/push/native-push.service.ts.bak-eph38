@@ -1,0 +1,125 @@
+import { Cron } from '@nestjs/schedule';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { createHash } from 'crypto';
+import { PrismaService } from '../prisma/prisma.service';
+
+type Preferences = Record<'messages' | 'forum' | 'pool' | 'announcements' | 'lina', boolean>;
+type Subscription = { userId: string; token: string; platform: string; sound: boolean; preferences: Preferences };
+type Payload = { title: string; body: string; url?: string };
+const PREFIX = 'EPH_NATIVE_PUSH_';
+const RECEIPTS = 'EPH_PUSH_RECEIPT_';
+const DEFAULTS: Preferences = { messages: true, forum: true, pool: true, announcements: true, lina: true };
+
+@Injectable()
+export class NativePushService {
+  private collecting = false;
+  constructor(private readonly prisma: PrismaService) {}
+
+  private token(value: unknown) {
+    if (typeof value !== 'string' || !/^(ExpoPushToken|ExponentPushToken)\[[A-Za-z0-9_-]{10,200}\]$/.test(value)) {
+      throw new BadRequestException('Geçerli cihaz bildirim kaydı bulunamadı.');
+    }
+    return value;
+  }
+
+  private key(token: string) { return PREFIX + createHash('sha256').update(token).digest('hex'); }
+
+  async subscribe(userId: string, body: { token?: unknown; platform?: unknown; sound?: unknown; preferences?: unknown }) {
+    const token = this.token(body?.token);
+    if (!['ios', 'android'].includes(String(body.platform))) throw new BadRequestException('Geçersiz cihaz platformu.');
+    const preferences = { ...DEFAULTS };
+    if (body.preferences && typeof body.preferences === 'object') {
+      for (const name of Object.keys(DEFAULTS) as Array<keyof Preferences>) {
+        const value = body.preferences[name];
+        if (typeof value === 'boolean') preferences[name] = value;
+      }
+    }
+    const valueJson = { userId, token, platform: String(body.platform), sound: body.sound !== false, preferences };
+    await this.prisma.$transaction(async tx => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`native-push:${userId}`}))`;
+      const devices = await tx.systemSetting.findMany({ where: { key: { startsWith: PREFIX }, valueJson: { path: ['userId'], equals: userId } }, select: { key: true }, take: 20 });
+      if (devices.length >= 20 && !devices.some(device => device.key === this.key(token))) throw new BadRequestException('Cihaz bildirim sınırına ulaşıldı. Kullanılmayan cihazların bildirimlerini kapatın.');
+      await tx.systemSetting.upsert({ where: { key: this.key(token) }, create: { key: this.key(token), valueJson }, update: { valueJson } });
+    });
+    return { ok: true };
+  }
+
+  async unsubscribe(userId: string, body: { token?: unknown }) {
+    const token = this.token(body?.token);
+    await this.prisma.systemSetting.deleteMany({ where: { key: this.key(token), valueJson: { path: ['userId'], equals: userId } } });
+    return { ok: true };
+  }
+
+  private category(url?: string): keyof Preferences {
+    if (url?.startsWith('/messages')) return 'messages';
+    if (url?.startsWith('/network') || url?.startsWith('/forum')) return 'forum';
+    if (url?.startsWith('/havuz') || url?.startsWith('/portfoy')) return 'pool';
+    if (url?.startsWith('/lina')) return 'lina';
+    return 'announcements';
+  }
+
+  async sendToUser(userId: string, payload: Payload, onlyToken?: string, bypassPreferences = false) {
+    const rows = await this.prisma.systemSetting.findMany({ where: {
+      key: onlyToken ? this.key(this.token(onlyToken)) : { startsWith: PREFIX },
+      valueJson: { path: ['userId'], equals: userId },
+    }, take: 100 });
+    let successCount = 0;
+    let failCount = 0;
+    await Promise.all(rows.map(async row => {
+      const subscription = row.valueJson as unknown as Subscription;
+      if (!subscription?.token || !bypassPreferences && subscription.preferences?.[this.category(payload.url)] === false) return;
+      try {
+        const response = await fetch('https://exp.host/--/api/v2/push/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(process.env.EXPO_ACCESS_TOKEN ? { Authorization: `Bearer ${process.env.EXPO_ACCESS_TOKEN}` } : {}) },
+          body: JSON.stringify({ to: subscription.token, title: payload.title, body: payload.body, sound: subscription.sound ? 'default' : null, channelId: subscription.sound ? 'eph-default' : 'eph-silent', data: { url: payload.url || '/' } }),
+          signal: AbortSignal.timeout(10000),
+        });
+        const result = await response.json() as { data?: { status?: string; id?: string; details?: { error?: string } } };
+        if (response.ok && result.data?.status === 'ok') {
+          successCount++;
+          if (result.data.id) {
+            try {
+              await this.prisma.systemSetting.upsert({ where: { key: RECEIPTS + result.data.id }, create: { key: RECEIPTS + result.data.id, valueJson: { userId, token: subscription.token } }, update: {} });
+            } catch { console.warn('EPH bildirim teslim makbuzu kaydedilemedi.'); }
+          }
+        }
+        else {
+          failCount++;
+          if (result.data?.details?.error === 'DeviceNotRegistered') await this.prisma.systemSetting.deleteMany({ where: { key: row.key, valueJson: { path: ['userId'], equals: userId } } });
+        }
+      } catch { failCount++; }
+    }));
+    return { ok: successCount > 0, successCount, failCount };
+  }
+
+  @Cron('*/2 * * * *')
+  async collectReceipts() {
+    if (this.collecting) return;
+    this.collecting = true;
+    try {
+      const rows = await this.prisma.systemSetting.findMany({ where: { key: { startsWith: RECEIPTS }, createdAt: { lt: new Date(Date.now() - 60000) } }, orderBy: { createdAt: 'asc' }, take: 100 });
+      if (!rows.length) return;
+      const response = await fetch('https://exp.host/--/api/v2/push/getReceipts', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...(process.env.EXPO_ACCESS_TOKEN ? { Authorization: `Bearer ${process.env.EXPO_ACCESS_TOKEN}` } : {}) },
+        body: JSON.stringify({ ids: rows.map(row => row.key.slice(RECEIPTS.length)) }), signal: AbortSignal.timeout(10000),
+      });
+      if (!response.ok) return;
+      const result = await response.json() as { data?: Record<string, { status?: string; details?: { error?: string } }> };
+      for (const row of rows) {
+        const receipt = result.data?.[row.key.slice(RECEIPTS.length)];
+        if (!receipt && Date.now() - row.createdAt.getTime() < 86400000) continue;
+        const subscription = row.valueJson as unknown as { userId: string; token: string };
+        if (receipt?.details?.error === 'DeviceNotRegistered') await this.prisma.systemSetting.deleteMany({ where: { key: this.key(subscription.token), valueJson: { path: ['userId'], equals: subscription.userId } } });
+        if (receipt?.status === 'error') console.warn('EPH bildirim teslim hatası:', receipt.details?.error || 'UNKNOWN');
+        await this.prisma.systemSetting.deleteMany({ where: { key: row.key } });
+      }
+    } catch { console.warn('EPH bildirim teslim kontrolü sonraki döngüde yeniden denenecek.'); }
+    finally { this.collecting = false; }
+  }
+
+  async test(userId: string, body: { token?: unknown }) {
+    const token = this.token(body?.token);
+    return this.sendToUser(userId, { title: 'EPH Test Bildirimi', body: 'EPH bildirimleri bu cihazda çalışıyor.', url: '/messages' }, token, true);
+  }
+}

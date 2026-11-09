@@ -7,13 +7,13 @@ import {UnitsService} from '../units/units.service';
 describe('Project revision contracts',()=>{
  it('lists the specific units missing prices or photos',()=>{
   const service:any=new ProjectSalesLaunchService({} as any,{} as any);
-  const project={setupStatus:'TAMAMLANDI',units:[{id:'u',number:'12',block:{code:'A'},price:0,images:[],mediaPackage:null}]};
+  const project={setupStatus:'TAMAMLANDI',mediaPackages:[],units:[{id:'u',number:'12',block:{code:'A'},price:0,images:[],mediaPackage:null}]};
   const readiness=service.buildPublishReadiness(project,{totalUnits:1,pricedUnits:0,imageCount:0,availableUnits:1});
   expect(readiness.ready).toBe(false);expect(readiness.issues).toEqual(expect.arrayContaining([expect.objectContaining({code:'price_u',message:expect.stringContaining('12')}),expect.objectContaining({code:'media_u'})]));
  });
  it('accepts direct photos without requiring a media package',()=>{
   const service:any=new ProjectSalesLaunchService({} as any,{} as any);
-  expect(service.buildPublishReadiness({setupStatus:'TAMAMLANDI',units:[{id:'u',price:1,images:[{id:'image'}]}]},{totalUnits:1,pricedUnits:1,imageCount:1,availableUnits:1}).ready).toBe(true);
+  expect(service.buildPublishReadiness({setupStatus:'TAMAMLANDI',mediaPackages:[],units:[{id:'u',price:1,images:[{id:'image'}]}]},{totalUnits:1,pricedUnits:1,imageCount:1,availableUnits:1}).ready).toBe(true);
  });
  it('withdraws visibility without deleting project or media',async()=>{
   const updateMany=jest.fn().mockResolvedValue({count:2});const db={project:{findUnique:jest.fn().mockResolvedValue({id:'p',ownerId:'owner'})},unit:{updateMany}};

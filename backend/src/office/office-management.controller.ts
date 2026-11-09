@@ -14,7 +14,7 @@ export class OfficeManagementController {
   constructor(private readonly service: OfficeManagementService) {}
   @Get('rollout') @UseGuards(RolesGuard) @Roles(Role.SUPER_ADMIN) rollout() { return this.service.rolloutStatus(); }
   @Post('rollout') @UseGuards(RolesGuard) @Roles(Role.SUPER_ADMIN) activate(@Req() req: any, @Body('enabled') enabled: unknown) { return this.service.activate(req.user.id, enabled); }
-  @Get('dashboard') dashboard(@Req() req: any) { return this.service.dashboard(req.user.id); }
+  @Get('dashboard') dashboard(@Req() req: any, @Query('officeId') officeId?: string) { return this.service.dashboard(req.user.id, officeId); }
   @Get('wallet-options') walletOptions(@Req() req: any) { return this.service.walletOptions(req.user.id); }
   @Post('create') create(@Req() req: any, @Body('name') name: unknown) { return this.service.create(req.user.id, name); }
   @Post('join') join(@Req() req: any, @Body('code') code: unknown) { return this.service.requestJoin(req.user.id, code); }
@@ -22,7 +22,8 @@ export class OfficeManagementController {
   @Post(':id/logo') @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: OFFICE_LOGO_MAX_BYTES, files: 1 } })) logo(@Req() req: any, @Param('id') id: string, @UploadedFile() file: Express.Multer.File) { return this.service.uploadLogo(req.user.id, id, file); }
   @Delete(':id/logo') removeLogo(@Req() req: any, @Param('id') id: string) { return this.service.removeLogo(req.user.id, id); }
   @Post(':id/spending-mode') mode(@Req() req: any, @Param('id') id: string, @Body('mode') mode: unknown) { return this.service.mode(req.user.id, id, mode); }
-  @Post(':id/invite') invite(@Req() req: any, @Param('id') id: string) { return this.service.invite(req.user.id, id); }
+  @Get(':id/invite-candidates') inviteCandidates(@Req() req: any, @Param('id') id: string, @Query('q') q: string) { return this.service.inviteCandidates(req.user.id, id, q); }
+  @Post(':id/invite') invite(@Req() req: any, @Param('id') id: string, @Body('recipientId') recipientId?: string) { return this.service.invite(req.user.id, id, recipientId); }
   @Post(':id/join-decision') decide(@Req() req: any, @Param('id') id: string, @Body() body: { memberId: string; approve: boolean }) { return this.service.decide(req.user.id, id, body.memberId, body.approve); }
   @Post(':id/transfer') transfer(@Req() req: any, @Param('id') id: string, @Body() body: { memberId?: string; amount?: number; requestId?: string }) { return this.service.transfer(req.user.id, id, body); }
 
@@ -46,4 +47,41 @@ export class OfficeManagementController {
   @Get(':id/match-logs') getMatchLogs(@Req() req: any, @Param('id') id: string, @Query() query: any) { return this.service.getOfficeMatchLogs(req.user.id, id, query); }
   @Post(':id/match-logs') recordMatchLog(@Req() req: any, @Param('id') id: string, @Body() body: any) { return this.service.recordOfficeMatchLog(req.user.id, id, body); }
 
+  // FAZ 4: Broker Dashboard & Performans Ligi
+  @Get('performance-league')
+  getPerformanceLeague(
+    @Req() req: any,
+    @Query('officeId') officeId?: string,
+  ) {
+    const resolvedOfficeId = officeId || req.user?.officeId;
+    return this.service.getBrokerPerformanceLeague(req.user.id, resolvedOfficeId);
+  }
+
+  @Get('stale-radar')
+  getStaleRadar(
+    @Req() req: any,
+    @Query('officeId') officeId?: string,
+  ) {
+    const resolvedOfficeId = officeId || req.user?.officeId;
+    return this.service.getStaleRadar(req.user.id, resolvedOfficeId);
+  }
+
+  @Get('wallet-discipline')
+  getWalletDiscipline(
+    @Req() req: any,
+    @Query('officeId') officeId?: string,
+  ) {
+    const resolvedOfficeId = officeId || req.user?.officeId;
+    return this.service.getWalletDiscipline(req.user.id, resolvedOfficeId);
+  }
+
+  @Get(':id/broker-audit')
+  getBrokerDailyAuditReport(@Req() req: any, @Param('id') id: string) {
+    return this.service.getBrokerDailyAuditReport(req.user.id, id);
+  }
+
+  @Post(':id/broker-audit/send-notification')
+  triggerDailyBrokerAuditNotification(@Req() req: any, @Param('id') id: string) {
+    return this.service.triggerDailyBrokerAuditNotification(req.user.id, id);
+  }
 }

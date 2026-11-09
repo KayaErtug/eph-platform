@@ -12,12 +12,12 @@ import {
   Clock3,
   Eye,
   FileText,
-  HeartHandshake,
   Loader2,
   MapPin,
   MessageCircle,
+  MessageSquareText,
+  Phone,
   Share2,
-  Sparkles,
   Tag,
   UserRound,
   X,
@@ -29,6 +29,11 @@ import {
   registerKontorSoundUnlock,
 } from "@/lib/kontorFeedback";
 import { useAuthStore } from "@/store/auth.store";
+import {
+  FORUM_PROPERTY_TYPE_OPTIONS,
+  getForumRequestTypeLabel,
+  normalizeForumRequestTypeCode,
+} from "@/schemas/forum/forum-request.schema";
 
 type NetworkUser = {
   id?: string;
@@ -59,7 +64,22 @@ type NetworkPost = {
   city?: string | null;
   district?: string | null;
   neighborhood?: string | null;
+  areas?: Array<{
+    city?: string | null;
+    district?: string | null;
+    neighborhood?: string | null;
+  }> | null;
   budget?: number | null;
+  minArea?: number | null;
+  maxArea?: number | null;
+  minRoom?: number | null;
+  maxRoom?: number | null;
+  minBudget?: number | null;
+  maxBudget?: number | null;
+  propertyTypes?: string[] | null;
+  roomCounts?: string[] | null;
+  features?: string[] | null;
+  priceCurrency?: string | null;
   visibility?: string | null;
   tags?: string[] | null;
   expiresAt?: string | null;
@@ -67,6 +87,8 @@ type NetworkPost = {
   viewCount?: number | null;
   requestCount?: number | null;
   followerCount?: number | null;
+  phoneCallAllowed?: boolean;
+  whatsappAllowed?: boolean;
 };
 
 const CATEGORY_IMAGES: Record<string, string> = {
@@ -80,6 +102,71 @@ const CATEGORY_IMAGES: Record<string, string> = {
   Duyuru: "/talep-merkezi/duyuru.jpg",
   Diğer: "/talep-merkezi/diger.jpg",
 };
+
+function normalizePostAreas(
+  post?: NetworkPost | null,
+) {
+  const normalizedAreas = Array.isArray(
+    post?.areas,
+  )
+    ? post.areas
+        .map((area) => ({
+          city: String(
+            area?.city || "",
+          ).trim(),
+          district: String(
+            area?.district || "",
+          ).trim(),
+          neighborhood: String(
+            area?.neighborhood || "",
+          ).trim(),
+        }))
+        .filter(
+          (area) =>
+            area.city ||
+            area.district ||
+            area.neighborhood,
+        )
+    : [];
+
+  if (normalizedAreas.length > 0) {
+    return normalizedAreas;
+  }
+
+  const legacyArea = {
+    city: String(
+      post?.city || "",
+    ).trim(),
+    district: String(
+      post?.district || "",
+    ).trim(),
+    neighborhood: String(
+      post?.neighborhood || "",
+    ).trim(),
+  };
+
+  return legacyArea.city ||
+    legacyArea.district ||
+    legacyArea.neighborhood
+    ? [legacyArea]
+    : [];
+}
+
+function formatPostArea(
+  area: {
+    city?: string | null;
+    district?: string | null;
+    neighborhood?: string | null;
+  },
+) {
+  return [
+    area.city,
+    area.district,
+    area.neighborhood,
+  ]
+    .filter(Boolean)
+    .join(" / ");
+}
 
 function normalizeText(value?: string | null) {
   return String(value || "")
@@ -207,7 +294,7 @@ function budgetCurrencyFromPost(post: NetworkPost) {
     .replace("Döviz:", "")
     .trim();
 
-  return currency || "TRY";
+  return post.priceCurrency || currency || "TRY";
 }
 
 function getRequestIntentFromPost(post: NetworkPost) {
@@ -218,16 +305,18 @@ function getRequestIntentFromPost(post: NetworkPost) {
     .replace("Talep Türü:", "")
     .trim();
 
-  if (value) return value;
+  if (value) {
+    return getForumRequestTypeLabel(normalizeForumRequestTypeCode(value));
+  }
 
   const text = normalizeText(
     [post.title, post.description, ...(post.tags || [])].join(" "),
   );
 
   if (text.includes("kiralık") || text.includes("kiralik"))
-    return "Kiralık Arıyorum";
+    return getForumRequestTypeLabel("PORTFOY_KIRALIK");
   if (text.includes("satılık") || text.includes("satilik"))
-    return "Satılık Arıyorum";
+    return getForumRequestTypeLabel("PORTFOY_SATILIK");
 
   return "Arıyorum";
 }
@@ -262,6 +351,107 @@ function visibilityLabel(value?: string | null) {
   if (value === "SADECE_BAGLANTILARIM") return "Bağlantılarım";
 
   return "Tüm EPH";
+}
+
+function formatRequestRange(
+  min?: number | null,
+  max?: number | null,
+  suffix = "",
+) {
+  const minimum = min != null && Number(min) > 0 ? Number(min) : null;
+  const maximum = max != null && Number(max) > 0 ? Number(max) : null;
+  const format = (value: number) =>
+    `${value.toLocaleString("tr-TR")}${suffix ? ` ${suffix}` : ""}`;
+
+  if (minimum !== null && maximum !== null) {
+    return minimum === maximum
+      ? format(minimum)
+      : `${format(minimum)} – ${format(maximum)}`;
+  }
+  if (minimum !== null) return `${format(minimum)} ve üzeri`;
+  if (maximum !== null) return `${format(maximum)}'a kadar`;
+  return "";
+}
+
+function formatRequestBudget(post: NetworkPost) {
+  const currency = budgetCurrencyFromPost(post);
+  const minimum =
+    post.minBudget != null && Number(post.minBudget) > 0
+      ? Number(post.minBudget)
+      : null;
+  const maximum =
+    post.maxBudget != null && Number(post.maxBudget) > 0
+      ? Number(post.maxBudget)
+      : null;
+
+  if (minimum !== null && maximum !== null) {
+    return minimum === maximum
+      ? formatMoney(minimum, currency)
+      : `${formatMoney(minimum, currency)} – ${formatMoney(maximum, currency)}`;
+  }
+  if (minimum !== null) return `${formatMoney(minimum, currency)} ve üzeri`;
+  if (maximum !== null) return `${formatMoney(maximum, currency)}'a kadar`;
+  return post.budget ? formatMoney(post.budget, currency) : "";
+}
+
+function getPropertyTypeLabels(post: NetworkPost) {
+  return (Array.isArray(post.propertyTypes) ? post.propertyTypes : []).map(
+    (value) =>
+      FORUM_PROPERTY_TYPE_OPTIONS.find((item) => item.value === value)?.label ||
+      String(value).replaceAll("_", " "),
+  );
+}
+
+type RequestDetailItem = {
+  label: string;
+  value: string;
+};
+
+function getCompleteRequestDetails(post: NetworkPost): RequestDetailItem[] {
+  const items: RequestDetailItem[] = [];
+  const add = (label: string, value?: string | number | null) => {
+    const text = String(value ?? "").trim();
+    if (!text || text === "Belirtilmemiş") return;
+    items.push({ label, value: text });
+  };
+
+  add("Talep Kategorisi", categoryLabel(post.type));
+  add("Talep Türü", getRequestIntentFromPost(post));
+  add("Gayrimenkul Tipleri", getPropertyTypeLabels(post).join(", "));
+  add("Bütçe Aralığı", formatRequestBudget(post));
+  add("Alan Aralığı", formatRequestRange(post.minArea, post.maxArea, "m²"));
+  add("Oda Aralığı", formatRequestRange(post.minRoom, post.maxRoom, "oda"));
+  add(
+    "Oda Seçenekleri",
+    Array.isArray(post.roomCounts) ? post.roomCounts.join(", ") : "",
+  );
+  add(
+    "Aranan Özellikler",
+    Array.isArray(post.features) ? post.features.join(", ") : "",
+  );
+  add("Para Birimi", budgetCurrencyFromPost(post));
+  add("Aciliyet", post.urgency);
+  add("Görünürlük", visibilityLabel(post.visibility));
+  add("Geçerlilik", remainingTime(post.expiresAt));
+  add("Oluşturulma Tarihi", formatDateTime(post.createdAt));
+  add("Talep Numarası", `#${post.id.slice(0, 8).toUpperCase()}`);
+  add(
+    "Telefonla İletişim",
+    post.phoneCallAllowed ? "İzin verildi" : "İzin verilmedi",
+  );
+  add(
+    "WhatsApp İletişimi",
+    post.whatsappAllowed ? "İzin verildi" : "İzin verilmedi",
+  );
+
+  const extraTags = (Array.isArray(post.tags) ? post.tags : []).filter(
+    (tag) =>
+      !String(tag).startsWith("Talep Türü:") &&
+      !String(tag).startsWith("Döviz:"),
+  );
+  add("Ek Etiketler", extraTags.join(", "));
+
+  return items;
 }
 
 
@@ -335,14 +525,33 @@ export default function NetworkPostDetailPage() {
   const owner = useMemo(() => getPostUser(post), [post]);
   const category = useMemo(() => categoryLabel(post?.type), [post?.type]);
   const image = useMemo(() => getCategoryImage(post?.type), [post?.type]);
-  const location = useMemo(
-    () =>
-      [post?.city, post?.district, post?.neighborhood]
-        .filter(Boolean)
-        .join(" / "),
+  const postAreas = useMemo(
+    () => normalizePostAreas(post),
     [post],
   );
+
+  const location = useMemo(() => {
+    const areaLabels = postAreas
+      .map(formatPostArea)
+      .filter(Boolean);
+
+    if (areaLabels.length === 0) {
+      return "";
+    }
+
+    if (areaLabels.length === 1) {
+      return areaLabels[0];
+    }
+
+    return `${areaLabels[0]} +${
+      areaLabels.length - 1
+    } bölge`;
+  }, [postAreas]);
   const criteria = useMemo(() => (post ? criteriaFromPost(post) : []), [post]);
+  const completeDetails = useMemo(
+    () => (post ? getCompleteRequestDetails(post) : []),
+    [post],
+  );
 
   useEffect(() => {
     const fetchPost = async () => {
@@ -400,7 +609,7 @@ export default function NetworkPostDetailPage() {
         throw new Error("Paylaşım bağlantısı oluşturulamadı.");
       }
 
-      const message = `Merhaba, "${post.title}" başlıklı Forum talebini sizinle paylaşmak istiyorum: ${url}`;
+      const message = `Merhaba, "${post.title}" başlıklı Talep Merkezi kaydını sizinle paylaşmak istiyorum: ${url}`;
 
       if (navigator.share) {
         await navigator.share({ title: post.title, text: message, url });
@@ -436,7 +645,7 @@ export default function NetworkPostDetailPage() {
     }
 
     if (participantId === user.id) {
-      alert("Kendi Forum paylaşımınız için bu işlemi yapamazsınız.");
+      alert("Kendi Talep Merkezi kaydınız için bu işlemi yapamazsınız.");
       return;
     }
 
@@ -458,7 +667,7 @@ export default function NetworkPostDetailPage() {
     const payload =
       action === "MESSAGE"
         ? {
-            message: `Merhaba, "${post.title}" başlıklı Forum paylaşımınız hakkında görüşmek istiyorum.`,
+            message: `Merhaba, "${post.title}" başlıklı Talep Merkezi kaydınız hakkında görüşmek istiyorum.`,
           }
         : {
             note:
@@ -480,9 +689,9 @@ export default function NetworkPostDetailPage() {
       const spent = getSpentFromResponse(response.data, fallbackSpent);
       const remainingBalance = getBalanceFromResponse(response.data);
 
-      const actionLabel =
-        action === "MESSAGE"
-          ? "Mesaj Başlatıldı"
+        const actionLabel =
+          action === "MESSAGE"
+            ? "Talebe Yanıt Verildi"
           : action === "INTEREST"
             ? "İlgileniyorum Bildirildi"
             : "Yardımcı Olabilirim Bildirildi";
@@ -517,7 +726,56 @@ export default function NetworkPostDetailPage() {
     } catch (error: any) {
       alert(
         error?.response?.data?.message ||
-          "Forum işlemi tamamlanamadı.",
+          "Talep Merkezi işlemi tamamlanamadı.",
+      );
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const confirmForumContact = async (
+    channel: "CALL" | "WHATSAPP",
+  ) => {
+    if (!post || actionLoading) return;
+
+    try {
+      setActionLoading(true);
+      const response = await api.post(
+        `/network/posts/${post.id}/contact/${channel}`,
+      );
+      const spent = getSpentFromResponse(response.data, 10);
+      const remainingBalance = getBalanceFromResponse(response.data);
+      const url = String(response.data?.url || "").trim();
+
+      void playKontorHarcamaSound();
+      setSuccessToast({
+        title:
+          channel === "CALL"
+            ? "Telefon İletişimi Açıldı"
+            : "WhatsApp İletişimi Açıldı",
+        message:
+          spent === 0
+            ? String(response.data?.message || "İletişim bilgisi açıldı.")
+            : remainingBalance === null
+              ? "10 kontör harcandı."
+              : `10 kontör harcandı. Kalan bakiyen ${remainingBalance} kontör.`,
+        spent,
+        balance: remainingBalance,
+      });
+      setSelectedAction(null);
+
+      if (!url) {
+        throw new Error("İletişim bağlantısı oluşturulamadı.");
+      }
+
+      window.setTimeout(() => {
+        window.location.assign(url);
+      }, 350);
+    } catch (error: any) {
+      alert(
+        error?.response?.data?.message ||
+          error?.message ||
+          "İletişim bilgisi açılamadı.",
       );
     } finally {
       setActionLoading(false);
@@ -550,7 +808,7 @@ export default function NetworkPostDetailPage() {
             onClick={() => router.push("/network")}
             className="mt-4 h-11 rounded-[22px] bg-[#EA580C] px-5 text-[13px] font-black text-white"
           >
-            Foruma Dön
+            Talep Merkezine Dön
           </button>
         </div>
       </main>
@@ -577,7 +835,7 @@ export default function NetworkPostDetailPage() {
 
             <div className="min-w-0 flex-1">
               <h1 className="truncate text-left text-[19px] font-black tracking-[-0.04em] text-[#3A2208]">
-                Forum Talep Detayı
+                Talep Merkezi Detayı
               </h1>
               <p className="truncate text-left text-[10px] font-bold text-[#7C5A36]">
                 {location || "Konum belirtilmedi"}
@@ -597,19 +855,6 @@ export default function NetworkPostDetailPage() {
               <Bookmark size={17} fill={saved ? "currentColor" : "none"} />
             </button>
 
-            <button
-              type="button"
-              onClick={() => openForumAction("MESSAGE")}
-              disabled={actionLoading}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[15px] border border-[#FED7AA] bg-white text-[#3A2208] disabled:opacity-60"
-              aria-label="Görüşme başlat"
-            >
-              {actionLoading ? (
-                <Loader2 size={17} className="animate-spin" />
-              ) : (
-                <MessageCircle size={17} />
-              )}
-            </button>
           </div>
         </section>
 
@@ -654,7 +899,7 @@ export default function NetworkPostDetailPage() {
                 No: #{post.id.slice(0, 8).toUpperCase()}
               </p>
 
-              <div className="mt-2 grid grid-cols-3 gap-1">
+              <div className="mt-2 grid grid-cols-2 gap-1">
                 <button
                   type="button"
                   onClick={handleSave}
@@ -678,19 +923,6 @@ export default function NetworkPostDetailPage() {
                   {shareBusy ? "Hazırlanıyor" : "Paylaş"}
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => openForumAction("INTEREST")}
-                  disabled={actionLoading}
-                  className="flex h-9 items-center justify-center gap-1 rounded-[14px] bg-[#EA580C] px-1 text-[9.5px] font-black text-white shadow-[0_8px_16px_rgba(234,88,12,0.24)] disabled:opacity-70"
-                >
-                  {actionLoading ? (
-                    <Loader2 size={13} className="animate-spin" />
-                  ) : (
-                    <HeartHandshake size={13} />
-                  )}
-                  İlgilen
-                </button>
               </div>
             </div>
           </div>
@@ -709,6 +941,45 @@ export default function NetworkPostDetailPage() {
           </div>
         </section>
 
+        {postAreas.length > 0 && (
+          <section className="rounded-[20px] border border-[#FED7AA] bg-[#FFF9F0] p-3 shadow-[0_8px_20px_rgba(15,23,42,0.05)]">
+            <div className="flex items-center gap-2">
+              <MapPin
+                size={15}
+                className="shrink-0 text-[#F97316]"
+              />
+
+              <h3 className="text-[11px] font-black uppercase tracking-wide text-[#7C5A36]">
+                Seçili Bölgeler
+              </h3>
+
+              <span className="rounded-full border border-[#FED7AA] bg-white px-2 py-0.5 text-[9px] font-black text-[#EA580C]">
+                {postAreas.length}
+              </span>
+            </div>
+
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {postAreas.map(
+                (area, index) => {
+                  const areaLabel =
+                    formatPostArea(area);
+
+                  return (
+                    <span
+                      key={`${areaLabel}-${index}`}
+                      className="inline-flex max-w-full rounded-full border border-[#FED7AA] bg-white px-2.5 py-1 text-[10px] font-bold leading-4 text-[#3A2208]"
+                    >
+                      <span className="break-words">
+                        {areaLabel}
+                      </span>
+                    </span>
+                  );
+                },
+              )}
+            </div>
+          </section>
+        )}
+
         <section className="grid grid-cols-4 gap-1.5">
           <InfoCard icon={<Tag size={14} />} label="Tür" value={category} />
           <InfoCard
@@ -720,7 +991,7 @@ export default function NetworkPostDetailPage() {
           <InfoCard
             icon={<Building2 size={14} />}
             label="Bütçe"
-            value={formatMoney(post.budget, budgetCurrencyFromPost(post))}
+            value={formatRequestBudget(post) || "Belirtilmemiş"}
           />
           <InfoCard
             icon={<Clock3 size={14} />}
@@ -753,6 +1024,33 @@ export default function NetworkPostDetailPage() {
           />
         </section>
 
+        <section className="overflow-hidden rounded-[20px] border border-white bg-white shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
+          <div className="border-b border-[#FDE1BF] bg-[#FFF9F0] px-3 py-2.5 text-center">
+            <h3 className="text-[12.5px] font-black text-[#3A2208]">
+              Talebin Tüm Bilgileri
+            </h3>
+            <p className="mt-0.5 text-[9.5px] font-bold text-[#7C5A36]">
+              Talep oluşturulurken girilen tüm kayıtlı bilgiler
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-1.5 p-2.5">
+            {completeDetails.map((item) => (
+              <div
+                key={`${item.label}-${item.value}`}
+                className="flex min-h-[72px] min-w-0 flex-col items-center justify-center rounded-[15px] border border-[#FED7AA] bg-[#FFF9F0] px-2 py-2 text-center"
+              >
+                <p className="text-[8.5px] font-black uppercase leading-3 tracking-[0.04em] text-[#9A6B35]">
+                  {item.label}
+                </p>
+                <p className="mt-1 break-words text-[10.5px] font-black leading-4 text-[#3A2208] [overflow-wrap:anywhere]">
+                  {item.value}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
         <section className="rounded-[20px] border border-white bg-white px-2.5 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
           <div className="flex items-center gap-2">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] bg-[#FFF1E8] text-[#EA580C]">
@@ -780,60 +1078,19 @@ export default function NetworkPostDetailPage() {
 
         <section className="grid grid-cols-1 gap-1.5">
           <div className="rounded-[20px] border border-white bg-white p-2.5 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
-            <h3 className="text-center text-[12.5px] font-black text-[#3A2208]">
-              Forum İşlemleri
-            </h3>
-
-            <p className="mt-1 text-center text-[9.5px] font-bold text-[#7C5A36]">
-              Okuma, paylaşım ve takip ücretsizdir.
-            </p>
-
-            <div className="mt-2 grid grid-cols-2 gap-1.5">
+            <div>
               <button
                 type="button"
                 onClick={() => openForumAction("MESSAGE")}
                 disabled={actionLoading}
-                className="flex min-h-11 items-center justify-center gap-1 rounded-[16px] bg-[#EA580C] px-2 text-[11px] font-black text-white disabled:opacity-60"
+                className="flex min-h-12 w-full items-center justify-center gap-2 rounded-[16px] bg-[#EA580C] px-3 text-[12px] font-black text-white shadow-[0_10px_22px_rgba(234,88,12,0.24)] disabled:opacity-60"
               >
-                <MessageCircle size={14} />
-                Mesaj 3K
-              </button>
-
-              <button
-                type="button"
-                onClick={() => openForumAction("INTEREST")}
-                disabled={actionLoading}
-                className="flex min-h-11 items-center justify-center gap-1 rounded-[16px] border-2 border-[#2563EB] bg-[#FFF1E8] px-2 text-[11px] font-black text-[#1D4ED8] disabled:opacity-60"
-              >
-                <CheckCircle2 size={14} />
-                İlgilen 10K
-              </button>
-
-              <button
-                type="button"
-                onClick={() => openForumAction("HELP")}
-                disabled={actionLoading}
-                className="flex min-h-11 items-center justify-center gap-1 rounded-[16px] bg-emerald-600 px-2 text-[11px] font-black text-white disabled:opacity-60"
-              >
-                <HeartHandshake size={15} />
-                Yardımcı Ol 10K
-              </button>
-
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={actionLoading}
-                className={`flex min-h-11 items-center justify-center gap-1 rounded-[16px] border px-2 text-[11px] font-black disabled:opacity-60 ${
-                  saved
-                    ? "border-[#EA580C] bg-[#FFF1E8] text-[#EA580C]"
-                    : "border-[#FED7AA] bg-[#FFF9F0] text-[#3A2208]"
-                }`}
-              >
-                <Bookmark
-                  size={14}
-                  fill={saved ? "currentColor" : "none"}
-                />
-                {saved ? "Kaydedildi" : "Kaydet"}
+                {actionLoading ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <MessageCircle size={16} />
+                )}
+                Talebe Yanıt Ver
               </button>
             </div>
           </div>
@@ -847,18 +1104,10 @@ export default function NetworkPostDetailPage() {
           busy={actionLoading}
           onClose={() => setSelectedAction(null)}
           onConfirm={confirmForumAction}
+          onContact={confirmForumContact}
         />
       )}
 
-      <button
-        type="button"
-        onClick={() => router.push("/lina")}
-        className="fixed right-4 z-30 flex h-[60px] w-[60px] flex-col items-center justify-center rounded-full bg-gradient-to-br from-[#7C3AED] to-[#4F46E5] text-white shadow-[0_14px_28px_rgba(79,70,229,0.30)]"
-        style={{ bottom: "calc(76px + env(safe-area-inset-bottom, 0px))" }}
-      >
-        <Sparkles size={20} fill="white" />
-        <span className="mt-0.5 text-[10px] font-black">Lina</span>
-      </button>
     </main>
   );
 }
@@ -902,18 +1151,20 @@ function ForumActionModal({
   busy,
   onClose,
   onConfirm,
+  onContact,
 }: {
   action: ForumActionType;
   post: NetworkPost;
   busy: boolean;
   onClose: () => void;
   onConfirm: () => void;
+  onContact: (channel: "CALL" | "WHATSAPP") => void;
 }) {
   const config = {
     MESSAGE: {
-      title: "Forum Mesajı",
+      title: "Talebe Yanıt Ver",
       cost: 3,
-      confirmText: "3 Kontör Harca ve Mesaj Gönder",
+      confirmText: "3 Kontör Harca ve Yanıt Ver",
     },
     INTEREST: {
       title: "İlgileniyorum Bildirimi",
@@ -926,13 +1177,16 @@ function ForumActionModal({
       confirmText: "10 Kontör Harca ve Bildir",
     },
   }[action];
+  const phoneAllowed = Boolean(post.phoneCallAllowed);
+  const whatsappAllowed = Boolean(post.whatsappAllowed);
+  const noExternalPermission = !phoneAllowed && !whatsappAllowed;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-3 py-4">
       <section className="w-[min(94vw,430px)] overflow-hidden rounded-[24px] border-2 border-[#C7D6E8] bg-white shadow-[0_24px_60px_rgba(15,23,42,0.25)]">
         <div className="relative px-14 pb-3 pt-4 text-center">
           <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#2563EB]">
-            Forum Kontör İşlemi
+            Talep Merkezi Kontör İşlemi
           </p>
 
           <h2 className="mt-1 text-[19px] font-black leading-tight text-[#1F2937]">
@@ -967,11 +1221,43 @@ function ForumActionModal({
             </p>
 
             <p className="mt-1 text-[12px] font-bold leading-5 text-[#6F4E2B]">
-              Bu işlem {config.cost} kontör harcar. Onaydan sonra paylaşım
-              sahibine bildirim gönderilir ve işlem cüzdan hareketlerine
-              kaydedilir.
+              {action === "MESSAGE"
+                ? "EPH üzerinden yanıt 3 kontör; izin verilen telefon veya WhatsApp kanalı 10 kontördür. Her kanal ayrı açılır."
+                : `Bu işlem ${config.cost} kontör harcar. Onaydan sonra paylaşım sahibine bildirim gönderilir ve işlem cüzdan hareketlerine kaydedilir.`}
             </p>
           </div>
+
+          {action === "MESSAGE" && (
+            <>
+              {noExternalPermission && (
+                <p className="mt-2 rounded-[16px] border border-slate-200 bg-slate-50 px-3 py-2.5 text-center text-[10.5px] font-bold leading-4 text-[#64748B]">
+                  Talep sahibi telefonla arama veya WhatsApp üzerinden iletişim izni vermemiştir.
+                </p>
+              )}
+
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => onContact("CALL")}
+                  disabled={busy || !phoneAllowed}
+                  className="flex min-h-12 items-center justify-center gap-2 rounded-[16px] border-2 border-[#2563EB] bg-[#EFF6FF] px-2 text-[11px] font-black text-[#1D4ED8] disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+                >
+                  <Phone size={16} />
+                  Ara 10K
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onContact("WHATSAPP")}
+                  disabled={busy || !whatsappAllowed}
+                  className="flex min-h-12 items-center justify-center gap-2 rounded-[16px] border-2 border-emerald-500 bg-emerald-50 px-2 text-[11px] font-black text-emerald-700 disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+                >
+                  <MessageSquareText size={16} />
+                  WhatsApp 10K
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-2 border-t border-[#D7E3F2] p-3 pb-[max(12px,env(safe-area-inset-bottom))]">
