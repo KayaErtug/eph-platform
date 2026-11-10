@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { BadRequestException } from '@nestjs/common';
 
 // Ticari değerler veridir, kod değildir (EPH_KURALLARI §0-B): kaynak SystemSetting.
 // Buradaki değerler yalnızca ayar yoksa kullanılan yedek değerlerdir.
@@ -9,6 +10,7 @@ export const COST_DEFAULTS = {
   COST_TALEP_YAYIN: 25,
   COST_TALEP_ACIL_EK: 10,
   COST_YETKI_MEKTUBU_ASIM: 5,
+  COST_SISTER_TALEP_ASIM: 10,
 } as const;
 
 export type CostKey = keyof typeof COST_DEFAULTS;
@@ -32,6 +34,7 @@ export const LIMIT_DEFAULTS = {
   LIMIT_ALICI_ADMIN_HEDIYE_ADET: 2,
   LIMIT_ALICI_ADMIN_HEDIYE_TOPLAM_PK: 1000,
   LIMIT_TAKIM_DANISMAN: 10,
+  LIMIT_OFFICE_SISTER_TALEP_QUOTA: 15,
 } as const;
 
 // Dizi değerli LIMIT_* ayarları ({ value: number[] }); tek sayı olmadıkları için LIMIT_DEFAULTS'a girmez.
@@ -48,6 +51,7 @@ export const LIMIT_DESCRIPTIONS: Record<string, string> = {
   LIMIT_ALICI_ADMIN_HEDIYE_ADET: 'Bir kullanıcının ADMIN hesaplarından alabileceği en fazla hediye PK işlemi sayısı.',
   LIMIT_ALICI_ADMIN_HEDIYE_TOPLAM_PK: 'Bir kullanıcının ADMIN hesaplarından alabileceği toplam hediye PK.',
   LIMIT_TAKIM_DANISMAN: 'Bir takımdaki en fazla aktif danışman sayısı.',
+  LIMIT_OFFICE_SISTER_TALEP_QUOTA: 'Kardeş ofisler ağı için aylık ücretsiz talep yayınlama kotası (varsayılan 15).',
   LIMIT_PK_DUSUK_UYARI: 'PK bakiyesi bu eşiğin altına düştüğünde bildirim gönderilir. Değer veritabanından yönetilir.',
 };
 
@@ -73,19 +77,21 @@ export function parseCostValue(raw: unknown): number | null {
 }
 
 // Sıra: COST_* ayarı, varsa eski anahtarlar, yoksa yedek değer.
-export async function readCost(db: CostDb, key: CostKey, legacyKeys: string[] = []): Promise<number> {
+export async function readCost(db: CostDb, key: CostKey, legacyKeys: string[] = [], required = false): Promise<number> {
   for (const candidate of [key, ...legacyKeys]) {
     const row = await db.systemSetting.findUnique({ where: { key: candidate }, select: { valueJson: true } });
     const value = row ? parseCostValue(row.valueJson) : null;
     if (value !== null) return value;
   }
+  if (required) throw new BadRequestException(`Ticari ayar eksik veya geçersiz: ${key}`);
   return COST_DEFAULTS[key];
 }
 
 // Sıra: LIMIT_* ayarı, yoksa yedek değer.
-export async function readLimit(db: CostDb, key: LimitKey): Promise<number> {
+export async function readLimit(db: CostDb, key: LimitKey, required = false): Promise<number> {
   const row = await db.systemSetting.findUnique({ where: { key }, select: { valueJson: true } });
   const value = row ? parseCostValue(row.valueJson) : null;
+  if (value === null && required) throw new BadRequestException(`Ticari ayar eksik veya geçersiz: ${key}`);
   return value !== null ? value : LIMIT_DEFAULTS[key];
 }
 

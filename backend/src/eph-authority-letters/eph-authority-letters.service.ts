@@ -1,4 +1,5 @@
 import { resolveOfficeWallet } from '../office/office-wallet.rules';
+import { consumeLots, lockWallet } from '../kontor/wallet-lots';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -20,6 +21,7 @@ import * as QRCode from 'qrcode';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { readCost, readLimit } from '../pricing/commercial-costs';
+import { entitlementSource, resolveOfficeEntitlements } from '../office/office-entitlement.service';
 
 type CurrentUserPayload = {
   userId: string;
@@ -39,6 +41,7 @@ type CreateInput = CurrentUserPayload & {
 };
 
 type AuthorityLetterQuotaResult = {
+  quotaUserId?: string;
   limit: number;
   usedBefore: number;
   usedAfter: number;
@@ -142,7 +145,7 @@ export class EphAuthorityLettersService {
       await tx.kotaKullanimi.update({
         where: {
           kullaniciId_kotaKodu_donem_donemBaslangic: {
-            kullaniciId: input.userId,
+            kullaniciId: quotaResult.quotaUserId ?? input.userId,
             kotaKodu: AUTHORITY_LETTER_MONTHLY_QUOTA_CODE,
             donem: KotaDonemi.AYLIK,
             donemBaslangic: this.getMonthRange().start,
@@ -618,7 +621,37 @@ export class EphAuthorityLettersService {
     };
   }
 
+  // ODM-8H: eski kişisel paket yerine ofis hakkı; tüm üyeler sahip kotasını paylaşır.
+  private async relationalAuthorityQuota(tx: any, userId: string, lock = false) {
+    if (await entitlementSource(tx) !== 'relational') return null;
+    const holder = await tx.user.findUnique({ where: { id: userId }, select: { officeId: true, role: true } });
+    const office = holder?.officeId
+      ? await tx.office.findUnique({ where: { id: holder.officeId } })
+      : await tx.office.findFirst({ where: { ownerUserId: userId, isActive: true } });
+    if (!office) {
+      if (holder?.role === 'EMLAKCI' || holder?.role === 'OFIS_BOY') throw new BadRequestException('Yetki belgesi için aktif ofis bağlantısı gerekli.');
+      return null;
+    }
+    if (!office.isActive || !office.ownerUserId) throw new BadRequestException('Aktif ofis sahibi doğrulanamadı.');
+    const quotaUserId = office.ownerUserId;
+    if (lock) await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`authority-quota:${quotaUserId}`}))`;
+    const eff = await resolveOfficeEntitlements(tx, office.id);
+    const monthRange = this.getMonthRange();
+    const limit = eff.portfolio * await readLimit(tx, 'LIMIT_YETKI_MEKTUBU_CARPAN', true);
+    const quota = await tx.kotaKullanimi.upsert({
+      where: { kullaniciId_kotaKodu_donem_donemBaslangic: { kullaniciId: quotaUserId, kotaKodu: AUTHORITY_LETTER_MONTHLY_QUOTA_CODE, donem: KotaDonemi.AYLIK, donemBaslangic: monthRange.start } },
+      update: { limit, donemBitis: monthRange.end },
+      create: { kullaniciId: quotaUserId, kotaKodu: AUTHORITY_LETTER_MONTHLY_QUOTA_CODE, donem: KotaDonemi.AYLIK, donemBaslangic: monthRange.start, donemBitis: monthRange.end, limit, kullanilan: 0 },
+    });
+    return { success: true, quotaUserId, quotaCode: AUTHORITY_LETTER_MONTHLY_QUOTA_CODE, period: 'AYLIK', limit,
+      used: quota.kullanilan, remaining: Math.max(0, limit - quota.kullanilan), isOverLimit: quota.kullanilan >= limit,
+      overLimitCost: await readCost(tx, 'COST_YETKI_MEKTUBU_ASIM', [], true),
+      package: { code: eff.packageCode ?? 'UCRETSIZ', name: eff.packageName, activePortfolioLimit: eff.portfolio }, periodStart: monthRange.start, periodEnd: monthRange.end };
+  }
+
   private async getAuthorityLetterQuotaSnapshot(input: { tx: any; userId: string }) {
+    const relational = await this.relationalAuthorityQuota(input.tx, input.userId);
+    if (relational) return relational;
     const activePackageRelation = await input.tx.kullaniciUyelikPaketi.findFirst({
       where: {
         kullaniciId: input.userId,
@@ -749,7 +782,7 @@ export class EphAuthorityLettersService {
       package: {
         code: 'EPH_DEFAULT',
         name: 'Varsayılan Paket',
-        activePortfolioLimit: 10,
+        activePortfolioLimit: null,
       },
       periodStart: monthRange.start,
       periodEnd: monthRange.end,
@@ -804,6 +837,9 @@ export class EphAuthorityLettersService {
     userId: string;
     unitId: string;
   }): Promise<AuthorityLetterQuotaResult> {
+    const relational = await this.relationalAuthorityQuota(input.tx, input.userId, true);
+    if (relational) return { quotaUserId: relational.quotaUserId, limit: relational.limit, usedBefore: relational.used, usedAfter: relational.used,
+      isFree: !relational.isOverLimit, chargedKontor: relational.isOverLimit ? relational.overLimitCost : 0 };
     const activePackageRelation = await input.tx.kullaniciUyelikPaketi.findFirst({
       where: {
         kullaniciId: input.userId,
@@ -885,13 +921,7 @@ export class EphAuthorityLettersService {
     ilgiliKayitId: string;
   }) {
     const chargeUserId = (await resolveOfficeWallet(input.tx, input.userId, {}, true)).chargeUserId;
-    await input.tx.$executeRaw`
-        SELECT pg_advisory_xact_lock(
-          hashtext(${`wallet:${chargeUserId}`})
-        )
-      `;
-
-    await input.tx.$queryRaw`SELECT "id" FROM "KontorCuzdani" WHERE "kullaniciId" = ${chargeUserId} FOR UPDATE`;
+    await lockWallet(input.tx, chargeUserId); // EPH-70B1F: ortak kilit sırası + atomik dönem sonu kapanışı
 
       let wallet = await input.tx.kontorCuzdani.findUnique({
       where: {
@@ -952,6 +982,7 @@ export class EphAuthorityLettersService {
         olusturanId: input.userId,
       },
     });
+    await consumeLots(input.tx, chargeUserId, input.amount, { hareketId: movement.id }); // EPH-70B1F/D1
 
     return {
       wallet: updatedWallet,

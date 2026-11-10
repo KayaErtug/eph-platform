@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { KotaDonemi, Prisma, Role } from '@prisma/client';
 import { resolvePoolAccess } from './pool-access';
+import { entitlementSource, resolveOfficeEntitlements } from '../office/office-entitlement.service';
 
 export async function consumeMembershipQuota(tx: Prisma.TransactionClient, actorId: string, kind: 'TALEP' | 'HAVUZ') {
   const actor = await tx.user.findUnique({ where: { id: actorId }, select: { role: true, officeId: true } });
@@ -11,6 +12,21 @@ export async function consumeMembershipQuota(tx: Prisma.TransactionClient, actor
     : actor.officeId
     ? await tx.office.findUnique({ where: { id: actor.officeId }, select: { id: true, ownerUserId: true } })
     : await tx.office.findFirst({ where: { ownerUserId: actorId, isActive: true }, select: { id: true, ownerUserId: true } });
+  // ODM-8H: kişisel eski üyelik ofis sınırlarını atlayamaz. Kilit ve sayaç yayın transaction'ında tutulur.
+  if (office && await entitlementSource(tx) === 'relational') {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`office-active-quota:${office.id}`}))`;
+    const eff = await resolveOfficeEntitlements(tx, office.id);
+    const activeMax = kind === 'TALEP' ? eff.talepMax : eff.havuzIlanMax;
+    if (activeMax !== null) {
+      const users = await tx.user.findMany({ where: { OR: [{ officeId: office.id }, { id: office.ownerUserId ?? actorId }] }, select: { id: true } });
+      const ids = users.map(u => u.id);
+      const used = kind === 'TALEP'
+        ? await tx.networkPost.count({ where: { userId: { in: ids }, isActive: true, expiresAt: { gt: new Date() } } })
+        : await tx.unit.count({ where: { project: { ownerId: { in: ids } }, isPoolVisible: true, approvalStatus: 'HAVUZDA' } });
+      if (used >= activeMax) throw new BadRequestException(`Ofisinizin aktif ${kind === 'TALEP' ? 'talep' : 'havuz ilanı'} sınırı (${activeMax}) doldu.`);
+    }
+    return; // Ücretli/Deneme aylık yayın sınırı yok; Ücretsiz aktif kayıt sayar (karar 20).
+  }
   const userId = office?.ownerUserId || actorId;
   const now = new Date();
   const membership = access.code === 'OFFICE_PACKAGE' ? null : await tx.kullaniciUyelikPaketi.findFirst({

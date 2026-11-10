@@ -1,4 +1,7 @@
 import { resolvePoolAccess, type PoolMembershipAccess } from '../membership/pool-access';
+import { consumeMembershipQuota } from '../membership/membership-quota.rules';
+import { entitlementSource } from '../office/office-entitlement.service';
+import { consumeLots, lockWallet } from '../kontor/wallet-lots';
 import { actorPaidWhere, resolveOfficeWallet } from '../office/office-wallet.rules';
 import { officeProfile, officeProfileKey } from '../office/office-profile';
 import { TextSafetyService } from '../text-safety/text-safety.service';
@@ -71,6 +74,12 @@ type CreateUnitPayload = {
   allowWhatsapp?: boolean;
   whatsappPhone?: string | null;
   features?: string[];
+  ownerType?: string;
+  assignedAdvisorId?: string;
+  salesRepresentativeId?: string;
+  visibilityScope?: string;
+  hiddenFromOffice?: boolean;
+  sharedWithSisters?: boolean;
 };
 
 type PoolActionPayload = {
@@ -82,6 +91,7 @@ type PoolActionPayload = {
 };
 
 const unitInclude = {
+  salesRepresentative: { select: { id: true, firstName: true, lastName: true, phone: true, role: true } },
   project: {
     select: {
       id: true,
@@ -124,6 +134,8 @@ const unitInclude = {
 const PORTFOLIO_METADATA_PREFIX = '__EPH_META__:';
 
 const PORTFOLIO_METADATA_KEYS = new Set([
+  'ownerType',
+  'visibilityScope',
   'buildingAge',
   'openArea',
   'closedArea',
@@ -816,12 +828,8 @@ export class UnitsService {
     userId: string,
   ) {
     userId = (await resolveOfficeWallet(tx, userId, {}, true)).chargeUserId;
-    await tx.$executeRaw`
-      SELECT pg_advisory_xact_lock(
-        hashtext(${`wallet:${userId}`})
-      )
-    `;
-    await tx.$queryRaw`SELECT "id" FROM "KontorCuzdani" WHERE "kullaniciId" = ${userId} FOR UPDATE`;
+    // EPH-70B1F: ortak kilit sırası + atomik dönem sonu kapanışı (kilit altında).
+    await lockWallet(tx, userId);
   }
 
   private async spendKontor(
@@ -905,6 +913,8 @@ export class UnitsService {
         olusturanId: actorId,
       },
     });
+    // EPH-70B1F/D1: doğrudan harcama da lot tüketir (+ tahsis kaydı).
+    await consumeLots(tx, chargeUserId, input.amount, { hareketId: movement.id });
 
     return {
       wallet: updatedWallet,
@@ -1931,6 +1941,22 @@ export class UnitsService {
         deedOwnerEmail: this.cleanText(data.deedOwnerEmail),
         availableCreditAmount: this.normalizeOptionalNumber(data.availableCreditAmount),
         doorAccessInfo: this.cleanText(data.doorAccessInfo),
+        salesRepresentativeId:
+          'salesRepresentativeId' in data || 'assignedAdvisorId' in data
+            ? (data as any).salesRepresentativeId || (data as any).assignedAdvisorId || null
+            : undefined,
+        hiddenFromOffice:
+          'visibilityScope' in data
+            ? (data as any).visibilityScope === 'ONLY_ME'
+            : 'hiddenFromOffice' in data
+              ? Boolean((data as any).hiddenFromOffice)
+              : undefined,
+        sharedWithSisters:
+          'visibilityScope' in data
+            ? (data as any).visibilityScope === 'SISTER_OFFICES'
+            : 'sharedWithSisters' in data
+              ? Boolean((data as any).sharedWithSisters)
+              : undefined,
         ...contactSettings,
         features: normalizedFeatures,
         projectId,
@@ -2101,21 +2127,41 @@ export class UnitsService {
       city?: string;
       isOffMarket?: boolean;
       ownerOnly?: boolean;
+      officeId?: string;
+      advisorId?: string;
     },
   ) {
+    const isSuper = this.isSuperAdmin(user);
     const units = await this.prisma.unit.findMany({
       where: {
-        ...this.getPrivateUnitWhere(user),
+        ...(isSuper ? {} : this.getPrivateUnitWhere(user)),
         status: filters?.status,
         type: filters?.type,
         isOffMarket: filters?.isOffMarket,
+        ...(filters?.advisorId
+          ? {
+              OR: [
+                { salesRepresentativeId: filters.advisorId },
+                { project: { ownerId: filters.advisorId } },
+              ],
+            }
+          : {}),
         project: {
-          ...(filters?.ownerOnly
-            ? { ownerId: user.id }
-            : this.isSuperAdmin(user) || this.isAdmin(user) || this.isModerator(user)
-              ? {}
-              : { ownerId: user.id }),
-          ...this.getPortfolioVisibleProjectWhere(),
+          ...(filters?.advisorId
+            ? {}
+            : filters?.ownerOnly
+              ? { ownerId: user.id }
+              : isSuper
+                ? {}
+                : { ownerId: user.id }),
+          ...(filters?.officeId
+            ? {
+                owner: {
+                  officeId: filters.officeId,
+                },
+              }
+            : {}),
+          ...this.getClassicPortfolioProjectWhere(),
           isActive: true,
           city: filters?.city
             ? { contains: filters.city, mode: 'insensitive' }
@@ -2791,6 +2837,7 @@ export class UnitsService {
       'Portföy yönetici tarafından incelendi, onaylandı ve havuzda yayınlandı.';
 
     return this.prisma.$transaction(async (tx) => {
+      if (!this.isSuperAdmin(user) && await entitlementSource(tx) === 'relational') await consumeMembershipQuota(tx, unit.project.ownerId, 'HAVUZ');
       const updatedUnit = await tx.unit.update({
         where: { id },
         data: {
@@ -2886,6 +2933,7 @@ export class UnitsService {
         }
       }
 
+      if (!this.isSuperAdmin(user) && await entitlementSource(tx) === 'relational') await consumeMembershipQuota(tx, unit.project.ownerId, 'HAVUZ');
       const updatedUnit = await tx.unit.update({
         where: { id },
         data: {
@@ -2917,9 +2965,9 @@ export class UnitsService {
   async removeFromPool(id: string, user: CurrentUserPayload) {
     const unit = await this.getUnitWithProjectOrFail(id);
 
-    if (!this.isOwner(user, unit.project.ownerId)) {
+    if (!this.isSuperAdmin(user) && !this.isOwner(user, unit.project.ownerId)) {
       throw new ForbiddenException(
-        'Bu ilanı yalnızca portföy sahibi geri çekebilir.',
+        'Bu ilanı yalnızca portföy sahibi veya Süper Admin geri çekebilir.',
       );
     }
 
@@ -2989,6 +3037,18 @@ export class UnitsService {
       contactPhone,
       allowWhatsapp,
       whatsappPhone,
+      ownerType,
+      assignedAdvisorId,
+      visibilityScope,
+      salesRepresentativeId: incomingSalesRepresentativeId,
+      hiddenFromOffice: incomingHiddenFromOffice,
+      sharedWithSisters: incomingSharedWithSisters,
+      features: incomingFeatures,
+      adaNo: incomingAdaNo,
+      parselNo: incomingParselNo,
+      deedOwnerFullName: incomingDeedOwnerFullName,
+      deedOwnerPhone: incomingDeedOwnerPhone,
+      deedOwnerEmail: incomingDeedOwnerEmail,
       ...safeData
     } = data;
     const nextType = 'type' in data ? data.type : unit.type;
@@ -3050,6 +3110,22 @@ export class UnitsService {
           'doorAccessInfo' in data
             ? this.cleanText(doorAccessInfo)
             : undefined,
+        salesRepresentativeId:
+          'salesRepresentativeId' in data || 'assignedAdvisorId' in data
+            ? (data as any).salesRepresentativeId || (data as any).assignedAdvisorId || null
+            : undefined,
+        hiddenFromOffice:
+          'visibilityScope' in data
+            ? (data as any).visibilityScope === 'ONLY_ME'
+            : 'hiddenFromOffice' in data
+              ? Boolean((data as any).hiddenFromOffice)
+              : undefined,
+        sharedWithSisters:
+          'visibilityScope' in data
+            ? (data as any).visibilityScope === 'SISTER_OFFICES'
+            : 'sharedWithSisters' in data
+              ? Boolean((data as any).sharedWithSisters)
+              : undefined,
         ...contactSettings,
         features:
           'features' in data
@@ -3059,12 +3135,16 @@ export class UnitsService {
       include: unitInclude,
     });
 
-    await this.syncDeedOwnerToCrm({
-      ownerId: unit.project.ownerId,
-      unitId: updatedUnit.id,
-      project: unit.project,
-      unit: updatedUnit,
-    });
+    try {
+      await this.syncDeedOwnerToCrm({
+        ownerId: unit.project.ownerId,
+        unitId: updatedUnit.id,
+        project: unit.project,
+        unit: updatedUnit,
+      });
+    } catch (crmErr) {
+      // CRM senkronizasyonu portföy güncellemesini engellememeli
+    }
 
     return updatedUnit;
   }
